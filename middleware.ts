@@ -1,21 +1,27 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSupabasePublicConfig } from "@/lib/env";
+
+const protectedRoutes = ["/upload", "/review", "/questions", "/reports"];
+
+function isProtectedPath(pathname: string) {
+  return protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request,
   });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const config = getSupabasePublicConfig();
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!config) {
     return response;
   }
 
   const supabase = createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
+    config.url,
+    config.anonKey,
     {
       cookies: {
         getAll() {
@@ -32,7 +38,17 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user && isProtectedPath(request.nextUrl.pathname)) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
   return response;
 }
 
