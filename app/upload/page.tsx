@@ -52,7 +52,7 @@ export default function UploadPage() {
   const [savedQuestionId, setSavedQuestionId] = useState("");
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const canSave = useMemo(
     () => Boolean(supabase) && selectedFile !== null && userNote.trim().length > 0 && !isSaving,
