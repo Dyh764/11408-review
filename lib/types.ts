@@ -1,0 +1,44 @@
+export type Subject = "数学" | "数据结构" | "计算机组成原理" | "操作系统" | "计算机网络";
+
+export type MasteryStatus =
+  | "完全没思路"
+  | "有一点思路"
+  | "思路对但卡住"
+  | "计算错误"
+  | "做对但不稳"
+  | "完全掌握";
+
+export type ReviewResult = "still_wrong" | "improved" | "mastered" | "wrong_again";
+
+export type QuestionTextStatus = "ai_unverified" | "verified" | "needs_fix";
+
+export type ReviewPriority = "low" | "medium" | "high";
+
+export type Confidence = "low" | "medium" | "high";
+
+export type MockAnalysis = {
+  question_text: string;
+  question_text_status: QuestionTextStatus;
+  subject: Subject;
+  chapter: string;
+  knowledge_point: string;
+  mistake_types: string[];
+  solution_summary: string;
+  one_sentence_tip: string;
+  review_priority: ReviewPriority;
+  confidence: Confidence;
+  needs_manual_check: boolean;
+};
+
+export type QuestionCard = {
+  id: string;
+  subject: Subject;
+  chapter: string;
+  knowledgePoint: string;
+  masteryStatus: MasteryStatus;
+  userNote: string;
+  mistakeTypes: string[];
+  oneSentenceTip: string;
+  weaknessScore: number;
+  nextReviewDate: string;
+};
