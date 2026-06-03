@@ -7,6 +7,7 @@ import { StatusPill } from "@/components/status-pill";
 import { supabaseBucket } from "@/lib/env";
 import { createMockAnalysis } from "@/lib/mock-ai";
 import { ensureProfile } from "@/lib/profile";
+import { buildInitialReviewPlan } from "@/lib/review-scheduler";
 import { createClient } from "@/lib/supabase/client";
 import type { MasteryStatus, MockAnalysis, Subject } from "@/lib/types";
 
@@ -168,9 +169,28 @@ export default function UploadPage() {
         return;
       }
 
+      const reviewPlan = buildInitialReviewPlan({
+        userId: user.id,
+        questionId,
+        masteryStatus,
+      });
+
+      if (reviewPlan.length > 0) {
+        const { error: reviewError } = await supabase
+          .from("reviews")
+          .upsert(reviewPlan, { onConflict: "question_id,scheduled_date" });
+
+        if (reviewError) {
+          setAnalysis(mock);
+          setSavedQuestionId(questionId);
+          setMessage(`错题已保存，但复习计划生成失败：${reviewError.message}`);
+          return;
+        }
+      }
+
       setAnalysis(mock);
       setSavedQuestionId(questionId);
-      setMessage("保存成功：图片已上传，错题记录已写入 questions。");
+      setMessage("保存成功：图片、错题记录和复习计划已写入。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败，请稍后重试。");
     } finally {
