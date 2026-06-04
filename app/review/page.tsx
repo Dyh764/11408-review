@@ -24,6 +24,7 @@ function isOverdue(scheduledDate: string) {
 export default function ReviewPage() {
   const [reviews, setReviews] = useState<DueReview[]>([]);
   const [completed, setCompleted] = useState<Record<string, ReviewResult>>({});
+  const [processingReviewId, setProcessingReviewId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实今日复习。",
@@ -65,6 +66,11 @@ export default function ReviewPage() {
       return;
     }
 
+    if (processingReviewId) {
+      return;
+    }
+
+    setProcessingReviewId(review.id);
     const completedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("reviews")
@@ -72,9 +78,11 @@ export default function ReviewPage() {
         completed_at: completedAt,
         review_result: result,
       })
-      .eq("id", review.id);
+      .eq("id", review.id)
+      .is("completed_at", null);
 
     if (updateError) {
+      setProcessingReviewId("");
       setMessage(`复习记录写入失败：${updateError.message}`);
       return;
     }
@@ -85,6 +93,7 @@ export default function ReviewPage() {
       .eq("question_id", review.question_id);
 
     if (existingError) {
+      setProcessingReviewId("");
       setMessage(`已完成当前复习，但读取后续计划失败：${existingError.message}`);
       return;
     }
@@ -98,6 +107,7 @@ export default function ReviewPage() {
         .gt("scheduled_date", todayIsoDate());
 
       if (cancelError) {
+        setProcessingReviewId("");
         setMessage(`已完成当前复习，但取消后续高频任务失败：${cancelError.message}`);
         return;
       }
@@ -116,6 +126,7 @@ export default function ReviewPage() {
         .upsert(adjustmentRows, { onConflict: "question_id,scheduled_date" });
 
       if (planError) {
+        setProcessingReviewId("");
         setMessage(`已完成当前复习，但后续计划调整失败：${planError.message}`);
         return;
       }
@@ -141,13 +152,18 @@ export default function ReviewPage() {
           ? `已完成复习，但薄弱点统计更新失败：${error.message}`
           : "已完成复习，但薄弱点统计更新失败。",
       );
+      setProcessingReviewId("");
       return;
     }
 
     setCompleted((current) => ({ ...current, [review.id]: result }));
     setReviews((current) => current.filter((item) => item.id !== review.id));
+    setProcessingReviewId("");
     setMessage("复习结果已写入，并已按规则调整后续复习计划。");
   }
+
+  const overdueCount = reviews.filter((review) => isOverdue(review.scheduled_date)).length;
+  const todayCount = reviews.length - overdueCount;
 
   return (
     <div>
@@ -157,14 +173,19 @@ export default function ReviewPage() {
       />
 
       <section className="px-5 pt-5">
-        <div className="rounded-lg bg-blue-600 p-4 text-white">
-          <p className="text-sm text-blue-100">待复习任务</p>
-          <p className="mt-1 text-3xl font-bold">
-            {Math.max(reviews.length - Object.keys(completed).length, 0)}
-          </p>
-          <p className="mt-2 text-xs text-blue-100">
-            still_wrong / wrong_again 会重新安排后续复习。
-          </p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-blue-600 p-4 text-white">
+            <p className="text-sm text-blue-100">待复习</p>
+            <p className="mt-1 text-3xl font-bold">{reviews.length}</p>
+          </div>
+          <div className="rounded-lg bg-red-50 p-4 text-red-700 ring-1 ring-red-100">
+            <p className="text-sm">逾期</p>
+            <p className="mt-1 text-3xl font-bold">{overdueCount}</p>
+          </div>
+          <div className="rounded-lg bg-white p-4 text-slate-700 ring-1 ring-slate-100">
+            <p className="text-sm">今日</p>
+            <p className="mt-1 text-3xl font-bold text-slate-950">{todayCount}</p>
+          </div>
         </div>
       </section>
 
@@ -181,8 +202,14 @@ export default function ReviewPage() {
       ) : null}
 
       <section className="space-y-4 px-5 pt-5">
+        {!isLoading && reviews.length === 0 ? (
+          <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
+            今天的复习任务已经清空。可以去错题库挑一题做主动复盘，或者休息一下。
+          </div>
+        ) : null}
         {reviews.map((review) => {
           const result = completed[review.id];
+          const isProcessing = processingReviewId === review.id;
 
           return (
             <article
@@ -213,17 +240,18 @@ export default function ReviewPage() {
                       tone={isOverdue(review.scheduled_date) ? "red" : "amber"}
                     />
                   </div>
-                  <h2 className="mt-2 font-semibold text-slate-950">
+                  <h2 className="mt-2 break-words font-semibold text-slate-950">
                     {review.questions.knowledge_point ?? "待识别知识点"}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 break-words text-sm leading-6 text-slate-600">
                     {review.questions.one_sentence_tip ?? "暂无一句话提醒"}
                   </p>
                 </div>
               </div>
 
-              <p className="mt-3 text-sm text-slate-500">
-                计划日期：{review.scheduled_date}；错因：
+              <p className="mt-3 break-words text-sm leading-6 text-slate-500">
+                计划日期：{review.scheduled_date}；章节：
+                {review.questions.chapter ?? "待识别"}；上次错因：
                 {review.questions.mistake_types?.join("、") || "待分析"}
               </p>
 
@@ -233,13 +261,14 @@ export default function ReviewPage() {
                     key={key}
                     type="button"
                     onClick={() => handleReview(review, key)}
+                    disabled={isProcessing || Boolean(processingReviewId)}
                     className={`min-h-12 rounded-lg px-3 text-sm font-semibold ${
                       result === key
                         ? "bg-blue-600 text-white"
                         : "bg-slate-100 text-slate-700"
-                    }`}
+                    } disabled:bg-slate-200 disabled:text-slate-400`}
                   >
-                    {resultLabels[key]}
+                    {isProcessing ? "写入中..." : resultLabels[key]}
                   </button>
                 ))}
               </div>

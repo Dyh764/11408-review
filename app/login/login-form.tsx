@@ -10,7 +10,9 @@ type AuthMode = "login" | "signup";
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/";
+  const rawNextPath = searchParams.get("next") || "/";
+  const nextPath =
+    rawNextPath.startsWith("/") && !rawNextPath.startsWith("//") ? rawNextPath : "/";
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

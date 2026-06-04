@@ -5,6 +5,12 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { supabaseBucket } from "@/lib/env";
+import {
+  compressImage,
+  formatFileSize,
+  getImageExtension,
+  isSupportedImageType,
+} from "@/lib/image/compress-image";
 import { createMockAnalysis } from "@/lib/mock-ai";
 import { ensureProfile } from "@/lib/profile";
 import { buildInitialReviewPlan } from "@/lib/review-scheduler";
@@ -22,26 +28,7 @@ const masteryStatuses: MasteryStatus[] = [
   "完全掌握",
 ];
 
-const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxFileSize = 8 * 1024 * 1024;
-
-function extensionFromFile(file: File) {
-  const fromName = file.name.split(".").pop()?.toLowerCase();
-
-  if (fromName && ["jpg", "jpeg", "png", "webp"].includes(fromName)) {
-    return fromName === "jpeg" ? "jpg" : fromName;
-  }
-
-  if (file.type === "image/png") {
-    return "png";
-  }
-
-  if (file.type === "image/webp") {
-    return "webp";
-  }
-
-  return "jpg";
-}
 
 export default function UploadPage() {
   const [subject, setSubject] = useState<Subject>("数据结构");
@@ -49,6 +36,10 @@ export default function UploadPage() {
   const [userNote, setUserNote] = useState("递归边界没想清楚");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [originalFileSize, setOriginalFileSize] = useState(0);
+  const [compressionMessage, setCompressionMessage] = useState("");
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [analysis, setAnalysis] = useState<MockAnalysis | null>(null);
   const [savedQuestionId, setSavedQuestionId] = useState("");
   const [message, setMessage] = useState("");
@@ -60,7 +51,7 @@ export default function UploadPage() {
     [isSaving, selectedFile, supabase, userNote],
   );
 
-  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -69,8 +60,10 @@ export default function UploadPage() {
     setMessage("");
     setSavedQuestionId("");
     setAnalysis(null);
+    setCompressionMessage("");
+    setOriginalFileSize(file.size);
 
-    if (!allowedTypes.includes(file.type)) {
+    if (!isSupportedImageType(file.type)) {
       setSelectedFile(null);
       setImagePreview("");
       setMessage("仅支持 jpg、jpeg、png、webp 图片。");
@@ -84,12 +77,27 @@ export default function UploadPage() {
       return;
     }
 
-    setSelectedFile(file);
+    setIsCompressing(true);
+    setCompressionMessage("正在压缩图片，优先保留题目和公式清晰度...");
+
+    const result = await compressImage(file, {
+      maxWidth: 1800,
+      targetBytes: 2 * 1024 * 1024,
+      minQuality: 0.74,
+    });
+
+    setSelectedFile(result.file);
+    setCompressionMessage(result.message);
     const reader = new FileReader();
     reader.onload = () => {
       setImagePreview(String(reader.result));
+      setIsCompressing(false);
     };
-    reader.readAsDataURL(file);
+    reader.onerror = () => {
+      setIsCompressing(false);
+      setMessage("图片预览生成失败，请重新选择图片。");
+    };
+    reader.readAsDataURL(result.file);
   }
 
   async function handleSave() {
@@ -122,7 +130,7 @@ export default function UploadPage() {
       await ensureProfile(supabase, user);
 
       const questionId = crypto.randomUUID();
-      const ext = extensionFromFile(selectedFile);
+      const ext = getImageExtension(selectedFile);
       const imagePath = `users/${user.id}/questions/${questionId}.${ext}`;
       const mock = createMockAnalysis({
         subject,
@@ -225,9 +233,10 @@ export default function UploadPage() {
           />
           {imagePreview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
+                <img
               src={imagePreview}
               alt="题目图片预览"
+              decoding="async"
               className="mx-auto max-h-72 w-full rounded-lg object-contain"
             />
           ) : (
@@ -237,6 +246,15 @@ export default function UploadPage() {
             </div>
           )}
         </label>
+        {imagePreview ? (
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            className="mt-3 min-h-11 w-full rounded-lg bg-white px-4 text-sm font-semibold text-blue-700 ring-1 ring-blue-100"
+          >
+            放大查看题图
+          </button>
+        ) : null}
       </section>
 
       <section className="space-y-4 px-5 pt-5">
@@ -285,11 +303,19 @@ export default function UploadPage() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || isCompressing}
           className="min-h-14 w-full rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-sm disabled:bg-slate-300"
         >
           {isSaving ? "保存中..." : "上传并保存错题"}
         </button>
+
+        {selectedFile ? (
+          <div className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
+            <p>原图大小：{formatFileSize(originalFileSize)}</p>
+            <p>上传大小：{formatFileSize(selectedFile.size)}</p>
+            <p>{isCompressing ? "压缩中..." : compressionMessage}</p>
+          </div>
+        ) : null}
 
         {message ? (
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
@@ -338,6 +364,26 @@ export default function UploadPage() {
             </dl>
           </div>
         </section>
+      ) : null}
+
+      {isPreviewOpen && imagePreview ? (
+        <div className="fixed inset-0 z-40 bg-slate-950/90 p-4">
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(false)}
+            className="mb-3 min-h-11 rounded-lg bg-white px-4 text-sm font-semibold text-slate-900"
+          >
+            关闭预览
+          </button>
+          <div className="h-[calc(100vh-5rem)] overflow-auto rounded-lg bg-slate-950">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imagePreview}
+              alt="放大的题目图片"
+              className="mx-auto h-auto max-w-none"
+            />
+          </div>
+        </div>
       ) : null}
     </div>
   );

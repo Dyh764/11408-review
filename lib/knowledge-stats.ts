@@ -1,9 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const UNKNOWN_POINT = "\u672a\u5206\u7c7b";
-const NO_IDEA = "瀹屽叏娌℃€濊矾";
-const STUCK = "鎬濊矾瀵逛絾鍗′綇";
-const MASTERED = "瀹屽叏鎺屾彙";
+const NO_IDEA = "完全没思路";
+const STUCK = "思路对但卡住";
+const MASTERED = "完全掌握";
 
 type QuestionStatSource = {
   id: string;

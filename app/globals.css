@@ -13,6 +13,7 @@
 html {
   min-height: 100%;
   background: #f8fafc;
+  overflow-x: hidden;
 }
 
 body {
@@ -20,6 +21,27 @@ body {
   margin: 0;
   background: #f8fafc;
   font-family: Arial, "Microsoft YaHei", sans-serif;
+  overflow-x: hidden;
+}
+
+main {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+}
+
+p,
+dd,
+li,
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
 }
 
 button,
@@ -35,4 +57,5 @@ textarea {
   min-height: 100vh;
   margin: 0 auto;
   background: #f8fafc;
+  overflow-x: hidden;
 }

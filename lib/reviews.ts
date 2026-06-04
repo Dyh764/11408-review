@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { todayIsoDate as todayIsoDateInTimeZone } from "@/lib/dates";
 import { supabaseBucket } from "@/lib/env";
 import type {
   MasteryStatus,
@@ -58,7 +59,7 @@ const dueReviewColumns = `
 `;
 
 export function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDateInTimeZone();
 }
 
 async function addSignedImageUrl(

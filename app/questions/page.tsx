@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
-import type { MasteryStatus, Subject } from "@/lib/types";
+import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjectFilters: Array<Subject | "全部"> = [
   "全部",
@@ -27,6 +28,15 @@ const masteryFilters: Array<MasteryStatus | "全部"> = [
   "完全掌握",
 ];
 
+const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
+  "全部",
+  "ai_unverified",
+  "verified",
+  "needs_fix",
+];
+
+type SortMode = "created_desc" | "created_asc" | "weak_first";
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -40,11 +50,16 @@ export default function QuestionsPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [subject, setSubject] = useState<Subject | "全部">("全部");
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
+  const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
+  const [keyword, setKeyword] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("created_desc");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -76,16 +91,182 @@ export default function QuestionsPage() {
   }, [supabase]);
 
   const filteredQuestions = useMemo(
-    () =>
-      questions.filter((question) => {
+    () => {
+      const normalizedKeyword = keyword.trim().toLowerCase();
+      const priorityRank = { high: 3, medium: 2, low: 1 } as const;
+
+      return questions
+        .filter((question) => {
         const subjectMatch = subject === "全部" || question.subject === subject;
         const masteryMatch =
           masteryStatus === "全部" || question.mastery_status === masteryStatus;
+          const textStatusMatch =
+            textStatus === "全部" || question.question_text_status === textStatus;
+          const keywordMatch =
+            normalizedKeyword.length === 0 ||
+            [
+              question.knowledge_point,
+              question.question_text,
+              question.chapter,
+              question.user_note,
+            ]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
 
-        return subjectMatch && masteryMatch;
-      }),
-    [masteryStatus, questions, subject],
+          return subjectMatch && masteryMatch && textStatusMatch && keywordMatch;
+        })
+        .sort((a, b) => {
+          if (sortMode === "created_asc") {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          }
+
+          if (sortMode === "weak_first") {
+            return (
+              (priorityRank[b.review_priority ?? "low"] ?? 0) -
+                (priorityRank[a.review_priority ?? "low"] ?? 0) ||
+              Number(b.needs_manual_check) - Number(a.needs_manual_check) ||
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          }
+
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+    },
+    [keyword, masteryStatus, questions, sortMode, subject, textStatus],
   );
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
+
+  function selectAllFiltered() {
+    setSelectedIds(filteredQuestions.map((question) => question.id));
+  }
+
+  async function handleBatchAction(action: "mastered" | "needs_fix" | "sprint") {
+    if (!supabase) {
+      setMessage("Supabase 尚未配置，无法批量操作。");
+      return;
+    }
+
+    if (selectedIds.length === 0) {
+      setMessage("请先选择至少一道错题。");
+      return;
+    }
+
+    const actionLabel =
+      action === "mastered"
+        ? "批量标记为已掌握"
+        : action === "needs_fix"
+          ? "批量标记为 needs_fix"
+          : "批量加入冲刺复习";
+
+    if (!window.confirm(`确认${actionLabel}？本操作不会删除错题。`)) {
+      return;
+    }
+
+    setIsBatchProcessing(true);
+    setMessage("");
+
+    try {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        setMessage("请先登录，再批量操作错题。");
+        return;
+      }
+
+      if (action === "mastered") {
+        const { error: updateError } = await supabase
+          .from("questions")
+          .update({ mastery_status: "完全掌握", review_priority: "low" })
+          .in("id", selectedIds)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          setMessage(`批量标记已掌握失败：${updateError.message}`);
+          return;
+        }
+
+        setQuestions((current) =>
+          current.map((question) =>
+            selectedIds.includes(question.id)
+              ? { ...question, mastery_status: "完全掌握", review_priority: "low" }
+              : question,
+          ),
+        );
+      }
+
+      if (action === "needs_fix") {
+        const { error: updateError } = await supabase
+          .from("questions")
+          .update({ question_text_status: "needs_fix", needs_manual_check: true })
+          .in("id", selectedIds)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          setMessage(`批量标记 needs_fix 失败：${updateError.message}`);
+          return;
+        }
+
+        setQuestions((current) =>
+          current.map((question) =>
+            selectedIds.includes(question.id)
+              ? { ...question, question_text_status: "needs_fix", needs_manual_check: true }
+              : question,
+          ),
+        );
+      }
+
+      if (action === "sprint") {
+        const scheduledDate = todayIsoDate();
+        const reviewRows = selectedIds.map((questionId) => ({
+          user_id: user.id,
+          question_id: questionId,
+          scheduled_date: scheduledDate,
+        }));
+        const { error: reviewError } = await supabase
+          .from("reviews")
+          .upsert(reviewRows, { onConflict: "question_id,scheduled_date" });
+
+        if (reviewError) {
+          setMessage(`加入冲刺复习失败：${reviewError.message}`);
+          return;
+        }
+
+        const { error: updateError } = await supabase
+          .from("questions")
+          .update({ review_priority: "high" })
+          .in("id", selectedIds)
+          .eq("user_id", user.id);
+
+        if (updateError) {
+          setMessage(`已加入冲刺复习，但更新优先级失败：${updateError.message}`);
+          return;
+        }
+
+        setQuestions((current) =>
+          current.map((question) =>
+            selectedIds.includes(question.id)
+              ? { ...question, review_priority: "high" }
+              : question,
+          ),
+        );
+      }
+
+      setSelectedIds([]);
+      setMessage(`${actionLabel}成功，已处理 ${selectedIds.length} 道错题。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `${actionLabel}失败。`);
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }
 
   return (
     <div>
@@ -111,17 +292,102 @@ export default function QuestionsPage() {
             </button>
           ))}
         </div>
-        <select
-          value={masteryStatus}
-          onChange={(event) => setMasteryStatus(event.target.value as MasteryStatus | "全部")}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <select
+            value={masteryStatus}
+            onChange={(event) => setMasteryStatus(event.target.value as MasteryStatus | "全部")}
+            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+          >
+            {masteryFilters.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <select
+            value={textStatus}
+            onChange={(event) =>
+              setTextStatus(event.target.value as QuestionTextStatus | "全部")
+            }
+            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+          >
+            {textStatusFilters.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+          >
+            <option value="created_desc">最新优先</option>
+            <option value="created_asc">最早优先</option>
+            <option value="weak_first">薄弱优先</option>
+          </select>
+        </div>
+        <input
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
           className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
-        >
-          {masteryFilters.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          placeholder="搜索题目文字、知识点、章节或备注"
+        />
+      </section>
+
+      <section className="px-5 pt-4">
+        <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-800">
+              已选择 {selectedIds.length} 道
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={selectAllFiltered}
+                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+              >
+                全选当前
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+              >
+                清空
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => handleBatchAction("mastered")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              标记已掌握
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBatchAction("needs_fix")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-amber-100 px-3 text-sm font-semibold text-amber-800 disabled:text-slate-400"
+            >
+              标记 needs_fix
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBatchAction("sprint")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              加入冲刺复习
+            </button>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            不提供批量删除，避免误删原图和错题记录。
+          </p>
+        </div>
       </section>
 
       {isLoading ? (
@@ -137,40 +403,71 @@ export default function QuestionsPage() {
       ) : null}
 
       <section className="space-y-4 px-5 pt-5">
+        {!isLoading && filteredQuestions.length === 0 ? (
+          <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
+            没有符合当前筛选条件的错题。可以清空搜索词或切换筛选条件。
+          </div>
+        ) : null}
         {filteredQuestions.map((question) => (
-          <Link
+          <article
             key={question.id}
-            href={`/questions/${question.id}`}
-            className="block rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100 active:scale-[0.99]"
+            className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100"
           >
             <div className="flex gap-3">
-              <div className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-500">
+              <label className="flex h-20 shrink-0 items-start pt-1">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(question.id)}
+                  onChange={() => toggleSelected(question.id)}
+                  className="h-5 w-5 rounded border-slate-300"
+                  aria-label={`选择 ${question.knowledge_point ?? question.id}`}
+                />
+              </label>
+              <Link
+                href={`/questions/${question.id}`}
+                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-500"
+              >
                 {question.signedImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={question.signedImageUrl}
                     alt="原题图片缩略图"
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   "无预览"
                 )}
-              </div>
+              </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap gap-2">
                   <StatusPill label={question.subject} tone="blue" />
                   <StatusPill label={question.mastery_status} tone="amber" />
                   <StatusPill label={question.question_text_status} tone="slate" />
+                  {question.needs_manual_check ? (
+                    <StatusPill label="需人工核对" tone="red" />
+                  ) : null}
                 </div>
-                <p className="mt-2 truncate text-sm font-semibold text-slate-950">
+                <p className="mt-2 break-words text-sm font-semibold text-slate-950">
                   {question.knowledge_point ?? "待识别知识点"}
+                </p>
+                <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
+                  {question.chapter ? `${question.chapter} / ` : ""}
+                  {question.question_text ?? "暂无题目文字"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   创建时间：{formatDate(question.created_at)}
                 </p>
+                <Link
+                  href={`/questions/${question.id}`}
+                  className="mt-2 inline-flex min-h-9 items-center rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
+                >
+                  查看详情
+                </Link>
               </div>
             </div>
-          </Link>
+          </article>
         ))}
       </section>
     </div>

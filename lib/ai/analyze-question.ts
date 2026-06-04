@@ -8,6 +8,7 @@ import {
   validateQuestionAnalysis,
 } from "@/lib/ai/schema";
 import { analyzeQuestionPrompt } from "@/lib/ai/prompts/analyze-question";
+import { buildAnalysisUpdatePayload } from "@/lib/ai/analysis-update";
 
 export type AnalysisSource = "openai" | "mock" | "needs_fix";
 
@@ -114,26 +115,14 @@ async function fetchQuestion(supabase: SupabaseClient, questionId: string) {
 
 async function updateQuestionAnalysis(
   supabase: SupabaseClient,
-  questionId: string,
+  question: QuestionRecord,
   analysis: NonNullable<ReturnType<typeof validateQuestionAnalysis>>,
+  allowOverwriteQuestionText: boolean,
 ) {
   const { error } = await supabase
     .from("questions")
-    .update({
-      question_text: analysis.question_text,
-      question_text_status: analysis.question_text_status,
-      subject: analysis.subject,
-      chapter: analysis.chapter,
-      knowledge_point: analysis.knowledge_point,
-      mistake_types: analysis.mistake_types,
-      solution_summary: analysis.solution_summary,
-      one_sentence_tip: analysis.one_sentence_tip,
-      review_priority: analysis.review_priority,
-      confidence: analysis.confidence,
-      needs_manual_check: analysis.needs_manual_check,
-      analyzed_at: new Date().toISOString(),
-    })
-    .eq("id", questionId);
+    .update(buildAnalysisUpdatePayload(question, analysis, allowOverwriteQuestionText))
+    .eq("id", question.id);
 
   if (error) {
     throw new Error(`写回分析结果失败：${error.message}`);
@@ -224,9 +213,11 @@ async function analyzeWithOpenAI(supabase: SupabaseClient, question: QuestionRec
 export async function analyzeQuestionById(
   supabase: SupabaseClient,
   questionId: string,
+  options: { allowOverwriteQuestionText?: boolean } = {},
 ): Promise<AnalyzeQuestionResult> {
   const question = await fetchQuestion(supabase, questionId);
   const openaiKey = process.env.OPENAI_API_KEY;
+  const allowOverwriteQuestionText = options.allowOverwriteQuestionText === true;
 
   if (!openaiKey) {
     const mock = createMockAnalysis({
@@ -236,7 +227,7 @@ export async function analyzeQuestionById(
       imagePreview: question.image_path,
     });
 
-    await updateQuestionAnalysis(supabase, question.id, mock);
+    await updateQuestionAnalysis(supabase, question, mock, allowOverwriteQuestionText);
     return {
       source: "mock",
       message: "未配置 OPENAI_API_KEY，已使用 mock fallback 分析。",
@@ -248,7 +239,7 @@ export async function analyzeQuestionById(
 
   if (!openaiAnalysis) {
     const fallback = buildNeedsFixAnalysis(question.subject, "AI 输出不符合 schema，已回退为 needs_fix。");
-    await updateQuestionAnalysis(supabase, question.id, fallback);
+    await updateQuestionAnalysis(supabase, question, fallback, allowOverwriteQuestionText);
     return {
       source: "needs_fix",
       message: "AI 输出不符合 schema，未写入原始 AI 内容，已回退为 needs_fix。",
@@ -256,7 +247,7 @@ export async function analyzeQuestionById(
     };
   }
 
-  await updateQuestionAnalysis(supabase, question.id, openaiAnalysis);
+  await updateQuestionAnalysis(supabase, question, openaiAnalysis, allowOverwriteQuestionText);
   return {
     source: "openai",
     message: "OpenAI 分析完成。",

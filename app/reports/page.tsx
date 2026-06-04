@@ -89,6 +89,7 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
   const subjectDistribution = asItems(content.subject_distribution);
   const mistakeTypes = asItems(content.frequent_mistake_types);
   const weakPoints = asItems(content.weakest_knowledge_points);
+  const repeatedWrong = asItems(content.repeated_wrong_knowledge_points);
   const nextActions = pickSuggestions(content, tab);
 
   return (
@@ -127,6 +128,7 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
       <ReportList title="科目分布" items={subjectDistribution} empty="暂无科目分布。" />
       <ReportList title="高频错因" items={mistakeTypes} empty="暂无高频错因。" />
       <ReportList title="薄弱知识点" items={weakPoints} empty="暂无薄弱知识点。" showScore />
+      <ReportList title="重复错误点" items={repeatedWrong} empty="暂无重复错误点。" showScore />
       <ReportList title="下一步建议" items={nextActions} empty="暂无下一步建议。" />
     </section>
   );
@@ -182,6 +184,7 @@ function ReportList({
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportType>("daily");
   const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实报告。",
@@ -216,7 +219,9 @@ export default function ReportsPage() {
     };
   }, [supabase]);
 
-  const latestReport = reports.find((report) => report.type === tab) ?? null;
+  const reportsForTab = reports.filter((report) => report.type === tab);
+  const selectedReport =
+    reportsForTab.find((report) => report.id === selectedReportId) ?? reportsForTab[0] ?? null;
 
   return (
     <div>
@@ -231,7 +236,10 @@ export default function ReportsPage() {
             <button
               key={key}
               type="button"
-              onClick={() => setTab(key)}
+              onClick={() => {
+                setTab(key);
+                setSelectedReportId("");
+              }}
               className={`min-h-11 rounded-md text-sm font-semibold ${
                 tab === key ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"
               }`}
@@ -254,7 +262,7 @@ export default function ReportsPage() {
         </section>
       ) : null}
 
-      {!isLoading && !latestReport ? (
+      {!isLoading && !selectedReport ? (
         <section className="px-5 pt-5">
           <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
             暂无{tabLabels[tab]}。部署 Cron 后，系统会按计划写入 reports 表；也可以先手动调用对应 Edge Function 生成。
@@ -262,7 +270,36 @@ export default function ReportsPage() {
         </section>
       ) : null}
 
-      {latestReport ? <LatestReport report={latestReport} tab={tab} /> : null}
+      {selectedReport ? <LatestReport report={selectedReport} tab={tab} /> : null}
+
+      {reportsForTab.length > 1 ? (
+        <section className="px-5 pt-5">
+          <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800">历史{tabLabels[tab]}</h3>
+            <div className="mt-3 space-y-2">
+              {reportsForTab.slice(0, 8).map((report) => (
+                <button
+                  key={report.id}
+                  type="button"
+                  onClick={() => setSelectedReportId(report.id)}
+                  className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm ${
+                    selectedReport?.id === report.id
+                      ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+                      : "bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <span className="break-words">
+                    {report.start_date} 至 {report.end_date}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {new Date(report.created_at).toLocaleDateString("zh-CN")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </article>
+        </section>
+      ) : null}
     </div>
   );
 }

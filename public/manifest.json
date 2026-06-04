@@ -1,8 +1,9 @@
 {
   "name": "11408 错题复盘助手",
-  "short_name": "11408复盘",
+  "short_name": "11408 Review",
   "description": "手机优先的 11408 错题拍题、复习和薄弱点分析工具。",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#2563eb",

@@ -27,7 +27,12 @@ export async function POST(_request: Request, context: RouteContext) {
 
   try {
     const { id } = await context.params;
-    const result = await analyzeQuestionById(supabase, id);
+    const body = (await _request.json().catch(() => ({}))) as {
+      allowOverwriteQuestionText?: boolean;
+    };
+    const result = await analyzeQuestionById(supabase, id, {
+      allowOverwriteQuestionText: body.allowOverwriteQuestionText === true,
+    });
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

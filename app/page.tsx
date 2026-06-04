@@ -6,8 +6,10 @@ import { dashboardStats, mockQuestions } from "@/lib/mock-data";
 const quickActions = [
   { href: "/upload", label: "拍题上传", description: "拍照、选科目、写一句卡点" },
   { href: "/review", label: "今日复习", description: "处理今天到期的错题" },
+  { href: "/sprint", label: "考前冲刺", description: "优先处理最危险的题" },
   { href: "/questions", label: "错题库", description: "按科目和薄弱点筛选" },
   { href: "/reports", label: "学习报告", description: "看本周薄弱点和建议" },
+  { href: "/settings", label: "设置导出", description: "导出数据和检查配置" },
 ];
 
 export default function DashboardPage() {
