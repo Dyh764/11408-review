@@ -220,9 +220,9 @@
 ## 结论
 
 当前已完成本地代码侧和文档侧验收准备。正式上线前，用户仍需在生产 Vercel 域名和生产 Supabase 项目上，用 iPhone Safari 与 Android Chrome 完成实机检查。
-## Stage 8 real-device acceptance table
+## Stage 9 actual result entry area
 
-Current phase only completed desktop Chrome mobile viewport acceptance. iPhone Safari and Android Chrome must be completed by the user on real devices after deployment.
+当前未完成 iPhone Safari / Android Chrome 真机验收，需要部署后由用户实测。Desktop Chrome mobile viewport 由本地 Playwright 冒烟测试覆盖。
 
 | Test item | iPhone Safari | Android Chrome | Desktop Chrome mobile viewport | Result | Issue | Fix status |
 | --- | --- | --- | --- | --- | --- | --- |

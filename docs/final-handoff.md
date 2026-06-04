@@ -64,7 +64,21 @@ npm run test:e2e
 With an existing local server:
 
 ```bash
-E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+E2E_BASE_URL=http://127.0.0.1:3000 npm run test:e2e
+```
+
+Without `E2E_BASE_URL`, Playwright defaults to `http://127.0.0.1:3000`.
+
+Production smoke test after Vercel deployment:
+
+```bash
+E2E_BASE_URL=https://your-app.vercel.app npm run test:e2e
+```
+
+Windows PowerShell:
+
+```powershell
+$env:E2E_BASE_URL="https://your-app.vercel.app"; npm run test:e2e
 ```
 
 ## Verified Locally

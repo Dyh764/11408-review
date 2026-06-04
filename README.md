@@ -270,7 +270,21 @@ node ./node_modules/@playwright/test/cli.js install chromium
 This project also supports using an already running local server:
 
 ```bash
-E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+E2E_BASE_URL=http://127.0.0.1:3000 npm run test:e2e
+```
+
+When `E2E_BASE_URL` is not set, Playwright starts or reuses a local server at `http://127.0.0.1:3000`.
+
+Production smoke test, after Vercel deployment:
+
+```bash
+E2E_BASE_URL=https://your-app.vercel.app npm run test:e2e
+```
+
+Windows PowerShell:
+
+```powershell
+$env:E2E_BASE_URL="https://your-app.vercel.app"; npm run test:e2e
 ```
 
 Production config check entrypoints:

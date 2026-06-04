@@ -138,13 +138,13 @@ Monthly report: 30 22 28-31 * *
 | OpenAI request failed | 检查 API key、模型、额度和网络。缺 key 时应走 mock fallback。 |
 | 报告重复 | 检查唯一约束 `reports_one_per_range` 是否存在，函数是否使用 upsert。 |
 | reviews 重复 | 检查唯一约束 `reviews_one_schedule_per_day` 是否存在，函数是否使用 upsert。 |
-## Stage 8 measured test record
+## Stage 9 actual run record
 
-Current status: keep this template until Supabase production secrets are configured.
+当前无法部署到真实 Supabase 项目，不假装已经部署或调用。等待用户配置 Supabase production secrets 后实测。
 
 | Function | Deploy time | Test command | HTTP status | Response summary | DB write | Idempotent | Error logs | Conclusion |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `analyze-daily-questions` | To fill | `curl -X POST https://<project-ref>.functions.supabase.co/analyze-daily-questions -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-04"}'` | To fill | To fill | To fill | To fill | To fill | Run after Supabase production secrets are configured. |
-| `generate-daily-report` | To fill | `curl -X POST https://<project-ref>.functions.supabase.co/generate-daily-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-04"}'` | To fill | To fill | To fill | To fill | To fill | Run after Supabase production secrets are configured. |
-| `generate-weekly-report` | To fill | `curl -X POST https://<project-ref>.functions.supabase.co/generate-weekly-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-07"}'` | To fill | To fill | To fill | To fill | To fill | Run after Supabase production secrets are configured. |
-| `generate-monthly-report` | To fill | `curl -X POST https://<project-ref>.functions.supabase.co/generate-monthly-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-30","force":true}'` | To fill | To fill | To fill | To fill | To fill | Run after Supabase production secrets are configured. |
+| `analyze-daily-questions` | 未部署到生产项目 | `curl -X POST https://<project-ref>.functions.supabase.co/analyze-daily-questions -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-04"}'` | 未验证 | 未验证 | 未验证 | 未验证 | 未验证 | 等待用户配置 Supabase production secrets 后实测。 |
+| `generate-daily-report` | 未部署到生产项目 | `curl -X POST https://<project-ref>.functions.supabase.co/generate-daily-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-04"}'` | 未验证 | 未验证 | 未验证 | 未验证 | 未验证 | 等待用户配置 Supabase production secrets 后实测。 |
+| `generate-weekly-report` | 未部署到生产项目 | `curl -X POST https://<project-ref>.functions.supabase.co/generate-weekly-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-07"}'` | 未验证 | 未验证 | 未验证 | 未验证 | 未验证 | 等待用户配置 Supabase production secrets 后实测。 |
+| `generate-monthly-report` | 未部署到生产项目 | `curl -X POST https://<project-ref>.functions.supabase.co/generate-monthly-report -H 'x-cron-secret: <CRON_SECRET>' -H 'content-type: application/json' -d '{"date":"2026-06-30","force":true}'` | 未验证 | 未验证 | 未验证 | 未验证 | 未验证 | 等待用户配置 Supabase production secrets 后实测。 |
