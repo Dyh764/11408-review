@@ -244,6 +244,15 @@ export async function buildReportContent(
           detail: "Add and analyze more questions before the next report.",
         },
       ];
+  const repeatedWrongKnowledgePoints = rankedMap(repeatedWrongCounts);
+  const progressPoints = knowledgeStats
+    .filter((stat) => stat.mastered_count > 0)
+    .slice(0, 5)
+    .map((stat) => ({ label: stat.knowledge_point, mastered_count: stat.mastered_count }));
+  const reduceInvestmentKnowledgePoints = knowledgeStats
+    .filter((stat) => stat.mastered_count > 0 && stat.weakness_score <= 2)
+    .slice(0, 5)
+    .map((stat) => ({ label: stat.knowledge_point, mastered_count: stat.mastered_count }));
 
   return {
     type,
@@ -255,15 +264,29 @@ export async function buildReportContent(
     subject_distribution: rankedMap(subjectCounts),
     frequent_mistake_types: rankedMap(mistakeCounts),
     weakest_knowledge_points: weakestKnowledgePoints,
-    repeated_wrong_knowledge_points: rankedMap(repeatedWrongCounts),
-    progress_points: knowledgeStats
-      .filter((stat) => stat.mastered_count > 0)
-      .slice(0, 5)
-      .map((stat) => ({ label: stat.knowledge_point, mastered_count: stat.mastered_count })),
+    repeated_wrong_knowledge_points: repeatedWrongKnowledgePoints,
+    progress_points: progressPoints,
     next_actions: nextActions,
     tomorrow_suggestions: nextActions,
     weekly_suggestions: nextActions,
     monthly_focus: nextActions,
+    weekly_fields: {
+      repeated_wrong_knowledge_points: repeatedWrongKnowledgePoints,
+      progress_points: progressPoints,
+      next_week_review_suggestions: nextActions,
+    },
+    monthly_fields: {
+      subject_trends: rankedMap(subjectCounts),
+      long_term_high_risk_knowledge_points: weakestKnowledgePoints.slice(0, 10),
+      most_repeated_wrong_knowledge_points: repeatedWrongKnowledgePoints,
+      mastered_knowledge_points: progressPoints,
+      next_month_focus: nextActions,
+      reduce_investment_knowledge_points: reduceInvestmentKnowledgePoints,
+      breakthrough_plan: nextActions.map((item, index) => ({
+        title: item.title,
+        detail: `Week ${index + 1}: ${item.detail}`,
+      })),
+    },
   };
 }
 
