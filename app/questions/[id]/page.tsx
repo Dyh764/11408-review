@@ -15,14 +15,24 @@ export default function QuestionDetailPage() {
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题详情。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
       return;
     }
 
+    const client = supabase;
     let isActive = true;
-    fetchCurrentUserQuestion(supabase, params.id)
+    loadQuestion()
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    async function loadQuestion() {
+      await fetchCurrentUserQuestion(client, params.id)
       .then((item) => {
         if (isActive) {
           setQuestion(item);
@@ -32,17 +42,68 @@ export default function QuestionDetailPage() {
         if (isActive) {
           setMessage(error instanceof Error ? error.message : "读取错题详情失败。");
         }
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsLoading(false);
-        }
       });
+    }
 
     return () => {
       isActive = false;
     };
   }, [params.id, supabase]);
+
+  async function refreshQuestion() {
+    if (!supabase) {
+      return;
+    }
+
+    const item = await fetchCurrentUserQuestion(supabase, params.id);
+    setQuestion(item);
+  }
+
+  async function handleAnalyze() {
+    setIsAnalyzing(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${params.id}/analyze`, {
+        method: "POST",
+      });
+      const result: unknown = await response.json();
+
+      if (!response.ok) {
+        const errorMessage =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "分析失败。";
+        setMessage(errorMessage);
+        return;
+      }
+
+      const source =
+        typeof result === "object" &&
+        result !== null &&
+        "source" in result &&
+        typeof result.source === "string"
+          ? result.source
+          : "unknown";
+      const resultMessage =
+        typeof result === "object" &&
+        result !== null &&
+        "message" in result &&
+        typeof result.message === "string"
+          ? result.message
+          : "分析完成。";
+
+      await refreshQuestion();
+      setMessage(`分析来源：${source}。${resultMessage}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "分析失败。");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
 
   return (
     <div>
@@ -86,6 +147,15 @@ export default function QuestionDetailPage() {
               <StatusPill label={question.mastery_status} tone="amber" />
               <StatusPill label={question.question_text_status} tone="slate" />
             </div>
+
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+              className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "分析这道题"}
+            </button>
 
             <dl className="mt-4 space-y-4 text-sm">
               <div>
