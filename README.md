@@ -1,45 +1,62 @@
 # 11408 错题复盘助手
 
-手机优先的 11408 考研错题复盘系统。核心流程是：手机拍题上传，保存原题图片和错题字段，生成复习计划，按日期复习，并从日报、周报、月报里查看薄弱点。
+手机优先的 11408 考研错题复盘工具。它面向个人长期使用：拍题上传、保存原题图片、记录卡点、生成复习计划、完成今日复习、查看报告、导出数据，并在考前按风险优先冲刺。
+
+## 功能截图
+
+当前仓库不提交真实用户截图。上线验收时建议补充以下截图到项目文档或发布说明：
+
+- 首页和底部导航。
+- 拍题上传和图片预览。
+- 错题详情和题干编辑。
+- 今日复习。
+- 学习报告。
+- 设置页导出。
+- 考前冲刺模式。
 
 ## 核心功能
 
 - Supabase Auth 登录、注册、退出。
-- 当前用户数据隔离：错题、复习、报告均依赖 RLS 读取自己的数据。
-- 手机端拍题上传，保存到 private Supabase Storage。
-- 上传前客户端图片压缩，压缩失败自动回退原图。
-- `questions` 真实写入，保留 `image_path`。
-- OpenAI 单题图片分析，未配置 `OPENAI_API_KEY` 时使用 mock fallback。
-- 错题详情编辑：题干、核对状态、科目、章节、知识点、掌握状态、备注、错因、摘要、提醒。
+- 未登录访问 `/upload`、`/review`、`/questions`、`/reports`、`/settings`、`/sprint` 会跳转登录页。
+- 当前用户数据隔离，错题、复习、报告和导出都走 RLS。
+- 手机拍题或相册上传，题图保存到 private Supabase Storage。
+- 客户端图片压缩，压缩失败或压缩无收益时自动使用原图。
+- 错题写入 `questions`，并保留 `image_path`。
+- 上传后生成初始复习计划。
+- AI 单题分析；未配置 `OPENAI_API_KEY` 时使用 mock fallback。
 - `verified` 题干重新分析时默认保留，只有明确允许才覆盖题目文字。
-- 今日复习页显示今日、逾期数量，完成后调整后续复习计划。
-- 错题库支持科目、掌握状态、题干核对状态、搜索和排序。
-- 错题库支持基础批量管理：批量标记已掌握、批量标记 `needs_fix`、批量加入冲刺复习；不做批量删除。
-- 报告页展示日报、周报、月报和历史报告，不直接裸显 JSON。
-- 设置页支持查看登录邮箱、timezone、配置状态、数据导出和 PWA 安装说明。
-- 数据导出支持 JSON、Markdown、CSV，仅导出当前登录用户自己的数据。
-- 考前冲刺模式按复习后又错、仍不会、完全没思路、逾期、高危知识点和人工核对需求优先展示错题。
-- PWA manifest，可添加到手机桌面。
+- 今日复习写入复习结果，并按结果调整后续复习计划。
+- 错题库筛选、搜索、排序和基础批量管理。
+- 报告页展示日报、周报、月报和历史报告。
+- 设置页显示账号、timezone、配置状态、数据导出和 PWA 安装说明。
+- 数据导出支持 JSON、Markdown、CSV，只导出当前用户数据。
+- 考前冲刺模式按高危错题和薄弱知识点优先展示。
+- PWA manifest 和移动端 metadata，可添加到手机桌面。
 
 ## 技术栈
 
-- Next.js App Router
-- React
-- TypeScript
-- Tailwind CSS
-- Supabase Auth / Database / Storage / RLS
-- Supabase Edge Functions 和 Cron
-- OpenAI Responses API
+- Next.js App Router。
+- React。
+- TypeScript。
+- Tailwind CSS。
+- Supabase Auth / Database / Storage / RLS。
+- Supabase Edge Functions / Cron。
+- OpenAI Responses API。
 
-## 本地运行
+## 快速开始
 
 ```bash
 cd 11408-review
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-打开 `http://localhost:3000`。
+本地打开：
+
+```text
+http://localhost:3000
+```
 
 验证：
 
@@ -48,210 +65,190 @@ npm run lint
 npm run build
 ```
 
-如果当前 Windows shell 没有 `npm` 或 `git`，先修复 PATH，或使用本机已有的 Node/npm 绝对路径运行同等命令。
+Windows 本机如果出现 `Access is denied`，先确认 PATH 中包含可用 Node 20.9+ 目录。
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env.local`：
+`.env.example` 使用占位符，不包含真实密钥。
 
-```bash
-cp .env.example .env.local
+前端可公开：
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=question-images
 ```
 
-变量：
+服务端或 Edge Functions：
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=question-images`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_STORAGE_BUCKET=question-images`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL=gpt-4.1`
-- `CRON_SECRET`
+```text
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_STORAGE_BUCKET=question-images
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1
+CRON_SECRET=
+```
 
-不要提交 `.env.local`。`OPENAI_API_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY` 只能在服务端或 Edge Functions 使用，不能写入客户端代码。
+安全要求：
+
+- 不提交 `.env.local`。
+- 不把真实 key 写入 README、docs 或源码。
+- `OPENAI_API_KEY` 不能加 `NEXT_PUBLIC_`。
+- `SUPABASE_SERVICE_ROLE_KEY` 只能放在 Supabase Edge Functions secrets。
 
 ## Supabase 设置
 
-1. 创建 Supabase 项目。
-2. 在 SQL Editor 中按顺序执行：
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_allow_profile_insert.sql`
-   - `supabase/migrations/003_allow_question_image_delete.sql`
-   - `supabase/migrations/004_allow_review_delete.sql`
-3. 确认 `question-images` bucket 是 private。
-4. Storage MIME types 使用 `image/jpeg`, `image/png`, `image/webp`。
-5. 图片路径保持 `users/{user_id}/questions/{question_id}.{jpg|png|webp}`。
-6. 确认 RLS policy 已启用，用户只能读写自己的 `questions`、`reviews`、`reports`。
+按顺序执行 migration：
+
+```text
+supabase/migrations/001_initial_schema.sql
+supabase/migrations/002_allow_profile_insert.sql
+supabase/migrations/003_allow_question_image_delete.sql
+supabase/migrations/004_allow_review_delete.sql
+```
+
+检查：
+
+- `profiles`、`questions`、`reviews`、`reports`、`knowledge_stats` 已创建。
+- RLS 已开启，用户只能访问自己的数据。
+- `question-images` bucket 为 private。
+- Storage 路径为 `users/{user_id}/questions/{question_id}.{jpg|png|webp}`。
+- Auth 已启用邮箱密码或 magic link。
+
+详细检查见 `docs/supabase-production-check.md`。
+
+## Vercel 部署
+
+Vercel 导入 GitHub 仓库后：
+
+- Framework Preset: `Next.js`。
+- Install Command: 默认。
+- Build Command: `npm run build`。
+- Output Directory: 留空，使用 Next.js 默认输出。
+- Node.js Version: Node 20.9+。
+
+部署后检查：
+
+- `/`
+- `/login`
+- `/upload`
+- `/review`
+- `/questions`
+- `/reports`
+- `/settings`
+- `/sprint`
+- `/manifest.json`
+
+详细步骤见 `docs/vercel-final-deploy.md`。
 
 ## Edge Functions 和 Cron
 
-Edge Functions 位于 `supabase/functions`：
+函数目录：
 
-- `analyze-daily-questions`
-- `generate-daily-report`
-- `generate-weekly-report`
-- `generate-monthly-report`
+```text
+supabase/functions/analyze-daily-questions
+supabase/functions/generate-daily-report
+supabase/functions/generate-weekly-report
+supabase/functions/generate-monthly-report
+```
 
-部署后需要设置 Supabase secrets：
+部署：
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-- `CRON_SECRET`
+```bash
+supabase functions deploy analyze-daily-questions --project-ref <project-ref>
+supabase functions deploy generate-daily-report --project-ref <project-ref>
+supabase functions deploy generate-weekly-report --project-ref <project-ref>
+supabase functions deploy generate-monthly-report --project-ref <project-ref>
+```
 
-Cron 设置参考 `docs/supabase-cron.md` 和 `docs/deployment.md`。
+所有 Cron 请求必须带 `CRON_SECRET`。报告和复习计划都使用 upsert，避免重复生成。
 
-## 图片压缩策略
+详细验收见：
 
-上传页使用 `lib/image/compress-image.ts` 在浏览器端压缩：
+- `docs/supabase-cron.md`
+- `docs/edge-functions-final-check.md`
 
-- 支持 jpg、jpeg、png、webp。
-- 大于约 2MB 时尝试压缩。
-- 最大宽度默认 1800px。
-- JPEG 质量不低于 0.74，避免公式和题干糊掉。
-- 压缩后不比原图小时使用原图。
-- 压缩失败时使用原图上传。
-- 页面显示原图大小、上传大小和压缩状态。
+## OpenAI API 配置
+
+OpenAI 用于题图分析和错题字段补全。
+
+```text
+OPENAI_API_KEY=<openai-api-key>
+OPENAI_MODEL=gpt-4.1
+```
+
+如果未配置 `OPENAI_API_KEY`：
+
+- 页面不会白屏。
+- 单题分析和 Edge Function 分析会使用 mock fallback。
+- mock 结果会明确标记为 fallback，不伪装真实 AI 结果。
 
 ## 手机端使用流程
 
 1. 手机浏览器打开站点并登录。
-2. 进入“拍题”，拍摄或选择题目图片。
-3. 查看预览，必要时点“放大查看题图”确认清晰。
-4. 选择科目、掌握状态，写一句卡点。
-5. 上传并保存错题。
-6. 在“错题”里搜索、筛选、进入详情。
-7. 在详情页编辑题干并把核对状态标为 `verified` 或 `needs_fix`。
-8. 在“复习”里按四个结果按钮完成今日或逾期复习。
-9. 在“报告”里查看日报、周报、月报和历史报告。
-10. 考前进入 `/sprint`，优先处理最危险的题。
-11. 进入 `/settings` 导出数据、保存 timezone 或退出登录。
+2. 进入“拍题”，拍摄或选择题图。
+3. 确认预览清晰。
+4. 选择科目和掌握状态。
+5. 写一句卡点备注。
+6. 保存错题。
+7. 在“错题”里查看详情，核对题目文字。
+8. 点击 AI 分析或使用 mock fallback。
+9. 在“复习”里完成今日或逾期任务。
+10. 在“报告”里查看日报、周报、月报。
+11. 考前进入“冲刺”处理高危题。
+12. 在“设置”里导出 JSON、Markdown 或 CSV。
 
-手机端上线前请按 `docs/mobile-test-checklist.md` 验收。无法连接真实手机时，先用浏览器手机视口模拟；生产上线前仍需 iPhone Safari 和 Android Chrome 复测。
+普通用户说明见 `docs/user-guide.md`。
 
-## 数据导出
+## 数据导出和备份
 
 入口：`/settings`。
 
-导出格式：
+格式：
 
-- JSON：完整备份当前用户的 `questions`、`reviews`、`reports`、`knowledge_stats`。
-- Markdown：按“科目 - 章节”分组，适合人工阅读。
-- CSV：适合 Excel 查看，至少包含核心错题字段。
+- JSON：完整备份当前用户核心数据。
+- Markdown：按科目和章节分组，适合阅读。
+- CSV：适合 Excel 查看核心错题字段。
 
-导出文件名包含日期，例如：
+导出包含：
 
-```text
-11408-review-export-2026-06-04.json
-11408-review-export-2026-06-04.md
-11408-review-export-2026-06-04.csv
-```
+- `questions`
+- `reviews`
+- `reports`
+- `knowledge_stats`
 
-CSV 字段：
+图片不会打包进导出文件，只保留 `image_path`。备份说明见 `docs/backup-and-restore.md`。
 
-- `id`
-- `subject`
-- `chapter`
-- `knowledge_point`
-- `mastery_status`
-- `question_text_status`
-- `mistake_types`
-- `user_note`
-- `solution_summary`
-- `one_sentence_tip`
-- `created_at`
+## 文档目录
 
-图片不会被打包进导出文件，但会保留 `image_path`。如果页面显示的是 signed URL，该 URL 可能过期，不能作为长期图片备份地址。
+- `docs/vercel-final-deploy.md`：Vercel 最终部署说明。
+- `docs/supabase-production-check.md`：Supabase 生产配置检查。
+- `docs/edge-functions-final-check.md`：Edge Functions 和 Cron 最终验收。
+- `docs/user-guide.md`：普通用户使用手册。
+- `docs/developer-guide.md`：开发者维护手册。
+- `docs/real-device-acceptance.md`：真实设备验收记录。
+- `docs/final-acceptance-report.md`：最终验收报告。
+- `docs/known-issues.md`：已知问题。
+- `docs/production-checklist.md`：生产部署验收清单。
+- `docs/mobile-test-checklist.md`：手机端测试清单。
+- `docs/backup-and-restore.md`：数据备份说明。
+- `docs/supabase-cron.md`：Supabase Cron 操作参考。
+- `docs/deployment.md`：早期部署说明。
 
-备份和恢复说明见 `docs/backup-and-restore.md`。当前版本只支持导出，不支持一键导入或完整自动恢复。
+## 当前限制
 
-## 设置页
+- 真实生产环境端到端验收需要部署后完成。
+- iPhone Safari 和 Android Chrome 真机测试需要用户执行。
+- 当前版本只支持导出，不支持一键导入恢复。
+- 当前 PWA 不做复杂离线缓存。
+- 不提供社交、付费、题库市场、班级系统、排行榜或 AI 聊天室。
 
-`/settings` 显示：
+## 后续路线图
 
-- 当前登录邮箱。
-- timezone 设置，默认 `Asia/Shanghai`。
-- Supabase 配置状态。
-- OpenAI 配置状态。
-- Storage bucket 配置状态。
-- JSON / Markdown / CSV 数据导出入口。
-- PWA 安装说明。
-- 退出登录按钮。
-
-设置页只显示配置是否存在，不显示 API Key、service role key、access token 或 refresh token。
-
-## 考前冲刺模式
-
-入口：`/sprint`。
-
-冲刺模式优先展示：
-
-- 复习后又错。
-- 仍不会。
-- 完全没思路。
-- 逾期复习。
-- `needs_manual_check`。
-- `needs_fix`。
-- 做对但不稳。
-- 高危知识点。
-- 超过 30 天仍未掌握。
-
-每张卡片显示原题缩略图、危险原因、详情入口和“已掌握”按钮。标记已掌握会把题目更新为 `完全掌握`，降低复习优先级，并取消未完成的待复习任务。
-
-## 部署验收
-
-部署前按 `docs/production-checklist.md` 检查 Vercel 环境变量、Supabase URL 和 anon key、service role key 服务端使用、OpenAI API Key、Storage bucket、RLS、Edge Functions、Cron、手机端、PWA、数据导出和 `npm run lint` / `npm run build`。
-
-## PWA
-
-`public/manifest.json` 已配置：
-
-- name: `11408 错题复盘助手`
-- short_name: `11408 Review`
-- display: `standalone`
-- theme_color: `#2563eb`
-- icon: `public/icon.svg`
-
-手机添加到桌面：用移动端浏览器打开部署地址，登录后选择浏览器菜单里的“添加到主屏幕”或“安装应用”。当前不做复杂离线缓存，避免影响错题、复习和报告数据更新。
-
-## 开发阶段说明
-
-已完成阶段：
-
-1. Supabase 登录和用户数据隔离。
-2. 手机端拍题上传。
-3. Storage 图片保存。
-4. `questions` 写入。
-5. `reviews` 复习计划。
-6. 今日复习页。
-7. OpenAI 单题图片分析和 mock fallback。
-8. Edge Functions、Cron、日报、周报、月报。
-9. `reports` 页面读取真实报告。
-10. `knowledge_stats` 薄弱点统计。
-11. 第五阶段手机体验、压缩、编辑、报告展示、PWA 和部署文档。
-12. 第六阶段手机测试清单、数据导出、设置页、考前冲刺、批量管理、备份说明和生产验收清单。
-
-未完成功能：
-
-- 真实生产环境端到端验收。
-- 更完整的自动化浏览器回归测试。
-- 更细的图表组件和学习趋势分析。
-- Next 16 `middleware.ts` 到 `proxy.ts` 的迁移。
-- 一键导入 JSON 和完整自动恢复。
-
-后续路线图：
-
-- 第七阶段做真实生产环境端到端验收和 Vercel/Supabase/Cron 联调。
-- 增加轻量趋势图和薄弱点变化。
-- 增加错题编辑、导出、冲刺和批量操作的自动化浏览器回归测试。
+- 完成 Vercel 生产部署和 Supabase 生产验收。
+- 完成真实手机 Safari / Chrome 实测。
+- 增加 Playwright 冒烟测试覆盖核心页面。
 - 评估 JSON 导入预检和 Storage 图片缺失检查。
+- 增加轻量趋势图和薄弱点变化展示。
 
-## 开发约束
-
-- 不做社交、排行、付费、题库市场、班级系统或复杂聊天。
-- 不写死本地绝对路径或 Windows 路径。
-- 不把 API Key 写进代码。
-- 上传失败不能生成残缺数据。
-- 错题编辑失败不能破坏原数据。
