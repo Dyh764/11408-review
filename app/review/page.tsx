@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -130,6 +131,17 @@ export default function ReviewPage() {
         .from("questions")
         .update({ review_priority: "high" })
         .eq("id", review.question_id);
+    }
+
+    try {
+      await updateKnowledgeStatsForQuestionId(supabase, review.question_id);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? `已完成复习，但薄弱点统计更新失败：${error.message}`
+          : "已完成复习，但薄弱点统计更新失败。",
+      );
+      return;
     }
 
     setCompleted((current) => ({ ...current, [review.id]: result }));
