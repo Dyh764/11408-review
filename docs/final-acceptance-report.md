@@ -117,6 +117,8 @@
 - `npm run lint` 通过。
 - `npm run build` 通过。
 - Next production build 生成核心页面路由。
+- 本地 production server 返回 200：`/`、`/login`、`/upload`、`/review`、`/questions`、`/reports`、`/settings`、`/sprint`。
+- `/manifest.json` 返回 200，content type 为 `application/json`。
 - 无 Supabase env 时页面有友好提示，不应白屏。
 - Next 16 proxy 迁移后不再出现 `middleware.ts` deprecation warning。
 
@@ -161,4 +163,3 @@
 - Supabase 生产配置检查。
 - Edge Functions 和 Cron 实际运行。
 - 真实手机登录、上传、复习、报告、导出和 PWA 验收。
-

@@ -7,7 +7,7 @@
 当前会话：
 
 - Windows 本机开发环境。
-- 浏览器移动视口检查待最终验证阶段执行。
+- 本地 production server HTTP 路由检查已完成。
 
 上线前仍需用户实测：
 
@@ -19,7 +19,7 @@
 当前会话：
 
 - Next.js production build 已生成页面路由。
-- 后续最终验证会用本地 dev server 或 production server 检查核心路径是否可访问。
+- 本地 production server 已检查核心路径和 PWA manifest。
 
 上线前仍需：
 
@@ -203,6 +203,7 @@
 
 - 当前会话无法直接完成真实手机 Safari / Chrome 验收。
 - 当前会话未连接真实生产 Supabase 项目执行 Edge Functions。
+- 当前会话未完成视觉截图级移动端检查；已完成 HTTP 可访问性和代码侧安全区检查。
 
 ## 已修复问题
 
@@ -219,4 +220,3 @@
 ## 结论
 
 当前已完成本地代码侧和文档侧验收准备。正式上线前，用户仍需在生产 Vercel 域名和生产 Supabase 项目上，用 iPhone Safari 与 Android Chrome 完成实机检查。
-
