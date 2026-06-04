@@ -220,3 +220,28 @@
 ## 结论
 
 当前已完成本地代码侧和文档侧验收准备。正式上线前，用户仍需在生产 Vercel 域名和生产 Supabase 项目上，用 iPhone Safari 与 Android Chrome 完成实机检查。
+## Stage 8 real-device acceptance table
+
+Current phase only completed desktop Chrome mobile viewport acceptance. iPhone Safari and Android Chrome must be completed by the user on real devices after deployment.
+
+| Test item | iPhone Safari | Android Chrome | Desktop Chrome mobile viewport | Result | Issue | Fix status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Login | Pending real device | Pending real device | Login page smoke test passed | Pending | None | Pending real device |
+| Logout | Pending real device | Pending real device | Code path exists | Pending | None | Pending real device |
+| Camera upload | Pending real device | Pending real device | Not available on desktop | Pending | None | Pending real device |
+| Album upload | Pending real device | Pending real device | Needs manual file selection | Pending | None | Pending real device |
+| Image compression | Pending real device | Pending real device | Existing unit logic | Pending | None | Pending real device |
+| Save question | Pending real device | Pending real device | Requires real Supabase login | Pending | None | Pending real device |
+| AI analysis or mock fallback | Pending real device | Pending real device | Requires real question data | Pending | None | Pending real device |
+| Question detail | Pending real device | Pending real device | Protected route smoke covered | Pending | None | Pending real device |
+| Question text edit | Pending real device | Pending real device | Requires real question data | Pending | None | Pending real device |
+| Today's review | Pending real device | Pending real device | Protected route smoke covered | Pending | None | Pending real device |
+| Review result buttons | Pending real device | Pending real device | Requires real review data | Pending | None | Pending real device |
+| Reports page | Pending real device | Pending real device | Protected route smoke covered | Pending | None | Pending real device |
+| Sprint mode | Pending real device | Pending real device | Smoke covered reachable/login behavior | Pending | None | Pending real device |
+| Data export | Pending real device | Pending real device | Requires logged-in data | Pending | None | Pending real device |
+| Add to home screen | Pending real device | Pending real device | Manifest smoke covered | Pending | None | Pending real device |
+| Weak network | Pending real device | Pending real device | Not automated | Pending | None | Pending real device |
+| Horizontal scroll | Pending real device | Pending real device | Home mobile viewport smoke passed | Pending | None | Pending real device |
+| Bottom nav overlap | Pending real device | Pending real device | Bottom nav smoke covered | Pending | None | Pending real device |
+| Keyboard overlap input | Pending real device | Pending real device | Requires real soft keyboard | Pending | None | Pending real device |

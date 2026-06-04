@@ -251,4 +251,31 @@ OPENAI_MODEL=gpt-4.1
 - 增加 Playwright 冒烟测试覆盖核心页面。
 - 评估 JSON 导入预检和 Storage 图片缺失检查。
 - 增加轻量趋势图和薄弱点变化展示。
+## Stage 8 production readiness
 
+Production readiness checks added in this phase:
+
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
+
+Playwright first-time setup, if browsers are missing:
+
+```bash
+node ./node_modules/@playwright/test/cli.js install chromium
+```
+
+This project also supports using an already running local server:
+
+```bash
+E2E_BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+Production config check entrypoints:
+
+- Page: `/settings/system-check`
+- JSON API: `/api/settings/system-check`
+
+Both entrypoints are designed to show only configured/missing status and masked values. Do not put real API keys in source code, docs, screenshots, or test fixtures.

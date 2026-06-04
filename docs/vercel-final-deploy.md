@@ -105,4 +105,82 @@ OPENAI_MODEL=gpt-4.1
 | AI 分析失败 | 检查 `OPENAI_API_KEY`、模型权限、额度和 Storage 图片下载权限。 |
 | 报告为空 | 先手动调用 Edge Function，再检查 `reports` 表是否有当前用户数据。 |
 | PWA 名称或图标异常 | 检查 `/manifest.json`、`app/layout.tsx` metadata 和浏览器缓存。 |
+## Stage 8 Vercel production checklist
 
+Run before deploy:
+
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
+
+If Windows reports `Access is denied`, put a usable Node 20.9+ directory at the front of PATH and rerun the exact commands. Do not change source code to bypass an environment failure.
+
+### Before deploy
+
+| Item | Result | Notes |
+| --- | --- | --- |
+| `git status` is clean | To fill | Do not deploy unreviewed local edits. |
+| `npm run lint` passes | To fill | Required before deploy. |
+| `npm run build` passes without warnings | To fill | Required before deploy. |
+| `npm run test:e2e` passes | To fill | Does not require real credentials. |
+| Vercel env vars are configured | To fill | Use dashboard secrets only. |
+| Supabase Auth Site URL is production URL | To fill | Include preview URLs only if needed. |
+| `/settings/system-check` is reachable after login | To fill | Shows masked status only. |
+| `/manifest.json` is reachable | To fill | Required for PWA install flow. |
+
+### After deploy
+
+| Item | Result | Notes |
+| --- | --- | --- |
+| `/` opens on production domain | To fill | Mobile width should not horizontally scroll. |
+| `/login` opens | To fill | Login failures show a visible message. |
+| `/upload`, `/questions`, `/reports` redirect to `/login` when signed out | To fill | Auth protection is expected. |
+| Logged-in upload writes to private Storage | To fill | Path must be `users/{user_id}/questions/{question_id}.{ext}`. |
+| AI analysis works or uses mock fallback | To fill | Missing OpenAI key must not white-screen. |
+| Reports page handles empty data | To fill | Empty state is acceptable after first deploy. |
+| Edge Functions manual calls are recorded | To fill | Cron belongs in Supabase, not Vercel. |
+
+### Environment variables
+
+Vercel app:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<supabase-anon-public-key>
+NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=question-images
+SUPABASE_STORAGE_BUCKET=question-images
+OPENAI_API_KEY=<openai-api-key>
+OPENAI_MODEL=gpt-4.1
+CRON_SECRET=<long-random-secret>
+```
+
+Supabase Edge Functions secrets:
+
+```text
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+SUPABASE_STORAGE_BUCKET=question-images
+OPENAI_API_KEY=<openai-api-key>
+OPENAI_MODEL=gpt-4.1
+CRON_SECRET=<long-random-secret>
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` must not be configured as a browser-visible value and must not be exposed in docs, logs, or screenshots.
+
+### Edge Functions and Vercel
+
+Vercel runs the Next.js web app. Supabase runs `supabase/functions/**`. Configure scheduled jobs in Supabase Cron or pg_cron, not Vercel Cron, so the function URL, secrets, and logs stay in the Supabase operational surface.
+
+### Common production errors
+
+| Error | Check |
+| --- | --- |
+| env missing | Open `/settings/system-check` after login and compare with Vercel env settings. |
+| Supabase auth redirect error | Check Site URL and Redirect URLs in Supabase Auth settings. |
+| Storage policy denied | Check private bucket policy and `users/{auth.uid()}/questions/` path constraint. |
+| OpenAI 401 | Check key project, key status, model access, and accidental whitespace. |
+| Cron secret 401 | Send `x-cron-secret: <CRON_SECRET>` or `Authorization: Bearer <CRON_SECRET>`. |
+| report empty data | Manually trigger report function, then inspect `reports` for current user. |
+| PWA manifest 404 | Confirm `public/manifest.json` is present in the deployed project. |

@@ -188,4 +188,113 @@ where conname in (
   'knowledge_stats_unique_point'
 );
 ```
+## Stage 8 Supabase production checklist
 
+### SQL migration
+
+Run migrations in order from `supabase/migrations/`:
+
+```text
+001_initial_schema.sql
+002_allow_profile_insert.sql
+003_allow_question_image_delete.sql
+004_allow_review_delete.sql
+```
+
+Supabase CLI alternative:
+
+```bash
+supabase db push --project-ref <project-ref>
+```
+
+Do not run destructive SQL against production data unless the exact target rows are known and backed up.
+
+### RLS check
+
+```sql
+select schemaname, tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+  and tablename in ('profiles', 'questions', 'reviews', 'reports', 'knowledge_stats');
+```
+
+Every listed table must have `rowsecurity = true`. Verify with two test accounts that user B cannot read, export, or open user A's data by URL.
+
+### Storage bucket and policy
+
+Create private bucket:
+
+```text
+question-images
+```
+
+Required behavior:
+
+- public access is off;
+- allowed file types include JPEG, PNG, and WebP;
+- user upload/read/update/delete is limited to `users/{auth.uid()}/questions/`;
+- application image paths stay under `users/{user_id}/questions/{question_id}.{ext}`.
+
+### Manual test question
+
+Use only a dedicated test user id:
+
+```sql
+insert into public.questions (
+  user_id,
+  subject,
+  image_path,
+  mastery_status,
+  question_text_status,
+  note
+) values (
+  '<test-user-id>',
+  '408',
+  'users/<test-user-id>/questions/manual-test.webp',
+  'still_wrong',
+  'ai_unverified',
+  'manual production check'
+);
+```
+
+### Verify generated data
+
+Reviews:
+
+```sql
+select user_id, question_id, scheduled_date, completed_at, review_result
+from public.reviews
+where user_id = '<test-user-id>'
+order by scheduled_date desc
+limit 20;
+```
+
+Reports:
+
+```sql
+select user_id, type, start_date, end_date, created_at
+from public.reports
+where user_id = '<test-user-id>'
+order by created_at desc
+limit 20;
+```
+
+Knowledge stats:
+
+```sql
+select user_id, subject, chapter, knowledge_point, weakness_score
+from public.knowledge_stats
+where user_id = '<test-user-id>'
+order by weakness_score desc
+limit 20;
+```
+
+### Clean test data
+
+Delete only rows that were intentionally created for production verification:
+
+```sql
+delete from public.questions
+where user_id = '<test-user-id>'
+  and note = 'manual production check';
+```
