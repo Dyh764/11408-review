@@ -4,8 +4,18 @@ import { BottomNav } from "@/components/bottom-nav";
 
 export const metadata: Metadata = {
   title: "11408 错题复盘助手",
+  applicationName: "11408 错题复盘助手",
   description: "手机优先的 11408 错题拍题、复习和薄弱点分析工具。",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "11408 错题复盘助手",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
@@ -24,7 +34,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body>
         <div className="phone-shell">
-          <main className="min-h-screen pb-24">{children}</main>
+          <main className="min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))]">{children}</main>
           <BottomNav />
         </div>
       </body>
