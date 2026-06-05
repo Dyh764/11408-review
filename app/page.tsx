@@ -1,6 +1,7 @@
 import { ActionCard, MobileCard, MobileSection, StatCard } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { isDeepSeekConfigured } from "@/lib/env";
 import { dashboardStats, mockQuestions } from "@/lib/mock-data";
 
 const quickActions = [
@@ -13,6 +14,8 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
+  const deepSeekEnabled = isDeepSeekConfigured();
+
   return (
     <div>
       <PageHeader
@@ -60,6 +63,29 @@ export default function DashboardPage() {
             </MobileCard>
           ))}
         </div>
+      </MobileSection>
+
+      <MobileSection title="智能建议">
+        <MobileCard>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <StatusPill
+              label={deepSeekEnabled ? "DeepSeek 已启用" : "DeepSeek 未启用（可选）"}
+              tone={deepSeekEnabled ? "blue" : "amber"}
+            />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {deepSeekEnabled
+              ? "点击后会根据最近错题、复习结果和薄弱点摘要生成建议。"
+              : "当前使用规则统计，DeepSeek 可选启用。"}
+          </p>
+          <button
+            type="button"
+            disabled={!deepSeekEnabled}
+            className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            刷新智能分析
+          </button>
+        </MobileCard>
       </MobileSection>
 
       <MobileSection title="今日样例题">

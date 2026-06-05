@@ -13,6 +13,7 @@ export type SprintQuestionInput = {
   chapter: string | null;
   knowledge_point: string | null;
   image_path: string | null;
+  question_text: string | null;
   source: QuestionSource;
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;

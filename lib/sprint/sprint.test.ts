@@ -8,6 +8,8 @@ const baseQuestion: SprintQuestionInput = {
   chapter: "函数",
   knowledge_point: "极限",
   image_path: "users/user-1/questions/q-base.jpg",
+  question_text: "求函数极限。",
+  source: "upload",
   question_text_status: "ai_unverified",
   mastery_status: "有一点思路",
   mistake_types: [],

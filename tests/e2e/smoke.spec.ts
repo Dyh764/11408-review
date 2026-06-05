@@ -67,8 +67,11 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await page.getByRole("button", { name: "解析" }).click();
 
   await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
-  await expect(page.getByText("文字错题卡")).toBeVisible();
-  await expect(page.getByText("二重积分 / 题目文字")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "文字错题卡" })).toBeVisible();
+  await expect(page.getByText("文字题卡预览")).toBeVisible();
+  const textPreview = page.locator("article").filter({ hasText: "文字题卡预览" });
+  await expect(textPreview.getByText("二重积分", { exact: true })).toBeVisible();
+  await expect(textPreview.getByText("题目文字", { exact: true })).toBeVisible();
 });
 
 test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
@@ -94,9 +97,35 @@ test("reports page presents report tabs instead of raw JSON", async ({ page }) =
     return;
   }
 
-  await expect(page.getByRole("button", { name: "日报" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "周报" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "月报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "日报", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "周报", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "月报", exact: true })).toBeVisible();
+});
+
+test("reports page uses user-facing empty copy and exposes manual rule report generation", async ({
+  page,
+}) => {
+  const response = await page.goto("/reports");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await expect(page.getByText("暂无日报")).toBeVisible();
+  await expect(page.getByText("完成上传、导入或复习后，这里会生成学习总结。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "生成今日报告" })).toBeVisible();
+  await expect(page.getByText(/Cron|Edge Function/)).toHaveCount(0);
+});
+
+test("home page explains optional DeepSeek suggestions without auto analysis", async ({ page }) => {
+  const response = await page.goto("/");
+
+  expect(response?.status()).toBeLessThan(400);
+  await expect(page.getByText("智能建议")).toBeVisible();
+  await expect(page.getByText("当前使用规则统计，DeepSeek 可选启用。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "刷新智能分析" })).toBeDisabled();
 });
 
 for (const route of protectedRoutes) {
@@ -131,6 +160,11 @@ test("production system check API returns sanitized readiness fields", async ({ 
     configured: expect.any(Boolean),
   });
   expect(body.variables.OPENAI_API_KEY.value).not.toMatch(/^sk-/);
+  expect(body.variables.OPENAI_API_KEY.status).toBe("optional");
+  expect(body.variables.OPENAI_API_KEY.label).toBe("AI 自动分析未启用（可选）");
+  expect(body.variables.DEEPSEEK_API_KEY.status).toBe("optional");
+  expect(body.variables.DEEPSEEK_API_KEY.label).toBe("DeepSeek 学习分析未启用（可选）");
+  expect(body.variables.DEEPSEEK_MODEL.value).toBe("deepseek-v4-flash");
   expect(body.supabase.connected).toEqual(expect.any(Boolean));
   expect(body.edgeFunctions.docsPresent).toBe(true);
 });

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { MobileCard, MobileSection, Notice } from "@/components/mobile/primitives";
+import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import {
@@ -37,10 +38,25 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
       <h2 className="mt-3 text-base font-semibold text-slate-950">
         {card.knowledge_point ?? "待补充知识点"}
       </h2>
-      <p className="mt-1 text-sm leading-6 text-slate-600">
-        {card.chapter ? `${card.chapter} / ` : ""}
-        {card.question_text ?? card.user_note}
-      </p>
+      {!card.image_path ? (
+        <div className="mt-3">
+          <TextQuestionPreview
+            subject={card.subject}
+            chapter={card.chapter}
+            knowledge_point={card.knowledge_point}
+            question_text={card.question_text ?? card.user_note}
+            mastery_status={card.mastery_status}
+            question_text_status={card.question_text_status}
+            source="chatgpt_import"
+            compact
+          />
+        </div>
+      ) : (
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          {card.chapter ? `${card.chapter} / ` : ""}
+          {card.question_text ?? card.user_note}
+        </p>
+      )}
       <dl className="mt-3 space-y-2 text-sm">
         <div>
           <dt className="font-semibold text-slate-800">错因</dt>

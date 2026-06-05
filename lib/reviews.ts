@@ -24,6 +24,7 @@ export type DueReview = {
     knowledge_point: string | null;
     image_path: string | null;
     source: QuestionSource;
+    question_text: string | null;
     question_text_status: QuestionTextStatus;
     mastery_status: MasteryStatus;
     mistake_types: string[] | null;
@@ -52,6 +53,7 @@ const dueReviewColumns = `
     knowledge_point,
     image_path,
     source,
+    question_text,
     question_text_status,
     mastery_status,
     mistake_types,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
@@ -457,10 +458,25 @@ export default function QuestionsPage() {
                 <p className="mt-2 break-words text-sm font-semibold text-slate-950">
                   {question.knowledge_point ?? "待识别知识点"}
                 </p>
-                <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
-                  {question.chapter ? `${question.chapter} / ` : ""}
-                  {question.question_text ?? "暂无题目文字"}
-                </p>
+                {!question.image_path ? (
+                  <div className="mt-2">
+                    <TextQuestionPreview
+                      subject={question.subject}
+                      chapter={question.chapter}
+                      knowledge_point={question.knowledge_point}
+                      question_text={question.question_text}
+                      mastery_status={question.mastery_status}
+                      question_text_status={question.question_text_status}
+                      source={question.source}
+                      compact
+                    />
+                  </div>
+                ) : (
+                  <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
+                    {question.chapter ? `${question.chapter} / ` : ""}
+                    {question.question_text ?? "暂无题目文字"}
+                  </p>
+                )}
                 <p className="mt-1 text-xs text-slate-500">
                   创建时间：{formatDate(question.created_at)}
                 </p>

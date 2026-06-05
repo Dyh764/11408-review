@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
@@ -254,6 +255,20 @@ export default function ReviewPage() {
                   <p className="mt-1 break-words text-sm leading-6 text-slate-600">
                     {review.questions.one_sentence_tip ?? "暂无一句话提醒"}
                   </p>
+                  {!review.questions.image_path ? (
+                    <div className="mt-2">
+                      <TextQuestionPreview
+                        subject={review.questions.subject}
+                        chapter={review.questions.chapter}
+                        knowledge_point={review.questions.knowledge_point}
+                        question_text={review.questions.question_text}
+                        mastery_status={review.questions.mastery_status}
+                        question_text_status={review.questions.question_text_status}
+                        source={review.questions.source}
+                        compact
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

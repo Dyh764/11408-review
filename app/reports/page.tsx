@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserReports, type ReportRecord, type ReportType } from "@/lib/reports";
@@ -11,6 +11,12 @@ const tabLabels: Record<ReportType, string> = {
   daily: "日报",
   weekly: "周报",
   monthly: "月报",
+};
+
+const generateButtonLabels: Record<ReportType, string> = {
+  daily: "生成今日报告",
+  weekly: "生成本周报告",
+  monthly: "生成本月报告",
 };
 
 type RankedItem = {
@@ -203,6 +209,17 @@ export default function ReportsPage() {
     supabase ? "" : "请配置 Supabase 环境变量后查看真实报告。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [deepSeekConfigured, setDeepSeekConfigured] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/status")
+      .then((response) => response.json())
+      .then((data: { deepseek?: { configured: boolean } }) => {
+        setDeepSeekConfigured(Boolean(data.deepseek?.configured));
+      })
+      .catch(() => setDeepSeekConfigured(false));
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -236,11 +253,41 @@ export default function ReportsPage() {
   const selectedReport =
     reportsForTab.find((report) => report.id === selectedReportId) ?? reportsForTab[0] ?? null;
 
+  async function handleGenerateReport(source: "rule" | "deepseek" = "rule") {
+    setIsGenerating(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/reports/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: tab, source }),
+      });
+      const result = (await response.json()) as { report?: ReportRecord; error?: string };
+
+      if (!response.ok || !result.report) {
+        setMessage(result.error ?? "生成报告失败。");
+        return;
+      }
+
+      setReports((current) => [
+        result.report as ReportRecord,
+        ...current.filter((report) => report.id !== result.report?.id),
+      ]);
+      setSelectedReportId(result.report.id);
+      setMessage("规则版报告已生成。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成报告失败。");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="学习报告"
-        subtitle="读取 reports 表中的日报、周报和月报，按当前登录用户的 RLS 数据展示。"
+        subtitle="手动生成学习总结，查看近期错因、薄弱点和下一步建议。"
       />
 
       <section className="px-5 pt-5">
@@ -279,14 +326,52 @@ export default function ReportsPage() {
 
       {!isLoading && !selectedReport ? (
         <MobileSection>
-          <EmptyState
-            title={`暂无${tabLabels[tab]}`}
-            description="部署 Cron 后，系统会按计划写入报告。也可以先手动调用对应 Edge Function 生成。"
-          />
+          <MobileCard>
+            <h2 className="text-base font-bold text-slate-950">暂无{tabLabels[tab]}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              完成上传、导入或复习后，这里会生成学习总结。
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              你也可以手动生成一次报告。
+            </p>
+            <button
+              type="button"
+              onClick={() => handleGenerateReport("rule")}
+              disabled={isGenerating}
+              className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              {isGenerating ? "生成中..." : generateButtonLabels[tab]}
+            </button>
+          </MobileCard>
         </MobileSection>
       ) : null}
 
       {selectedReport ? <LatestReport report={selectedReport} tab={tab} /> : null}
+
+      <MobileSection>
+        <MobileCard>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold text-slate-800">DeepSeek 分析</h2>
+            <StatusPill
+              label={deepSeekConfigured ? "DeepSeek 已启用" : "DeepSeek 未启用（可选）"}
+              tone={deepSeekConfigured ? "blue" : "amber"}
+            />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {deepSeekConfigured
+              ? "可在规则统计基础上生成学习建议；规则版报告始终可用。"
+              : "DeepSeek 未启用，当前使用规则统计。"}
+          </p>
+          <button
+            type="button"
+            onClick={() => handleGenerateReport("deepseek")}
+            disabled={isGenerating || !deepSeekConfigured}
+            className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            刷新智能分析
+          </button>
+        </MobileCard>
+      </MobileSection>
 
       {reportsForTab.length > 1 ? (
         <MobileSection>

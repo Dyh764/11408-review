@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
@@ -24,6 +25,14 @@ const masteryStatuses: MasteryStatus[] = [
   "完全掌握",
 ];
 const textStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_fix"];
+
+type StatusResponse = {
+  deepseek?: {
+    configured: boolean;
+    label: string;
+    model: string;
+  };
+};
 
 function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
   return {
@@ -49,10 +58,19 @@ export default function QuestionDetailPage() {
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings/status")
+      .then((response) => response.json())
+      .then((data: StatusResponse) => setDeepSeekStatus(data.deepseek ?? null))
+      .catch(() => setDeepSeekStatus(null));
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -159,6 +177,50 @@ export default function QuestionDetailPage() {
     }
   }
 
+  async function handleDeepSeekEnhance() {
+    if (!deepSeekStatus?.configured) {
+      setMessage("DeepSeek 未启用（可选）。");
+      return;
+    }
+
+    const shouldContinue = window.confirm(
+      "DeepSeek 只会优化章节、知识点、错因、摘要、提醒和优先级，不会覆盖题目文字或用户备注。是否继续？",
+    );
+
+    if (!shouldContinue) {
+      return;
+    }
+
+    setIsDeepSeekEnhancing(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${params.id}/deepseek-enhance`, {
+        method: "POST",
+      });
+      const result: unknown = await response.json();
+
+      if (!response.ok) {
+        const errorMessage =
+          typeof result === "object" &&
+          result !== null &&
+          "error" in result &&
+          typeof result.error === "string"
+            ? result.error
+            : "DeepSeek 优化失败。";
+        setMessage(errorMessage);
+        return;
+      }
+
+      await refreshQuestion();
+      setMessage("DeepSeek 优化完成，题目文字和用户备注已保留。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "DeepSeek 优化失败。");
+    } finally {
+      setIsDeepSeekEnhancing(false);
+    }
+  }
+
   async function handleSaveEdit() {
     if (!supabase || !question || !form) {
       setMessage("请先配置 Supabase 并读取错题详情。");
@@ -208,7 +270,7 @@ export default function QuestionDetailPage() {
     <div>
       <PageHeader
         title="错题详情"
-        subtitle="展示原题图片和写入 questions 的 mock 错题卡字段。"
+        subtitle="查看原图或文字题卡，人工核对后再按规则复习。"
       />
 
       {isLoading ? (
@@ -241,8 +303,22 @@ export default function QuestionDetailPage() {
                 />
               </button>
             ) : (
-              <div className="grid h-64 place-items-center bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
-                {question.image_path ? "原题图片暂不可预览" : "未绑定原图，可后续补图"}
+              <div className="bg-white p-4">
+                {question.image_path ? (
+                  <div className="grid min-h-32 place-items-center rounded-lg bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
+                    原题图片暂不可预览
+                  </div>
+                ) : (
+                  <TextQuestionPreview
+                    subject={question.subject}
+                    chapter={question.chapter}
+                    knowledge_point={question.knowledge_point}
+                    question_text={question.question_text}
+                    mastery_status={question.mastery_status}
+                    question_text_status={question.question_text_status}
+                    source={question.source}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -263,6 +339,20 @@ export default function QuestionDetailPage() {
             >
               {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "分析这道题"}
             </button>
+
+            <button
+              type="button"
+              onClick={handleDeepSeekEnhance}
+              disabled={isDeepSeekEnhancing || !deepSeekStatus?.configured}
+              className="mt-3 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {isDeepSeekEnhancing ? "DeepSeek 优化中..." : "DeepSeek 优化题卡"}
+            </button>
+            {!deepSeekStatus?.configured ? (
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                DeepSeek 未启用（可选），当前仍可正常编辑、上传、导入和复习。
+              </p>
+            ) : null}
 
             <button
               type="button"

@@ -24,7 +24,19 @@ import { createClient } from "@/lib/supabase/client";
 
 type StatusResponse = {
   supabase: { configured: boolean; urlConfigured: boolean; anonKeyConfigured: boolean };
-  openai: { configured: boolean; modelConfigured: boolean };
+  openai: {
+    configured: boolean;
+    modelConfigured: boolean;
+    optional: boolean;
+    label: string;
+  };
+  deepseek: {
+    configured: boolean;
+    model: string;
+    modelConfigured: boolean;
+    optional: boolean;
+    label: string;
+  };
   storage: { bucket: string; configured: boolean };
 };
 
@@ -305,8 +317,16 @@ export default function SettingsPage() {
               tone={status?.supabase.configured ? "blue" : "red"}
             />
             <StatusPill
-              label={status?.openai.configured ? "OpenAI 已配置" : "OpenAI 未配置"}
+              label={status?.storage.configured ? "图片存储已配置" : "图片存储未配置"}
+              tone={status?.storage.configured ? "blue" : "red"}
+            />
+            <StatusPill
+              label={status?.openai.label ?? "AI 自动分析：未启用（可选）"}
               tone={status?.openai.configured ? "blue" : "amber"}
+            />
+            <StatusPill
+              label={status?.deepseek.label ?? "DeepSeek 学习分析：未启用（可选）"}
+              tone={status?.deepseek.configured ? "blue" : "amber"}
             />
             <StatusPill
               label={status?.storage.configured ? `Bucket: ${status.storage.bucket}` : "Bucket 未配置"}
@@ -314,8 +334,17 @@ export default function SettingsPage() {
             />
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            设置页只显示是否配置，不显示 API Key、service role key 或 token。
+            AI 自动分析和 DeepSeek 学习分析都是可选增强，不配置也不影响上传、导入、复习和错题库。设置页只显示是否配置，不显示 API Key、service role key 或 token。
           </p>
+          <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">
+            <p className="font-semibold">当前推荐流程</p>
+            <ol className="mt-2 grid gap-1">
+              <li>1. 白天在 ChatGPT 中提问和整理错题；</li>
+              <li>2. 晚上复制 ChatGPT 生成的 JSON；</li>
+              <li>3. 在“导入 ChatGPT 错题卡”中导入；</li>
+              <li>4. 系统负责保存错题、安排复习和统计薄弱点。</li>
+            </ol>
+          </div>
         </MobileCard>
 
         <MobileCard>

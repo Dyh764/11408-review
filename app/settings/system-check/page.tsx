@@ -24,14 +24,35 @@ function StatusBadge({ status }: { status: "pass" | "warn" | "fail" }) {
   );
 }
 
-function ConfigRow({ label, value }: { label: string; value: { configured: boolean; value: string } }) {
+function configStatus(value: { configured: boolean; status?: "required" | "optional" }) {
+  if (value.configured) {
+    return "pass";
+  }
+
+  return value.status === "optional" ? "warn" : "fail";
+}
+
+function ConfigRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: {
+    configured: boolean;
+    value: string;
+    status?: "required" | "optional";
+    label?: string;
+    message?: string;
+  };
+}) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-100 py-3 last:border-b-0">
       <div>
-        <p className="text-sm font-medium text-slate-800">{label}</p>
-        <p className="mt-1 text-xs text-slate-500">{value.configured ? value.value : "未配置"}</p>
+        <p className="text-sm font-medium text-slate-800">{value.label ?? label}</p>
+        <p className="mt-1 text-xs text-slate-500">{value.value}</p>
+        {value.message ? <p className="mt-1 text-xs leading-5 text-slate-500">{value.message}</p> : null}
       </div>
-      <StatusBadge status={value.configured ? "pass" : "fail"} />
+      <StatusBadge status={configStatus(value)} />
     </div>
   );
 }

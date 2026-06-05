@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
@@ -248,6 +249,20 @@ export default function SprintPage() {
                   <p className="mt-1 break-words text-sm leading-6 text-slate-600">
                     {item.question.one_sentence_tip ?? "暂无一句话提醒"}
                   </p>
+                  {!item.question.image_path ? (
+                    <div className="mt-2">
+                      <TextQuestionPreview
+                        subject={item.question.subject}
+                        chapter={item.question.chapter}
+                        knowledge_point={item.question.knowledge_point}
+                        question_text={item.question.question_text}
+                        mastery_status={item.question.mastery_status}
+                        question_text_status={item.question.question_text_status}
+                        source={item.question.source}
+                        compact
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
