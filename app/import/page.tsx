@@ -6,6 +6,7 @@ import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
+import { getQuestionSourceLabel } from "@/lib/questions/meta-labels";
 import {
   importExampleJson,
   parseImportJsonText,
@@ -30,7 +31,6 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
       <div className="flex flex-wrap gap-2">
         <StatusPill label={`第 ${item.index} 条`} tone="slate" />
         <StatusPill label={card.subject} tone="blue" />
-        <StatusPill label={card.mastery_status} tone="amber" />
         {card.image_path ? (
           <StatusPill label="已绑定原图路径" tone="blue" />
         ) : (
@@ -84,12 +84,6 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
           <dt className="font-semibold text-slate-800">一句话提醒</dt>
           <dd className="mt-1 text-slate-600">{card.one_sentence_tip ?? "待补充"}</dd>
         </div>
-        {card.image_code ? (
-          <div>
-            <dt className="font-semibold text-slate-800">image_code</dt>
-            <dd className="mt-1 break-words text-slate-600">{card.image_code}</dd>
-          </div>
-        ) : null}
       </dl>
     </MobileCard>
   );
@@ -218,7 +212,7 @@ export default function ImportPage() {
             <h2 className="text-base font-semibold text-slate-950">
               预览 {previewCards.length} 张错题卡
             </h2>
-            <StatusPill label="source: chatgpt_import" tone="blue" />
+            <StatusPill label={getQuestionSourceLabel("chatgpt_import")} tone="blue" />
           </div>
           {previewCards.map((item) => (
             <ImportPreviewCard key={item.index} item={item} />

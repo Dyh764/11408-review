@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
+import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
 import { PageHeader } from "@/components/page-header";
-import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
-import { getAnswerStatusLabel, getAnswerStatusTone } from "@/lib/questions/answer-labels";
-import { getQuestionSourceLabel } from "@/lib/questions/source-label";
+import { getQuestionTextStatusLabel } from "@/lib/questions/meta-labels";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjectFilters: Array<Subject | "全部"> = [
@@ -164,7 +163,7 @@ export default function QuestionsPage() {
       action === "mastered"
         ? "批量标记为已掌握"
         : action === "needs_fix"
-          ? "批量标记为 needs_fix"
+          ? "批量标记为题目需修正"
           : "批量加入冲刺复习";
 
     if (!window.confirm(`确认${actionLabel}？本操作不会删除错题。`)) {
@@ -214,7 +213,7 @@ export default function QuestionsPage() {
           .eq("user_id", user.id);
 
         if (updateError) {
-          setMessage(`批量标记 needs_fix 失败：${updateError.message}`);
+          setMessage(`批量标记题目需修正失败：${updateError.message}`);
           return;
         }
 
@@ -317,7 +316,7 @@ export default function QuestionsPage() {
           >
             {textStatusFilters.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {item === "全部" ? item : getQuestionTextStatusLabel(item)}
               </option>
             ))}
           </select>
@@ -377,7 +376,7 @@ export default function QuestionsPage() {
               disabled={isBatchProcessing}
               className="min-h-11 rounded-lg bg-amber-100 px-3 text-sm font-semibold text-amber-800 disabled:text-slate-400"
             >
-              标记 needs_fix
+              标记需修正
             </button>
             <button
               type="button"
@@ -447,24 +446,13 @@ export default function QuestionsPage() {
                 )}
               </Link>
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap gap-2">
-                  <StatusPill label={question.subject} tone="blue" />
-                  <StatusPill label={question.mastery_status} tone="amber" />
-                  {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
-                  <StatusPill
-                    label={question.standard_answer ? "有答案" : "无答案"}
-                    tone={question.standard_answer ? "blue" : "amber"}
-                  />
-                  <StatusPill
-                    label={getAnswerStatusLabel(question.answer_status)}
-                    tone={getAnswerStatusTone(question.answer_status)}
-                  />
-                  <StatusPill label={question.question_text_status} tone="slate" />
-                  <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
-                  {question.needs_manual_check ? (
-                    <StatusPill label="需人工核对" tone="red" />
-                  ) : null}
-                </div>
+                <QuestionMetaBadges
+                  subject={question.subject}
+                  difficulty={question.difficulty}
+                  mastery_status={question.mastery_status}
+                  question_text_status={question.question_text_status}
+                  hasAnswer={Boolean(question.standard_answer?.trim())}
+                />
                 <p className="mt-2 break-words text-sm font-semibold text-slate-950">
                   {question.knowledge_point ?? "待识别知识点"}
                 </p>
@@ -474,10 +462,12 @@ export default function QuestionsPage() {
                       subject={question.subject}
                       chapter={question.chapter}
                       knowledge_point={question.knowledge_point}
+                      difficulty={question.difficulty}
                       question_text={question.question_text}
                       mastery_status={question.mastery_status}
                       question_text_status={question.question_text_status}
                       source={question.source}
+                      hasAnswer={Boolean(question.standard_answer?.trim())}
                       compact
                     />
                   </div>

@@ -29,6 +29,7 @@ function readEnv(
   options?: {
     status?: "required" | "optional";
     label?: string;
+    configuredLabel?: string;
     message?: string;
     defaultValue?: string;
   },
@@ -40,7 +41,7 @@ function readEnv(
     configured: Boolean(value),
     value: value ? maskSecret(value) : defaultValue ?? "未配置",
     status: options?.status ?? "required",
-    label: options?.label ?? name,
+    label: value ? options?.configuredLabel ?? options?.label ?? name : options?.label ?? name,
     message: options?.message ?? (value ? "已配置。" : "未配置。"),
   };
 }
@@ -181,12 +182,14 @@ export async function getProductionConfigCheck() {
       }),
       OPENAI_API_KEY: readEnv("OPENAI_API_KEY", {
         status: "optional",
-        label: "AI 自动分析未启用（可选）",
+        label: "AI 自动分析：未启用（可选）",
+        configuredLabel: "AI 自动分析：已配置",
         message: "OpenAI 自动分析是可选增强，不影响上传、导入、复习和错题库。",
       }),
       DEEPSEEK_API_KEY: readEnv("DEEPSEEK_API_KEY", {
         status: "optional",
-        label: "DeepSeek 学习分析未启用（可选）",
+        label: "DeepSeek 学习分析：未启用（可选）",
+        configuredLabel: "DeepSeek 学习分析：已配置",
         message: "DeepSeek 学习分析是可选增强，未配置时继续使用规则统计。",
       }),
       DEEPSEEK_MODEL: readEnv("DEEPSEEK_MODEL", {

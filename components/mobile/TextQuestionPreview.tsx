@@ -1,6 +1,7 @@
+import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
 import { StatusPill } from "@/components/status-pill";
-import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import type {
+  Difficulty,
   MasteryStatus,
   QuestionSource,
   QuestionTextStatus,
@@ -11,10 +12,13 @@ type TextQuestionPreviewProps = {
   subject: Subject | string;
   chapter?: string | null;
   knowledge_point?: string | null;
+  difficulty?: Difficulty | string | null;
   question_text?: string | null;
   mastery_status?: MasteryStatus | string | null;
   question_text_status?: QuestionTextStatus | null;
   source?: QuestionSource | null;
+  hasAnswer?: boolean;
+  showSource?: boolean;
   compact?: boolean;
 };
 
@@ -22,10 +26,13 @@ export function TextQuestionPreview({
   subject,
   chapter,
   knowledge_point,
+  difficulty,
   question_text,
   mastery_status,
   question_text_status = "needs_fix",
   source = "chatgpt_import",
+  hasAnswer,
+  showSource = false,
   compact = false,
 }: TextQuestionPreviewProps) {
   const hasText = Boolean(question_text?.trim());
@@ -33,37 +40,41 @@ export function TextQuestionPreview({
   if (!hasText) {
     return (
       <div className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
-        <p className="font-semibold text-slate-700">还没有题目文字，也未绑定原图</p>
+        <p className="font-semibold text-slate-700">还没有题目文字，也未绑定原图。</p>
         {!compact ? (
-          <p className="mt-1 text-xs leading-5">可以编辑错题或补充绑定原图。</p>
+          <p className="mt-1 text-xs leading-5">可以先编辑错题，补充题干后再复习。</p>
         ) : null}
       </div>
     );
   }
 
   return (
-    <article className="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-left">
+    <article className="rounded-lg border border-slate-100 bg-white p-3 text-left shadow-sm">
       <div className="flex flex-wrap gap-2">
         <StatusPill label="未绑定原图" tone="amber" />
-        <StatusPill
-          label={getQuestionSourceLabel({
-            source,
-            question_text_status: question_text_status ?? "needs_fix",
-            user_note: null,
-          })}
-          tone="blue"
+        {!compact ? <StatusPill label="文字错题卡" tone="blue" /> : null}
+      </div>
+      <h2 className={`mt-3 font-bold text-slate-950 ${compact ? "text-sm" : "text-base"}`}>
+        文字错题卡
+      </h2>
+      <div className="mt-3">
+        <QuestionMetaBadges
+          subject={subject}
+          difficulty={difficulty}
+          mastery_status={mastery_status}
+          question_text_status={question_text_status}
+          hasAnswer={hasAnswer}
+          source={source}
+          showSource={showSource}
         />
       </div>
-      <p className="mt-3 text-xs font-semibold text-blue-700">文字题卡预览</p>
-      <h3 className="mt-1 text-sm font-bold text-slate-950">文字错题卡</h3>
-      <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-        <span>{subject}</span>
-        {chapter ? <span>{chapter}</span> : null}
-        {knowledge_point ? <span>{knowledge_point}</span> : null}
-        {mastery_status ? <span>{mastery_status}</span> : null}
-      </div>
+      {chapter || knowledge_point ? (
+        <p className="mt-2 break-words text-xs leading-5 text-slate-500">
+          {[chapter, knowledge_point].filter(Boolean).join(" / ")}
+        </p>
+      ) : null}
       <p
-        className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800 ${
+        className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 ${
           compact ? "line-clamp-3" : ""
         }`}
       >

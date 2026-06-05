@@ -68,9 +68,9 @@ test("import page can parse example JSON into preview cards when reachable", asy
 
   await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
   await expect(page.getByRole("heading", { name: "文字错题卡" })).toBeVisible();
-  await expect(page.getByText("文字题卡预览")).toBeVisible();
-  const textPreview = page.locator("article").filter({ hasText: "文字题卡预览" });
-  await expect(textPreview.getByText("二重积分", { exact: true })).toBeVisible();
+  await expect(page.getByText("文字题卡预览")).toHaveCount(0);
+  const textPreview = page.locator("article").filter({ hasText: "文字错题卡" });
+  await expect(textPreview.getByText("二重积分")).toBeVisible();
   await expect(textPreview.getByText("题目文字", { exact: true })).toBeVisible();
 });
 
@@ -124,7 +124,7 @@ test("import page previews ChatGPT answer fields when JSON includes an answer", 
     page.locator("div").filter({ hasText: "标准答案预览" }).getByText("最终答案", { exact: true }),
   ).toBeVisible();
   await expect(page.getByText("关键步骤 3 步")).toBeVisible();
-  await expect(page.getByText("待核对")).toBeVisible();
+  await expect(page.getByText("待核对", { exact: true })).toBeVisible();
 });
 
 test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
@@ -255,9 +255,9 @@ test("production system check API returns sanitized readiness fields", async ({ 
   });
   expect(body.variables.OPENAI_API_KEY.value).not.toMatch(/^sk-/);
   expect(body.variables.OPENAI_API_KEY.status).toBe("optional");
-  expect(body.variables.OPENAI_API_KEY.label).toBe("AI 自动分析未启用（可选）");
+  expect(body.variables.OPENAI_API_KEY.label).toBe("AI 自动分析：未启用（可选）");
   expect(body.variables.DEEPSEEK_API_KEY.status).toBe("optional");
-  expect(body.variables.DEEPSEEK_API_KEY.label).toBe("DeepSeek 学习分析未启用（可选）");
+  expect(body.variables.DEEPSEEK_API_KEY.label).toBe("DeepSeek 学习分析：未启用（可选）");
   expect(body.variables.DEEPSEEK_MODEL.value).toBe("deepseek-v4-flash");
   expect(body.supabase.connected).toEqual(expect.any(Boolean));
   expect(body.edgeFunctions.docsPresent).toBe(true);

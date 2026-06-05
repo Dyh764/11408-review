@@ -1,4 +1,5 @@
 import type { QuestionSource, QuestionTextStatus } from "@/lib/types";
+import { getQuestionSourceLabel as getQuestionSourceEnumLabel } from "@/lib/questions/meta-labels";
 
 type SourceLabelInput = {
   source?: QuestionSource | null;
@@ -14,11 +15,11 @@ export function getQuestionSourceLabel(question: SourceLabelInput) {
     (question.question_text_status === "needs_fix" &&
       question.user_note?.includes("待 ChatGPT 整理"))
   ) {
-    return "待整理";
+    return "待 ChatGPT 整理";
   }
 
-  if (question.source === "chatgpt_import") {
-    return "ChatGPT 整理";
+  if (question.source) {
+    return getQuestionSourceEnumLabel(question.source);
   }
 
   if (question.question_text_status === "verified") {
@@ -29,9 +30,9 @@ export function getQuestionSourceLabel(question: SourceLabelInput) {
     return "需核对";
   }
 
-  if (question.source === "ai_analysis" || question.solution_summary) {
+  if (question.solution_summary) {
     return "AI 自动分析";
   }
 
-  return "手动编辑";
+  return "手动录入";
 }

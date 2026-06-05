@@ -14,7 +14,7 @@ export async function GET() {
       configured: Boolean(process.env.OPENAI_API_KEY),
       modelConfigured: Boolean(process.env.OPENAI_MODEL),
       optional: true,
-      label: process.env.OPENAI_API_KEY ? "AI 自动分析：已启用" : "AI 自动分析：未启用（可选）",
+      label: process.env.OPENAI_API_KEY ? "AI 自动分析：已配置" : "AI 自动分析：未启用（可选）",
     },
     deepseek: {
       configured: Boolean(process.env.DEEPSEEK_API_KEY),
@@ -22,7 +22,7 @@ export async function GET() {
       modelConfigured: Boolean(process.env.DEEPSEEK_MODEL),
       optional: true,
       label: process.env.DEEPSEEK_API_KEY
-        ? "DeepSeek 学习分析：已启用"
+        ? "DeepSeek 学习分析：已配置"
         : "DeepSeek 学习分析：未启用（可选）",
     },
     storage: {

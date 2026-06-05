@@ -18,6 +18,11 @@ import {
 } from "@/lib/image/compress-image";
 import { createMockAnalysis } from "@/lib/mock-ai";
 import { ensureProfile } from "@/lib/profile";
+import {
+  getConfidenceLabel,
+  getQuestionTextStatusLabel,
+  getReviewPriorityLabel,
+} from "@/lib/questions/meta-labels";
 import { buildInitialReviewPlan } from "@/lib/review-scheduler";
 import { createClient } from "@/lib/supabase/client";
 import type { MasteryStatus, MockAnalysis, Subject } from "@/lib/types";
@@ -430,9 +435,9 @@ export default function UploadPage() {
         <MobileSection>
           <MobileCard>
             <div className="flex flex-wrap gap-2">
-              <StatusPill label={analysis.question_text_status} tone="amber" />
-              <StatusPill label={analysis.review_priority} tone="blue" />
-              <StatusPill label={analysis.confidence} tone="slate" />
+              <StatusPill label={getQuestionTextStatusLabel(analysis.question_text_status)} tone="amber" />
+              <StatusPill label={getReviewPriorityLabel(analysis.review_priority)} tone="blue" />
+              <StatusPill label={getConfidenceLabel(analysis.confidence)} tone="slate" />
             </div>
             <h2 className="mt-4 text-base font-bold text-slate-950">自动分析结果</h2>
             {savedQuestionId ? (

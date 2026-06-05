@@ -36,24 +36,24 @@ export function AnswerPanel({
 
       {!hasAnswer ? (
         <p className="mt-3 text-slate-600">
-          还没有录入标准答案，可在导入 JSON 时加入 standard_answer，或手动编辑。
+          还没有录入答案。晚上整理错题时，请让 ChatGPT 输出 standard_answer 和 answer_explanation。
         </p>
       ) : (
         <div className="mt-3 space-y-4">
           <div>
-            <p className="font-semibold text-slate-900">标准答案</p>
+            <p className="font-semibold text-slate-900">答案：</p>
             <p className="mt-1 whitespace-pre-wrap break-words">{standard_answer}</p>
           </div>
 
           <div>
-            <p className="font-semibold text-slate-900">答案解析</p>
+            <p className="font-semibold text-slate-900">过程：</p>
             <p className="mt-1 whitespace-pre-wrap break-words">
-              {answer_explanation?.trim() || "暂无完整解析。"}
+              {answer_explanation?.trim() || "暂无完整过程。"}
             </p>
           </div>
 
           <div>
-            <p className="font-semibold text-slate-900">关键步骤</p>
+            <p className="font-semibold text-slate-900">关键步骤：</p>
             {steps.length > 0 ? (
               <ol className="mt-1 list-decimal space-y-1 pl-5">
                 {steps.map((step, index) => (

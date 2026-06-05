@@ -1,19 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
+import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
 import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
-import { getAnswerStatusLabel, getAnswerStatusTone } from "@/lib/questions/answer-labels";
+import { todayIsoDate } from "@/lib/dates";
+import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
+import {
+  getQuestionTextStatusLabel,
+  getQuestionTextStatusTone,
+} from "@/lib/questions/meta-labels";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
 import {
   buildQuestionUpdatePayload,
   type QuestionEditForm,
 } from "@/lib/questions/edit-question";
-import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import { createClient } from "@/lib/supabase/client";
 import type { AnswerStatus, Difficulty, MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
@@ -69,6 +75,7 @@ export default function QuestionDetailPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingReview, setIsAddingReview] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isAnswerVisible, setIsAnswerVisible] = useState(false);
@@ -272,6 +279,48 @@ export default function QuestionDetailPage() {
     }
   }
 
+  async function handleAddToTodayReview() {
+    if (!supabase || !question) {
+      setMessage("请先配置 Supabase 并读取错题详情。");
+      return;
+    }
+
+    setIsAddingReview(true);
+    setMessage("");
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setMessage("请先登录，再加入今日复习。");
+        return;
+      }
+
+      const { error } = await supabase.from("reviews").upsert(
+        {
+          user_id: user.id,
+          question_id: question.id,
+          scheduled_date: todayIsoDate(),
+        },
+        { onConflict: "question_id,scheduled_date" },
+      );
+
+      if (error) {
+        setMessage(`加入今日复习失败：${error.message}`);
+        return;
+      }
+
+      setMessage("已加入今日复习。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "加入今日复习失败，请稍后重试。");
+    } finally {
+      setIsAddingReview(false);
+    }
+  }
+
   function updateForm<K extends keyof QuestionEditForm>(key: K, value: QuestionEditForm[K]) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
@@ -280,7 +329,7 @@ export default function QuestionDetailPage() {
     <div>
       <PageHeader
         title="错题详情"
-        subtitle="查看原图或文字题卡，人工核对后再按规则复习。"
+        subtitle="查看原题或文字题卡，做完后再核对答案。"
       />
 
       {isLoading ? (
@@ -298,91 +347,215 @@ export default function QuestionDetailPage() {
       ) : null}
 
       {question ? (
-        <MobileSection>
-          <div className="space-y-4">
-          <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
-            {question.signedImageUrl ? (
-              <button type="button" onClick={() => setIsPreviewOpen(true)} className="block w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                  src={question.signedImageUrl}
-                  alt="原题图片"
-                  loading="lazy"
-                  decoding="async"
-                  className="max-h-[520px] w-full object-contain"
-                />
-              </button>
-            ) : (
-              <div className="bg-white p-4">
-                {question.image_path ? (
-                  <div className="grid min-h-32 place-items-center rounded-lg bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
-                    原题图片暂不可预览
-                  </div>
-                ) : (
-                  <TextQuestionPreview
+        <>
+          <MobileSection title={question.signedImageUrl ? "原题图片" : "文字错题卡"}>
+            <div className="space-y-4">
+              {question.signedImageUrl ? (
+                <MobileCard>
+                  <QuestionMetaBadges
                     subject={question.subject}
-                    chapter={question.chapter}
-                    knowledge_point={question.knowledge_point}
-                    question_text={question.question_text}
+                    difficulty={question.difficulty}
                     mastery_status={question.mastery_status}
                     question_text_status={question.question_text_status}
-                    source={question.source}
+                    hasAnswer={Boolean(question.standard_answer?.trim())}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className="mt-4 block w-full overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={question.signedImageUrl}
+                      alt="原题图片"
+                      loading="lazy"
+                      decoding="async"
+                      className="max-h-[520px] w-full object-contain"
+                    />
+                  </button>
+                </MobileCard>
+              ) : question.image_path ? (
+                <MobileCard>
+                  <QuestionMetaBadges
+                    subject={question.subject}
+                    difficulty={question.difficulty}
+                    mastery_status={question.mastery_status}
+                    question_text_status={question.question_text_status}
+                    hasAnswer={Boolean(question.standard_answer?.trim())}
+                  />
+                  <div className="mt-4 grid min-h-32 place-items-center rounded-lg bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
+                    原题图片暂不可预览
+                  </div>
+                  {question.question_text ? (
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                      {question.question_text}
+                    </p>
+                  ) : null}
+                </MobileCard>
+              ) : (
+                <TextQuestionPreview
+                  subject={question.subject}
+                  chapter={question.chapter}
+                  knowledge_point={question.knowledge_point}
+                  difficulty={question.difficulty}
+                  question_text={question.question_text}
+                  mastery_status={question.mastery_status}
+                  question_text_status={question.question_text_status}
+                  source={question.source}
+                  hasAnswer={Boolean(question.standard_answer?.trim())}
+                />
+              )}
+            </div>
+          </MobileSection>
+
+          <MobileSection title="核对答案" subtitle="先自己做一遍，再展开标准答案和过程。">
+            <MobileCard>
+              <button
+                type="button"
+                onClick={() => setIsAnswerVisible((value) => !value)}
+                className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+              >
+                {isAnswerVisible ? "隐藏答案" : "查看答案"}
+              </button>
+              {isAnswerVisible ? (
+                <div className="mt-3">
+                  <AnswerPanel
+                    standard_answer={question.standard_answer}
+                    answer_explanation={question.answer_explanation}
+                    key_steps={question.key_steps}
+                    answer_status={question.answer_status}
+                    answer_source={question.answer_source}
+                  />
+                </div>
+              ) : null}
+            </MobileCard>
+          </MobileSection>
+
+          <MobileSection title="复习结果" subtitle="做完并核对后，把这道题加入今天的复习队列。">
+            <MobileCard>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Link
+                  href="/review"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+                >
+                  开始复习
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleAddToTodayReview}
+                  disabled={isAddingReview}
+                  className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:text-slate-400"
+                >
+                  {isAddingReview ? "加入中..." : "加入今日复习"}
+                </button>
+              </div>
+            </MobileCard>
+          </MobileSection>
+
+          <MobileSection title="解析笔记">
+            <MobileCard>
+              <dl className="space-y-4 text-sm">
+                <div>
+                  <dt className="font-semibold text-slate-800">章节 / 知识点</dt>
+                  <dd className="mt-1 break-words text-slate-600">
+                    {question.chapter ?? "待补充"} / {question.knowledge_point ?? "待补充"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-800">错因</dt>
+                  <dd className="mt-1 text-slate-600">
+                    {question.mistake_types?.join("、") || "待补充"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-800">解析摘要</dt>
+                  <dd className="mt-1 whitespace-pre-wrap break-words leading-6 text-slate-600">
+                    {question.solution_summary ?? "待补充"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-800">一句话提醒</dt>
+                  <dd className="mt-1 break-words text-slate-600">
+                    {question.one_sentence_tip ?? "待补充"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-800">我的备注</dt>
+                  <dd className="mt-1 whitespace-pre-wrap break-words leading-6 text-slate-600">
+                    {question.user_note ?? "无"}
+                  </dd>
+                </div>
+              </dl>
+            </MobileCard>
+          </MobileSection>
+
+          <MobileSection title="智能增强">
+            <MobileCard>
+              <div className="flex flex-wrap gap-2">
+                <StatusPill
+                  label={getQuestionTextStatusLabel(question.question_text_status)}
+                  tone={getQuestionTextStatusTone(question.question_text_status)}
+                />
+                <StatusPill
+                  label={question.standard_answer ? "有答案" : "无答案"}
+                  tone={question.standard_answer ? "blue" : "amber"}
+                />
+                <StatusPill label={getAnswerStatusLabel(question.answer_status)} tone="slate" />
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                当前主要流程是查看题目、核对答案和记录复习。AI 自动分析和 DeepSeek 都是可选增强。
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                  className="min-h-11 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:text-slate-400"
+                >
+                  {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "AI 自动分析"}
+                </button>
+                {deepSeekStatus?.configured ? (
+                  <button
+                    type="button"
+                    onClick={handleDeepSeekEnhance}
+                    disabled={isDeepSeekEnhancing}
+                    className="min-h-11 rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:text-slate-400"
+                  >
+                    {isDeepSeekEnhancing ? "优化中..." : "DeepSeek 优化题卡"}
+                  </button>
+                ) : (
+                  <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500 ring-1 ring-slate-100">
+                    DeepSeek 学习分析未启用（可选），不影响当前复习。配置 DEEPSEEK_API_KEY 后可用。
+                  </p>
                 )}
               </div>
-            )}
-          </div>
+            </MobileCard>
+          </MobileSection>
 
-          <MobileCard>
-            <div className="flex flex-wrap gap-2">
-              <StatusPill label={question.subject} tone="blue" />
-              <StatusPill label={question.mastery_status} tone="amber" />
-              {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
-              <StatusPill label={question.question_text_status} tone="slate" />
-              <StatusPill
-                label={question.standard_answer ? "有答案" : "无答案"}
-                tone={question.standard_answer ? "blue" : "amber"}
-              />
-              <StatusPill
-                label={getAnswerStatusLabel(question.answer_status)}
-                tone={getAnswerStatusTone(question.answer_status)}
-              />
-              <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
-            </div>
+          <MobileSection title="更多操作">
+            <MobileCard>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Link
+                  href="/questions"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
+                >
+                  返回错题库
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing((value) => !value)}
+                  className="min-h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+                >
+                  {isEditing ? "收起编辑" : "编辑错题"}
+                </button>
+              </div>
+            </MobileCard>
+          </MobileSection>
 
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isAnalyzing}
-              className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
-            >
-              {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "分析这道题"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDeepSeekEnhance}
-              disabled={isDeepSeekEnhancing || !deepSeekStatus?.configured}
-              className="mt-3 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              {isDeepSeekEnhancing ? "DeepSeek 优化中..." : "DeepSeek 优化题卡"}
-            </button>
-            {!deepSeekStatus?.configured ? (
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                DeepSeek 未启用（可选），当前仍可正常编辑、上传、导入和复习。
-              </p>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => setIsEditing((value) => !value)}
-              className="mt-3 min-h-12 w-full rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
-            >
-              {isEditing ? "收起编辑" : "编辑错题"}
-            </button>
-
-            {isEditing && form ? (
-              <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
+          {isEditing && form ? (
+            <MobileSection title="编辑错题">
+              <MobileCard>
+                <div className="space-y-3">
                 <label className="block">
                   <span className="text-sm font-semibold text-slate-800">题目文字</span>
                   <textarea
@@ -404,7 +577,7 @@ export default function QuestionDetailPage() {
                     >
                       {textStatuses.map((item) => (
                         <option key={item} value={item}>
-                          {item}
+                          {getQuestionTextStatusLabel(item)}
                         </option>
                       ))}
                     </select>
@@ -562,68 +735,10 @@ export default function QuestionDetailPage() {
                   {isSaving ? "保存中..." : "保存编辑"}
                 </button>
               </div>
-            ) : null}
-
-            <div className="mt-4 rounded-lg bg-white p-3 ring-1 ring-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsAnswerVisible((value) => !value)}
-                className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
-              >
-                {isAnswerVisible ? "隐藏答案" : "查看答案"}
-              </button>
-              {isAnswerVisible ? (
-                <div className="mt-3">
-                  <AnswerPanel
-                    standard_answer={question.standard_answer}
-                    answer_explanation={question.answer_explanation}
-                    key_steps={question.key_steps}
-                    answer_status={question.answer_status}
-                    answer_source={question.answer_source}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <dl className="mt-4 space-y-4 text-sm">
-              <div>
-                <dt className="font-semibold text-slate-800">题目文字</dt>
-                <dd className="mt-1 whitespace-pre-wrap break-words leading-6 text-slate-600">
-                  {question.question_text ?? "AI 尚未识别题目文字"}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-slate-800">章节 / 知识点</dt>
-                <dd className="mt-1 text-slate-600">
-                  {question.chapter ?? "待识别"} / {question.knowledge_point ?? "待识别"}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-slate-800">用户备注</dt>
-                <dd className="mt-1 text-slate-600">{question.user_note ?? "无"}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-slate-800">错因标签</dt>
-                <dd className="mt-1 text-slate-600">
-                  {question.mistake_types?.join("、") || "待分析"}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-slate-800">正确思路摘要</dt>
-                <dd className="mt-1 whitespace-pre-wrap break-words leading-6 text-slate-600">
-                  {question.solution_summary ?? "待分析"}
-                </dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-slate-800">一句话提醒</dt>
-                <dd className="mt-1 text-slate-600">
-                  {question.one_sentence_tip ?? "待分析"}
-                </dd>
-              </div>
-            </dl>
-          </MobileCard>
-          </div>
-        </MobileSection>
+              </MobileCard>
+            </MobileSection>
+          ) : null}
+        </>
       ) : null}
 
       {isPreviewOpen && question?.signedImageUrl ? (
