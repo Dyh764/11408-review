@@ -32,6 +32,7 @@ function readEnv(
     configuredLabel?: string;
     message?: string;
     defaultValue?: string;
+    mask?: boolean;
   },
 ): EnvStatus {
   const value = process.env[name];
@@ -39,7 +40,7 @@ function readEnv(
 
   return {
     configured: Boolean(value),
-    value: value ? maskSecret(value) : defaultValue ?? "未配置",
+    value: value ? (options?.mask === false ? value : maskSecret(value)) : defaultValue ?? "未配置",
     status: options?.status ?? "required",
     label: value ? options?.configuredLabel ?? options?.label ?? name : options?.label ?? name,
     message: options?.message ?? (value ? "已配置。" : "未配置。"),
@@ -196,6 +197,7 @@ export async function getProductionConfigCheck() {
         status: "optional",
         label: "DeepSeek 模型",
         defaultValue: defaultDeepSeekModel,
+        mask: false,
         message: `未配置时默认使用 ${defaultDeepSeekModel}。`,
       }),
       CRON_SECRET: readEnv("CRON_SECRET", {

@@ -87,7 +87,6 @@ export async function POST(_request: Request, context: RouteContext) {
         review_priority: enhancement.review_priority,
         confidence: enhancement.confidence,
         needs_manual_check: enhancement.needs_manual_check,
-        analyzed_at: new Date().toISOString(),
       })
       .eq("id", id)
       .eq("user_id", user.id);

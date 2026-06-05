@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { EmptyState, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
-import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
 import { PageHeader } from "@/components/page-header";
+import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
-import { getQuestionTextStatusLabel } from "@/lib/questions/meta-labels";
+import {
+  getQuestionSourceLabel,
+  getQuestionTextStatusLabel,
+  getQuestionTextStatusTone,
+} from "@/lib/questions/meta-labels";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjectFilters: Array<Subject | "全部"> = [
@@ -416,7 +420,11 @@ export default function QuestionsPage() {
             action={{ href: "/upload", label: "去拍题" }}
           />
         ) : null}
-        {filteredQuestions.map((question) => (
+        {filteredQuestions.map((question) => {
+          const hasAnswer = Boolean(question.standard_answer?.trim());
+          const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
+
+          return (
           <MobileCard key={question.id}>
             <div className="flex gap-3">
               <label className="flex h-20 shrink-0 items-start pt-1">
@@ -430,7 +438,7 @@ export default function QuestionsPage() {
               </label>
               <Link
                 href={`/questions/${question.id}`}
-                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-500"
+                className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs font-semibold text-slate-500"
               >
                 {question.signedImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -442,22 +450,15 @@ export default function QuestionsPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <ImagePlaceholder label={question.image_path ? "无预览" : "文字错题卡"} />
+                  <span className="px-2 text-center">{question.image_path ? "无预览" : "文字卡"}</span>
                 )}
               </Link>
               <div className="min-w-0 flex-1">
-                <QuestionMetaBadges
-                  subject={question.subject}
-                  difficulty={question.difficulty}
-                  mastery_status={question.mastery_status}
-                  question_text_status={question.question_text_status}
-                  hasAnswer={Boolean(question.standard_answer?.trim())}
-                />
-                <p className="mt-2 break-words text-sm font-semibold text-slate-950">
-                  {question.knowledge_point ?? "待识别知识点"}
+                <p className="break-words text-sm font-semibold text-slate-950">
+                  {title}
                 </p>
                 {!question.image_path ? (
-                  <div className="mt-2">
+                  <div className="mt-1">
                     <TextQuestionPreview
                       subject={question.subject}
                       chapter={question.chapter}
@@ -467,29 +468,50 @@ export default function QuestionsPage() {
                       mastery_status={question.mastery_status}
                       question_text_status={question.question_text_status}
                       source={question.source}
-                      hasAnswer={Boolean(question.standard_answer?.trim())}
+                      hasAnswer={hasAnswer}
                       compact
+                      hideMeta
+                      hideTitle
                     />
                   </div>
                 ) : (
                   <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
-                    {question.chapter ? `${question.chapter} / ` : ""}
                     {question.question_text ?? "暂无题目文字"}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-slate-500">
-                  创建时间：{formatDate(question.created_at)}
-                </p>
-                <Link
-                  href={`/questions/${question.id}`}
-                  className="mt-2 inline-flex min-h-9 items-center rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
-                >
-                  查看详情
-                </Link>
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-2" aria-label="基础信息">
+                    <StatusPill label={question.subject} tone="blue" />
+                    {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2" aria-label="学习状态">
+                    <StatusPill label={question.mastery_status} tone="amber" />
+                    <StatusPill label={hasAnswer ? "有答案" : "无答案"} tone={hasAnswer ? "blue" : "amber"} />
+                    <StatusPill
+                      label={getQuestionTextStatusLabel(question.question_text_status)}
+                      tone={getQuestionTextStatusTone(question.question_text_status)}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2" aria-label="来源信息">
+                    <StatusPill label={getQuestionSourceLabel(question.source)} tone="slate" />
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-slate-500">
+                    创建时间：{formatDate(question.created_at)}
+                  </p>
+                  <Link
+                    href={`/questions/${question.id}`}
+                    className="inline-flex min-h-9 items-center rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
+                  >
+                    查看详情
+                  </Link>
+                </div>
               </div>
             </div>
           </MobileCard>
-        ))}
+          );
+        })}
         </div>
       </MobileSection>
     </div>

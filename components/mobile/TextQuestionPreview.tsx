@@ -20,6 +20,8 @@ type TextQuestionPreviewProps = {
   hasAnswer?: boolean;
   showSource?: boolean;
   compact?: boolean;
+  hideMeta?: boolean;
+  hideTitle?: boolean;
 };
 
 export function TextQuestionPreview({
@@ -34,12 +36,23 @@ export function TextQuestionPreview({
   hasAnswer,
   showSource = false,
   compact = false,
+  hideMeta = false,
+  hideTitle = false,
 }: TextQuestionPreviewProps) {
   const hasText = Boolean(question_text?.trim());
+  const containerClass = compact
+    ? "text-left"
+    : "rounded-lg border border-slate-100 bg-white p-3 text-left shadow-sm";
 
   if (!hasText) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
+      <div
+        className={
+          compact
+            ? "text-sm text-slate-500"
+            : "rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500"
+        }
+      >
         <p className="font-semibold text-slate-700">还没有题目文字，也未绑定原图。</p>
         {!compact ? (
           <p className="mt-1 text-xs leading-5">可以先编辑错题，补充题干后再复习。</p>
@@ -49,14 +62,19 @@ export function TextQuestionPreview({
   }
 
   return (
-    <article className="rounded-lg border border-slate-100 bg-white p-3 text-left shadow-sm">
+    <article className={containerClass}>
+      {!hideMeta ? (
       <div className="flex flex-wrap gap-2">
         <StatusPill label="未绑定原图" tone="amber" />
         {!compact ? <StatusPill label="文字错题卡" tone="blue" /> : null}
       </div>
-      <h2 className={`mt-3 font-bold text-slate-950 ${compact ? "text-sm" : "text-base"}`}>
+      ) : null}
+      {!hideTitle ? (
+      <h2 className={`${hideMeta ? "" : "mt-3"} font-bold text-slate-950 ${compact ? "text-sm" : "text-base"}`}>
         文字错题卡
       </h2>
+      ) : null}
+      {!hideMeta ? (
       <div className="mt-3">
         <QuestionMetaBadges
           subject={subject}
@@ -68,14 +86,15 @@ export function TextQuestionPreview({
           showSource={showSource}
         />
       </div>
+      ) : null}
       {chapter || knowledge_point ? (
         <p className="mt-2 break-words text-xs leading-5 text-slate-500">
           {[chapter, knowledge_point].filter(Boolean).join(" / ")}
         </p>
       ) : null}
       <p
-        className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 ${
-          compact ? "line-clamp-3" : ""
+        className={`${hideMeta && hideTitle ? "" : "mt-3"} whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 ${
+          compact ? "line-clamp-2" : ""
         }`}
       >
         {question_text}
