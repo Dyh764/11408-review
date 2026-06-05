@@ -1,5 +1,8 @@
 import type {
+  AnswerSource,
+  AnswerStatus,
   Confidence,
+  Difficulty,
   MasteryStatus,
   QuestionSource,
   QuestionTextStatus,
@@ -13,17 +16,23 @@ export type ImportQuestionCard = {
   subject: Subject;
   chapter?: string;
   knowledge_point?: string;
+  difficulty?: Difficulty;
   question_text?: string;
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
   user_note?: string;
   mistake_types: string[];
   solution_summary?: string;
+  standard_answer?: string;
+  answer_explanation?: string;
+  key_steps: string[];
   one_sentence_tip?: string;
   review_priority: ReviewPriority;
   confidence?: Confidence;
   needs_manual_check: boolean;
   source: QuestionSource;
+  answer_status: AnswerStatus;
+  answer_source: AnswerSource;
 };
 
 export type ImportRowError = {
@@ -59,6 +68,9 @@ export const importMasteryStatuses: MasteryStatus[] = [
 ];
 
 const questionTextStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_fix"];
+const difficulties: Difficulty[] = ["基础", "中等", "较难", "压轴"];
+const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"];
+const answerSources: AnswerSource[] = ["chatgpt_import", "manual", "ai_enhanced", "unknown"];
 const reviewPriorities: ReviewPriority[] = ["low", "medium", "high"];
 const confidences: Confidence[] = ["low", "medium", "high"];
 
@@ -69,17 +81,23 @@ export const importExampleJson = JSON.stringify(
       subject: "数学",
       chapter: "二重积分",
       knowledge_point: "积分区域与换序",
+      difficulty: "中等",
       question_text: "题目文字",
       question_text_status: "ai_unverified",
       mastery_status: "思路对但卡住",
       user_note: "我想先算0-1先积x，但是积分那里卡住了",
       mistake_types: ["积分限判断不稳", "没优先看对称性"],
       solution_summary: "先画区域，再判断是否能利用对称性，避免硬拆。",
+      standard_answer: "最终答案",
+      answer_explanation: "完整解析",
+      key_steps: ["画区域", "确定积分顺序", "计算积分"],
       one_sentence_tip: "二重积分先看区域对称性，再决定积分顺序。",
       review_priority: "high",
       confidence: "medium",
       needs_manual_check: true,
       source: "chatgpt",
+      answer_status: "ai_unverified",
+      answer_source: "chatgpt_import",
     },
   ],
   null,
@@ -156,6 +174,18 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     value.question_text_status === undefined || value.question_text_status === null
       ? "ai_unverified"
       : requireEnum(value.question_text_status, "question_text_status", questionTextStatuses);
+  const difficulty =
+    value.difficulty === undefined || value.difficulty === null || value.difficulty === ""
+      ? undefined
+      : requireEnum(value.difficulty, "difficulty", difficulties);
+  const answerStatus =
+    value.answer_status === undefined || value.answer_status === null
+      ? "ai_unverified"
+      : requireEnum(value.answer_status, "answer_status", answerStatuses);
+  const answerSource =
+    value.answer_source === undefined || value.answer_source === null
+      ? "chatgpt_import"
+      : requireEnum(value.answer_source, "answer_source", answerSources);
   const reviewPriority =
     value.review_priority === undefined || value.review_priority === null
       ? defaultPriorityFromMastery(masteryStatus)
@@ -179,17 +209,24 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     subject,
     chapter: optionalString(value.chapter, "chapter") || undefined,
     knowledge_point: optionalString(value.knowledge_point, "knowledge_point") || undefined,
+    difficulty,
     question_text: questionText || undefined,
     question_text_status: questionTextStatus,
     mastery_status: masteryStatus,
     user_note: userNote || undefined,
     mistake_types: optionalStringArray(value.mistake_types, "mistake_types"),
     solution_summary: optionalString(value.solution_summary, "solution_summary") || undefined,
+    standard_answer: optionalString(value.standard_answer, "standard_answer") || undefined,
+    answer_explanation:
+      optionalString(value.answer_explanation, "answer_explanation") || undefined,
+    key_steps: optionalStringArray(value.key_steps, "key_steps"),
     one_sentence_tip: optionalString(value.one_sentence_tip, "one_sentence_tip") || undefined,
     review_priority: reviewPriority,
     confidence,
     needs_manual_check: needsManualCheck,
     source: "chatgpt_import",
+    answer_status: answerStatus,
+    answer_source: answerSource,
   };
 }
 

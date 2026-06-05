@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { AnswerPanel } from "@/components/mobile/AnswerPanel";
 import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { getAnswerStatusLabel, getAnswerStatusTone } from "@/lib/questions/answer-labels";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
 import {
   buildQuestionUpdatePayload,
@@ -13,9 +15,10 @@ import {
 } from "@/lib/questions/edit-question";
 import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import { createClient } from "@/lib/supabase/client";
-import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
+import type { AnswerStatus, Difficulty, MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjects: Subject[] = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
+const difficulties: Array<Difficulty | ""> = ["", "基础", "中等", "较难", "压轴"];
 const masteryStatuses: MasteryStatus[] = [
   "完全没思路",
   "有一点思路",
@@ -25,6 +28,7 @@ const masteryStatuses: MasteryStatus[] = [
   "完全掌握",
 ];
 const textStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_fix"];
+const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"];
 
 type StatusResponse = {
   deepseek?: {
@@ -41,10 +45,15 @@ function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
     subject: question.subject,
     chapter: question.chapter ?? "",
     knowledge_point: question.knowledge_point ?? "",
+    difficulty: question.difficulty ?? "",
     mastery_status: question.mastery_status,
     user_note: question.user_note ?? "",
     mistake_types: question.mistake_types?.join("，") ?? "",
     solution_summary: question.solution_summary ?? "",
+    standard_answer: question.standard_answer ?? "",
+    answer_explanation: question.answer_explanation ?? "",
+    key_steps: question.key_steps?.join("\n") ?? "",
+    answer_status: question.answer_status,
     one_sentence_tip: question.one_sentence_tip ?? "",
   };
 }
@@ -62,6 +71,7 @@ export default function QuestionDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isAnswerVisible, setIsAnswerVisible] = useState(false);
   const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
 
@@ -327,7 +337,16 @@ export default function QuestionDetailPage() {
             <div className="flex flex-wrap gap-2">
               <StatusPill label={question.subject} tone="blue" />
               <StatusPill label={question.mastery_status} tone="amber" />
+              {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
               <StatusPill label={question.question_text_status} tone="slate" />
+              <StatusPill
+                label={question.standard_answer ? "有答案" : "无答案"}
+                tone={question.standard_answer ? "blue" : "amber"}
+              />
+              <StatusPill
+                label={getAnswerStatusLabel(question.answer_status)}
+                tone={getAnswerStatusTone(question.answer_status)}
+              />
               <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
             </div>
 
@@ -415,6 +434,22 @@ export default function QuestionDetailPage() {
                     />
                   </label>
                   <label className="block">
+                    <span className="text-sm font-semibold text-slate-800">难度</span>
+                    <select
+                      value={form.difficulty}
+                      onChange={(event) => updateForm("difficulty", event.target.value as Difficulty | "")}
+                      className="mt-2 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      {difficulties.map((item) => (
+                        <option key={item || "empty"} value={item}>
+                          {item || "未设置"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
                     <span className="text-sm font-semibold text-slate-800">知识点</span>
                     <input
                       value={form.knowledge_point}
@@ -467,6 +502,50 @@ export default function QuestionDetailPage() {
                   />
                 </label>
                 <label className="block">
+                  <span className="text-sm font-semibold text-slate-800">标准答案</span>
+                  <textarea
+                    value={form.standard_answer}
+                    onChange={(event) => updateForm("standard_answer", event.target.value)}
+                    rows={3}
+                    className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-800">答案解析</span>
+                  <textarea
+                    value={form.answer_explanation}
+                    onChange={(event) => updateForm("answer_explanation", event.target.value)}
+                    rows={4}
+                    className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-800">关键步骤</span>
+                  <textarea
+                    value={form.key_steps}
+                    onChange={(event) => updateForm("key_steps", event.target.value)}
+                    rows={4}
+                    className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6"
+                    placeholder="每行一个步骤"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-slate-800">答案状态</span>
+                  <select
+                    value={form.answer_status}
+                    onChange={(event) =>
+                      updateForm("answer_status", event.target.value as AnswerStatus)
+                    }
+                    className="mt-2 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                  >
+                    {answerStatuses.map((item) => (
+                      <option key={item} value={item}>
+                        {getAnswerStatusLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
                   <span className="text-sm font-semibold text-slate-800">一句话提醒</span>
                   <input
                     value={form.one_sentence_tip}
@@ -484,6 +563,27 @@ export default function QuestionDetailPage() {
                 </button>
               </div>
             ) : null}
+
+            <div className="mt-4 rounded-lg bg-white p-3 ring-1 ring-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAnswerVisible((value) => !value)}
+                className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+              >
+                {isAnswerVisible ? "隐藏答案" : "查看答案"}
+              </button>
+              {isAnswerVisible ? (
+                <div className="mt-3">
+                  <AnswerPanel
+                    standard_answer={question.standard_answer}
+                    answer_explanation={question.answer_explanation}
+                    key_steps={question.key_steps}
+                    answer_status={question.answer_status}
+                    answer_source={question.answer_source}
+                  />
+                </div>
+              ) : null}
+            </div>
 
             <dl className="mt-4 space-y-4 text-sm">
               <div>

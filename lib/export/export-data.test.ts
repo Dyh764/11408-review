@@ -18,6 +18,7 @@ const dataset: ExportDataset = {
       subject: "数学",
       chapter: "二重积分",
       knowledge_point: "极坐标换元",
+      difficulty: "中等",
       image_path: "users/user-1/questions/q1.jpg",
       question_text: "求二重积分。",
       question_text_status: "verified",
@@ -25,6 +26,11 @@ const dataset: ExportDataset = {
       user_note: "区域没画对",
       mistake_types: ["审题", "积分区域"],
       solution_summary: "先画区域，再换元。",
+      standard_answer: "最终答案",
+      answer_explanation: "完整解析",
+      key_steps: ["画区域", "换元"],
+      answer_status: "verified",
+      answer_source: "chatgpt_import",
       one_sentence_tip: "先画图再换元。",
       review_priority: "high",
       confidence: "high",
@@ -92,6 +98,6 @@ test("builds readable markdown grouped by subject and chapter", () => {
 test("builds CSV with Excel-friendly core question columns", () => {
   const csv = buildCsvExport(dataset);
 
-  assert.match(csv, /^id,subject,chapter,knowledge_point,mastery_status/);
-  assert.match(csv, /q1,数学,二重积分,极坐标换元,完全没思路/);
+  assert.match(csv, /^id,subject,chapter,knowledge_point,difficulty,mastery_status/);
+  assert.match(csv, /q1,数学,二重积分,极坐标换元,中等,完全没思路/);
 });

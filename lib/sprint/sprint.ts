@@ -1,4 +1,7 @@
 import type {
+  AnswerSource,
+  AnswerStatus,
+  Difficulty,
   MasteryStatus,
   QuestionSource,
   QuestionTextStatus,
@@ -12,12 +15,18 @@ export type SprintQuestionInput = {
   subject: Subject;
   chapter: string | null;
   knowledge_point: string | null;
+  difficulty: Difficulty | null;
   image_path: string | null;
   question_text: string | null;
   source: QuestionSource;
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
   mistake_types: string[] | null;
+  standard_answer: string | null;
+  answer_explanation: string | null;
+  key_steps: string[];
+  answer_status: AnswerStatus;
+  answer_source: AnswerSource;
   one_sentence_tip: string | null;
   review_priority: ReviewPriority | null;
   needs_manual_check: boolean;

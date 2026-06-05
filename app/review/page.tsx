@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { AnswerPanel } from "@/components/mobile/AnswerPanel";
 import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
@@ -17,7 +18,7 @@ const resultLabels: Record<ReviewResult, string> = {
   still_wrong: "仍不会",
   improved: "有进步",
   mastered: "已掌握",
-  wrong_again: "复习后又错",
+  wrong_again: "又错了",
 };
 
 function isOverdue(scheduledDate: string) {
@@ -27,6 +28,7 @@ function isOverdue(scheduledDate: string) {
 export default function ReviewPage() {
   const [reviews, setReviews] = useState<DueReview[]>([]);
   const [completed, setCompleted] = useState<Record<string, ReviewResult>>({});
+  const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
@@ -218,6 +220,8 @@ export default function ReviewPage() {
         {reviews.map((review) => {
           const result = completed[review.id];
           const isProcessing = processingReviewId === review.id;
+          const hasAnswer = Boolean(review.questions.standard_answer?.trim());
+          const isAnswerRevealed = revealedAnswers[review.id] || !hasAnswer;
 
           return (
             <MobileCard key={review.id}>
@@ -278,23 +282,55 @@ export default function ReviewPage() {
                 {review.questions.mistake_types?.join("、") || "待分析"}
               </p>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
+              {hasAnswer ? (
+                <div className="mt-4">
                   <button
-                    key={key}
                     type="button"
-                    onClick={() => handleReview(review, key)}
-                    disabled={isProcessing || Boolean(processingReviewId)}
-                    className={`min-h-12 rounded-lg px-3 text-sm font-semibold ${
-                      result === key
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-700"
-                    } disabled:bg-slate-200 disabled:text-slate-400`}
+                    onClick={() =>
+                      setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
+                    }
+                    disabled={isAnswerRevealed}
+                    className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-500"
                   >
-                    {isProcessing ? "写入中..." : resultLabels[key]}
+                    {isAnswerRevealed ? "答案已显示" : "我做完了，查看答案"}
                   </button>
-                ))}
-              </div>
+                  {isAnswerRevealed ? (
+                    <div className="mt-3">
+                      <AnswerPanel
+                        standard_answer={review.questions.standard_answer}
+                        answer_explanation={review.questions.answer_explanation}
+                        key_steps={review.questions.key_steps}
+                        answer_status={review.questions.answer_status}
+                        answer_source={review.questions.answer_source}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-800 ring-1 ring-amber-100">
+                  这道题还没有录入标准答案，可以先按自己的结果记录复习。
+                </p>
+              )}
+
+              {isAnswerRevealed ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleReview(review, key)}
+                      disabled={isProcessing || Boolean(processingReviewId)}
+                      className={`min-h-12 rounded-lg px-3 text-sm font-semibold ${
+                        result === key
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-700"
+                      } disabled:bg-slate-200 disabled:text-slate-400`}
+                    >
+                      {isProcessing ? "写入中..." : resultLabels[key]}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </MobileCard>
           );
         })}

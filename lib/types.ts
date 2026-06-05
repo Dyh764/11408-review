@@ -16,6 +16,12 @@ export type ReviewPriority = "low" | "medium" | "high";
 
 export type Confidence = "low" | "medium" | "high";
 
+export type Difficulty = "基础" | "中等" | "较难" | "压轴";
+
+export type AnswerStatus = "ai_unverified" | "verified" | "needs_fix";
+
+export type AnswerSource = "chatgpt_import" | "manual" | "ai_enhanced" | "unknown";
+
 export type QuestionSource =
   | "upload"
   | "chatgpt_import"

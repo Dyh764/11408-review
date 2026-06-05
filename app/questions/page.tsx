@@ -9,6 +9,7 @@ import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
+import { getAnswerStatusLabel, getAnswerStatusTone } from "@/lib/questions/answer-labels";
 import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
@@ -449,6 +450,15 @@ export default function QuestionsPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusPill label={question.subject} tone="blue" />
                   <StatusPill label={question.mastery_status} tone="amber" />
+                  {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
+                  <StatusPill
+                    label={question.standard_answer ? "有答案" : "无答案"}
+                    tone={question.standard_answer ? "blue" : "amber"}
+                  />
+                  <StatusPill
+                    label={getAnswerStatusLabel(question.answer_status)}
+                    tone={getAnswerStatusTone(question.answer_status)}
+                  />
                   <StatusPill label={question.question_text_status} tone="slate" />
                   <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
                   {question.needs_manual_check ? (

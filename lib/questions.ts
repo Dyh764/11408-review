@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseBucket } from "@/lib/env";
 import type {
+  AnswerSource,
+  AnswerStatus,
+  Difficulty,
   MasteryStatus,
   QuestionSource,
   QuestionTextStatus,
@@ -14,6 +17,7 @@ export type QuestionRecord = {
   subject: Subject;
   chapter: string | null;
   knowledge_point: string | null;
+  difficulty: Difficulty | null;
   image_path: string | null;
   question_text: string | null;
   question_text_status: QuestionTextStatus;
@@ -21,11 +25,16 @@ export type QuestionRecord = {
   user_note: string | null;
   mistake_types: string[] | null;
   solution_summary: string | null;
+  standard_answer: string | null;
+  answer_explanation: string | null;
+  key_steps: string[];
   one_sentence_tip: string | null;
   review_priority: ReviewPriority | null;
   confidence: string | null;
   needs_manual_check: boolean;
   source: QuestionSource;
+  answer_status: AnswerStatus;
+  answer_source: AnswerSource;
   created_at: string;
   analyzed_at: string | null;
 };
@@ -40,6 +49,7 @@ const questionColumns = `
   subject,
   chapter,
   knowledge_point,
+  difficulty,
   image_path,
   question_text,
   question_text_status,
@@ -47,11 +57,16 @@ const questionColumns = `
   user_note,
   mistake_types,
   solution_summary,
+  standard_answer,
+  answer_explanation,
+  key_steps,
   one_sentence_tip,
   review_priority,
   confidence,
   needs_manual_check,
   source,
+  answer_status,
+  answer_source,
   created_at,
   analyzed_at
 `;

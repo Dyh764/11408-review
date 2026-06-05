@@ -2,6 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { todayIsoDate as todayIsoDateInTimeZone } from "@/lib/dates";
 import { supabaseBucket } from "@/lib/env";
 import type {
+  AnswerSource,
+  AnswerStatus,
+  Difficulty,
   MasteryStatus,
   QuestionTextStatus,
   ReviewPriority,
@@ -22,12 +25,18 @@ export type DueReview = {
     subject: Subject;
     chapter: string | null;
     knowledge_point: string | null;
+    difficulty: Difficulty | null;
     image_path: string | null;
     source: QuestionSource;
     question_text: string | null;
     question_text_status: QuestionTextStatus;
     mastery_status: MasteryStatus;
     mistake_types: string[] | null;
+    standard_answer: string | null;
+    answer_explanation: string | null;
+    key_steps: string[];
+    answer_status: AnswerStatus;
+    answer_source: AnswerSource;
     one_sentence_tip: string | null;
     review_priority: ReviewPriority | null;
     created_at: string;
@@ -51,12 +60,18 @@ const dueReviewColumns = `
     subject,
     chapter,
     knowledge_point,
+    difficulty,
     image_path,
     source,
     question_text,
     question_text_status,
     mastery_status,
     mistake_types,
+    standard_answer,
+    answer_explanation,
+    key_steps,
+    answer_status,
+    answer_source,
     one_sentence_tip,
     review_priority,
     created_at

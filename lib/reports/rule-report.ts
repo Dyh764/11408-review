@@ -6,6 +6,8 @@ type QuestionInput = {
   knowledge_point: string | null;
   mastery_status: string;
   mistake_types: string[] | null;
+  standard_answer?: string | null;
+  answer_status?: string | null;
   created_at: string;
 };
 
@@ -143,6 +145,13 @@ export function buildRuleReportContent(input: RuleReportInput) {
   const masteredCount = input.questions.filter(
     (question) => question.mastery_status === "完全掌握",
   ).length;
+  const answeredCount = input.questions.filter((question) =>
+    Boolean(question.standard_answer?.trim()),
+  ).length;
+  const unansweredCount = input.questions.length - answeredCount;
+  const answerUnverifiedCount = input.questions.filter(
+    (question) => question.answer_status === "ai_unverified",
+  ).length;
   const wrongAgainCount = input.reviews.filter(
     (review) => review.review_result === "wrong_again" || review.review_result === "still_wrong",
   ).length;
@@ -178,6 +187,9 @@ export function buildRuleReportContent(input: RuleReportInput) {
       period_completed_reviews: completedReviews.length,
       overdue_reviews: overdueReviews.length,
       mastered_count: masteredCount,
+      answered_questions: answeredCount,
+      unanswered_questions: unansweredCount,
+      answer_unverified_count: answerUnverifiedCount,
       wrong_again_count: wrongAgainCount,
       review_completion_rate:
         periodReviews.length > 0 ? Math.round((completedReviews.length / periodReviews.length) * 100) : 0,

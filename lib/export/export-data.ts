@@ -4,6 +4,7 @@ export type ExportQuestion = {
   subject: string;
   chapter: string | null;
   knowledge_point: string | null;
+  difficulty: string | null;
   image_path: string | null;
   question_text: string | null;
   question_text_status: string;
@@ -11,6 +12,11 @@ export type ExportQuestion = {
   user_note: string | null;
   mistake_types: string[] | null;
   solution_summary: string | null;
+  standard_answer: string | null;
+  answer_explanation: string | null;
+  key_steps: string[];
+  answer_status: string;
+  answer_source: string;
   one_sentence_tip: string | null;
   review_priority: string | null;
   confidence: string | null;
@@ -149,6 +155,8 @@ export function buildMarkdownExport(dataset: ExportDataset) {
         `- 题目文字：${question.question_text ?? "暂无"}`,
         `- 我的备注：${question.user_note ?? "无"}`,
         `- 正确思路：${question.solution_summary ?? "暂无"}`,
+        `- 标准答案：${question.standard_answer ?? "暂无"}`,
+        `- 答案状态：${question.answer_status}`,
         `- 一句话提醒：${question.one_sentence_tip ?? "暂无"}`,
         `- 复习记录：${reviewLines}`,
         "",
@@ -169,12 +177,17 @@ export function buildCsvExport(dataset: ExportDataset) {
     "subject",
     "chapter",
     "knowledge_point",
+    "difficulty",
     "mastery_status",
     "question_text_status",
+    "answer_status",
+    "answer_source",
     "source",
     "mistake_types",
     "user_note",
     "solution_summary",
+    "standard_answer",
+    "answer_explanation",
     "one_sentence_tip",
     "created_at",
   ];
@@ -194,7 +207,7 @@ export async function fetchCurrentUserExportDataset(
     supabase
       .from("questions")
       .select(
-        "id,user_id,subject,chapter,knowledge_point,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,one_sentence_tip,review_priority,confidence,needs_manual_check,source,created_at,analyzed_at",
+        "id,user_id,subject,chapter,knowledge_point,difficulty,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,standard_answer,answer_explanation,key_steps,answer_status,answer_source,one_sentence_tip,review_priority,confidence,needs_manual_check,source,created_at,analyzed_at",
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),

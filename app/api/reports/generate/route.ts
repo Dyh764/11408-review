@@ -69,7 +69,9 @@ export async function POST(request: Request) {
   const [questionsResult, reviewsResult, statsResult] = await Promise.all([
     supabase
       .from("questions")
-      .select("subject,chapter,knowledge_point,mastery_status,mistake_types,created_at")
+      .select(
+        "subject,chapter,knowledge_point,mastery_status,mistake_types,standard_answer,answer_status,created_at",
+      )
       .eq("user_id", user.id),
     supabase
       .from("reviews")

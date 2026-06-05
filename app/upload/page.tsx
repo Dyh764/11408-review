@@ -220,7 +220,7 @@ export default function UploadPage() {
       setSavedQuestionId(questionId);
       setMessage(
         isPendingChatGPT
-          ? "已保存：图片和复习计划已写入，稍后可用 ChatGPT 整理错题卡。"
+          ? "已保存原题。晚上可让 ChatGPT 生成包含答案的错题卡，再导入或补充。"
           : "保存成功：图片、错题记录和复习计划已写入。",
       );
     } catch (error) {

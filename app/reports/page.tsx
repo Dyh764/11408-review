@@ -49,6 +49,9 @@ const metricLabels: Record<string, string> = {
   completed_reviews: "完成复习",
   overdue_reviews: "逾期复习",
   mastered_count: "已掌握",
+  answered_questions: "有答案",
+  unanswered_questions: "无答案",
+  answer_unverified_count: "答案待核对",
   wrong_again_count: "复习后又错",
   review_completion_rate: "复习完成率",
 };

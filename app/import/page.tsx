@@ -5,6 +5,7 @@ import { MobileCard, MobileSection, Notice } from "@/components/mobile/primitive
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import {
   importExampleJson,
   parseImportJsonText,
@@ -22,6 +23,7 @@ type ImportApiResult = {
 
 function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
   const { card } = item;
+  const hasAnswer = Boolean(card.standard_answer?.trim());
 
   return (
     <MobileCard>
@@ -34,6 +36,9 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
         ) : (
           <StatusPill label="文字错题卡" tone="amber" />
         )}
+        <StatusPill label={card.difficulty ? `难度：${card.difficulty}` : "难度待补充"} tone="slate" />
+        <StatusPill label={hasAnswer ? "包含答案" : "未包含答案，可后续补充"} tone={hasAnswer ? "blue" : "amber"} />
+        <StatusPill label={getAnswerStatusLabel(card.answer_status)} tone="amber" />
       </div>
       <h2 className="mt-3 text-base font-semibold text-slate-950">
         {card.knowledge_point ?? "待补充知识点"}
@@ -58,6 +63,17 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
         </p>
       )}
       <dl className="mt-3 space-y-2 text-sm">
+        {hasAnswer ? (
+          <div className="rounded-lg bg-slate-50 p-3">
+            <dt className="font-semibold text-slate-800">标准答案预览</dt>
+            <dd className="mt-1 whitespace-pre-wrap break-words text-slate-600">
+              {card.standard_answer}
+            </dd>
+            <dd className="mt-2 text-xs text-slate-500">
+              关键步骤 {card.key_steps.length} 步
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt className="font-semibold text-slate-800">错因</dt>
           <dd className="mt-1 text-slate-600">

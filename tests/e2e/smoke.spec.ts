@@ -74,6 +74,59 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await expect(textPreview.getByText("题目文字", { exact: true })).toBeVisible();
 });
 
+test("import page previews ChatGPT answer fields when JSON includes an answer", async ({
+  page,
+}) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "JSON 错题卡数组" }).fill(
+    JSON.stringify(
+      [
+        {
+          subject: "数学",
+          chapter: "二重积分",
+          knowledge_point: "积分区域与换序",
+          difficulty: "中等",
+          question_text: "题目文字",
+          question_text_status: "ai_unverified",
+          mastery_status: "思路对但卡住",
+          user_note: "我知道要分区域，但是积分限写不出来。",
+          mistake_types: ["积分限判断不稳"],
+          solution_summary: "先画区域，再确定积分限。",
+          standard_answer: "最终答案",
+          answer_explanation: "完整解析",
+          key_steps: ["画区域", "确定积分顺序", "计算积分"],
+          one_sentence_tip: "二重积分先画区域，再决定积分顺序。",
+          review_priority: "high",
+          confidence: "medium",
+          needs_manual_check: true,
+          source: "chatgpt",
+          answer_status: "ai_unverified",
+          answer_source: "chatgpt_import",
+        },
+      ],
+      null,
+      2,
+    ),
+  );
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(page.getByText("包含答案")).toBeVisible();
+  await expect(page.getByText("难度：中等")).toBeVisible();
+  await expect(page.getByText("标准答案预览")).toBeVisible();
+  await expect(
+    page.locator("div").filter({ hasText: "标准答案预览" }).getByText("最终答案", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("关键步骤 3 步")).toBeVisible();
+  await expect(page.getByText("待核对")).toBeVisible();
+});
+
 test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
   const response = await page.goto("/upload");
 
@@ -117,6 +170,47 @@ test("reports page uses user-facing empty copy and exposes manual rule report ge
   await expect(page.getByText("完成上传、导入或复习后，这里会生成学习总结。")).toBeVisible();
   await expect(page.getByRole("button", { name: "生成今日报告" })).toBeVisible();
   await expect(page.getByText(/Cron|Edge Function/)).toHaveCount(0);
+});
+
+test("question detail keeps answers hidden until reveal when reachable", async ({ page }) => {
+  const response = await page.goto("/questions/example-answer");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  const revealButton = page.getByRole("button", { name: "查看答案" });
+
+  if ((await revealButton.count()) === 0) {
+    return;
+  }
+
+  await expect(revealButton).toBeVisible();
+  await expect(page.getByText("标准答案")).toHaveCount(0);
+});
+
+test("review flow asks users to reveal answers before result buttons when reachable", async ({
+  page,
+}) => {
+  const response = await page.goto("/review");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  const revealButton = page.getByRole("button", { name: "我做完了，查看答案" }).first();
+
+  if ((await revealButton.count()) === 0) {
+    return;
+  }
+
+  await expect(page.getByRole("button", { name: "仍不会" })).toHaveCount(0);
+  await revealButton.click();
+  await expect(page.getByRole("button", { name: "仍不会" }).first()).toBeVisible();
 });
 
 test("home page explains optional DeepSeek suggestions without auto analysis", async ({ page }) => {
