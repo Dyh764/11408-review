@@ -6,6 +6,7 @@ import type {
   QuestionTextStatus,
   ReviewPriority,
   ReviewResult,
+  QuestionSource,
   Subject,
 } from "@/lib/types";
 
@@ -21,7 +22,8 @@ export type DueReview = {
     subject: Subject;
     chapter: string | null;
     knowledge_point: string | null;
-    image_path: string;
+    image_path: string | null;
+    source: QuestionSource;
     question_text_status: QuestionTextStatus;
     mastery_status: MasteryStatus;
     mistake_types: string[] | null;
@@ -49,6 +51,7 @@ const dueReviewColumns = `
     chapter,
     knowledge_point,
     image_path,
+    source,
     question_text_status,
     mastery_status,
     mistake_types,
@@ -66,6 +69,13 @@ async function addSignedImageUrl(
   supabase: SupabaseClient,
   review: Omit<DueReview, "signedImageUrl">,
 ): Promise<DueReview> {
+  if (!review.questions.image_path) {
+    return {
+      ...review,
+      signedImageUrl: null,
+    };
+  }
+
   const { data, error } = await supabase.storage
     .from(supabaseBucket)
     .createSignedUrl(review.questions.image_path, 60 * 10);

@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { fetchCurrentUserQuestions } from "@/lib/questions";
+import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import {
   buildSprintItems,
   type SprintItem,
@@ -232,13 +233,14 @@ export default function SprintPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    "无预览"
+                    item.question.image_path ? "无预览" : "文字错题卡"
                   )}
                 </Link>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap gap-2">
                     <StatusPill label={item.question.subject} tone="blue" />
                     <StatusPill label={item.question.mastery_status} tone="amber" />
+                    <StatusPill label={getQuestionSourceLabel(item.question)} tone="blue" />
                   </div>
                   <h2 className="mt-2 break-words font-semibold text-slate-950">
                     {item.question.knowledge_point ?? "待识别知识点"}

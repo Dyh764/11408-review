@@ -37,6 +37,7 @@ const questionColumns = `
   review_priority,
   confidence,
   needs_manual_check,
+  source,
   created_at,
   analyzed_at
 `;
@@ -136,6 +137,10 @@ async function analyzeWithOpenAI(supabase: SupabaseClient, question: QuestionRec
     return null;
   }
 
+  if (!question.image_path) {
+    return buildNeedsFixAnalysis(question.subject, "这张错题卡未绑定原图，无法执行图片分析。");
+  }
+
   const { data: imageBlob, error: downloadError } = await supabase.storage
     .from(supabaseBucket)
     .download(question.image_path);
@@ -224,7 +229,7 @@ export async function analyzeQuestionById(
       subject: question.subject,
       mastery_status: question.mastery_status,
       user_note: question.user_note ?? "",
-      imagePreview: question.image_path,
+      imagePreview: question.image_path ?? undefined,
     });
 
     await updateQuestionAnalysis(supabase, question, mock, allowOverwriteQuestionText);

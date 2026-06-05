@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserReports, type ReportRecord, type ReportType } from "@/lib/reports";
@@ -93,8 +94,9 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
   const nextActions = pickSuggestions(content, tab);
 
   return (
-    <section className="space-y-4 px-5 pt-5">
-      <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+    <MobileSection>
+      <div className="space-y-4">
+      <MobileCard>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="break-words font-semibold text-slate-950">
@@ -106,7 +108,7 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
           </div>
           <StatusPill label="real report" tone="blue" />
         </div>
-      </article>
+      </MobileCard>
 
       <section className="grid grid-cols-2 gap-3">
         {metrics.length > 0 ? (
@@ -130,7 +132,8 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
       <ReportList title="薄弱知识点" items={weakPoints} empty="暂无薄弱知识点。" showScore />
       <ReportList title="重复错误点" items={repeatedWrong} empty="暂无重复错误点。" showScore />
       <ReportList title="下一步建议" items={nextActions} empty="暂无下一步建议。" />
-    </section>
+      </div>
+    </MobileSection>
   );
 }
 
@@ -145,9 +148,11 @@ function ReportList({
   empty: string;
   showScore?: boolean;
 }) {
+  const maxCount = Math.max(...items.map((item) => item.count ?? 0), 1);
+
   return (
-    <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-      <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+    <MobileCard>
+      <h3 className="text-sm font-bold text-slate-800">{title}</h3>
       {items.length > 0 ? (
         <ul className="mt-3 space-y-2">
           {items.slice(0, 10).map((item, index) => {
@@ -170,6 +175,14 @@ function ReportList({
                   {value ? <span className="shrink-0 text-xs text-slate-500">{value}</span> : null}
                 </div>
                 {meta ? <p className="mt-1 break-words text-xs text-slate-500">{meta}</p> : null}
+                {title === "科目分布" && typeof item.count === "number" ? (
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${Math.max(8, Math.round((item.count / maxCount) * 100))}%` }}
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -177,7 +190,7 @@ function ReportList({
       ) : (
         <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-500">{empty}</p>
       )}
-    </article>
+    </MobileCard>
   );
 }
 
@@ -251,31 +264,34 @@ export default function ReportsPage() {
       </section>
 
       {isLoading ? (
-        <p className="px-5 pt-5 text-sm text-slate-500">正在读取报告...</p>
+        <MobileSection>
+          <LoadingState label="正在读取报告..." />
+        </MobileSection>
       ) : null}
 
       {message ? (
-        <section className="px-5 pt-5">
+        <MobileSection>
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
-        </section>
+        </MobileSection>
       ) : null}
 
       {!isLoading && !selectedReport ? (
-        <section className="px-5 pt-5">
-          <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
-            暂无{tabLabels[tab]}。部署 Cron 后，系统会按计划写入 reports 表；也可以先手动调用对应 Edge Function 生成。
-          </div>
-        </section>
+        <MobileSection>
+          <EmptyState
+            title={`暂无${tabLabels[tab]}`}
+            description="部署 Cron 后，系统会按计划写入报告。也可以先手动调用对应 Edge Function 生成。"
+          />
+        </MobileSection>
       ) : null}
 
       {selectedReport ? <LatestReport report={selectedReport} tab={tab} /> : null}
 
       {reportsForTab.length > 1 ? (
-        <section className="px-5 pt-5">
-          <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-            <h3 className="text-sm font-semibold text-slate-800">历史{tabLabels[tab]}</h3>
+        <MobileSection>
+          <MobileCard>
+            <h3 className="text-sm font-bold text-slate-800">历史{tabLabels[tab]}</h3>
             <div className="mt-3 space-y-2">
               {reportsForTab.slice(0, 8).map((report) => (
                 <button
@@ -297,8 +313,8 @@ export default function ReportsPage() {
                 </button>
               ))}
             </div>
-          </article>
-        </section>
+          </MobileCard>
+        </MobileSection>
       ) : null}
     </div>
   );

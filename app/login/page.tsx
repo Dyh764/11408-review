@@ -7,7 +7,7 @@ export default function LoginPage() {
     <div>
       <PageHeader
         title="登录 11408-review"
-        subtitle="第二阶段使用 Supabase Auth。没有配置环境变量时，页面会提示配置，不会白屏。"
+        subtitle="登录后继续拍题、导入 ChatGPT 错题卡、完成今日复习。"
       />
       <Suspense fallback={<p className="px-5 pt-5 text-sm text-slate-500">正在加载登录表单...</p>}>
         <LoginForm />

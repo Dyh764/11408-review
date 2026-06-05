@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
+import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -172,7 +174,7 @@ export default function ReviewPage() {
         subtitle="读取今天及以前未完成的 reviews，逾期任务优先补完。"
       />
 
-      <section className="px-5 pt-5">
+      <MobileSection>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg bg-blue-600 p-4 text-white">
             <p className="text-sm text-blue-100">待复习</p>
@@ -187,35 +189,37 @@ export default function ReviewPage() {
             <p className="mt-1 text-3xl font-bold text-slate-950">{todayCount}</p>
           </div>
         </div>
-      </section>
+      </MobileSection>
 
       {isLoading ? (
-        <p className="px-5 pt-5 text-sm text-slate-500">正在读取今日复习...</p>
+        <MobileSection>
+          <LoadingState label="正在读取今日复习..." />
+        </MobileSection>
       ) : null}
 
       {message ? (
-        <section className="px-5 pt-5">
+        <MobileSection>
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
-        </section>
+        </MobileSection>
       ) : null}
 
-      <section className="space-y-4 px-5 pt-5">
+      <MobileSection>
+        <div className="space-y-4">
         {!isLoading && reviews.length === 0 ? (
-          <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
-            今天的复习任务已经清空。可以去错题库挑一题做主动复盘，或者休息一下。
-          </div>
+          <EmptyState
+            title="今天的复习任务已清空"
+            description="可以去错题库挑一题主动复盘，或导入今天整理好的 ChatGPT 错题卡。"
+            action={{ href: "/import", label: "导入错题卡" }}
+          />
         ) : null}
         {reviews.map((review) => {
           const result = completed[review.id];
           const isProcessing = processingReviewId === review.id;
 
           return (
-            <article
-              key={review.id}
-              className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100"
-            >
+            <MobileCard key={review.id}>
               <div className="flex gap-3">
                 <Link
                   href={`/questions/${review.question_id}`}
@@ -229,12 +233,16 @@ export default function ReviewPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    "原题缩略图"
+                    <ImagePlaceholder label={review.questions.image_path ? "原题缩略图" : "文字错题卡"} />
                   )}
                 </Link>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap gap-2">
                     <StatusPill label={review.questions.subject} tone="blue" />
+                    <StatusPill
+                      label={getQuestionSourceLabel(review.questions)}
+                      tone="blue"
+                    />
                     <StatusPill
                       label={isOverdue(review.scheduled_date) ? "已逾期" : "今日到期"}
                       tone={isOverdue(review.scheduled_date) ? "red" : "amber"}
@@ -272,10 +280,11 @@ export default function ReviewPage() {
                   </button>
                 ))}
               </div>
-            </article>
+            </MobileCard>
           );
         })}
-      </section>
+        </div>
+      </MobileSection>
     </div>
   );
 }

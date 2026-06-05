@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { MobileCard, MobileSection, Notice } from "@/components/mobile/primitives";
 import { createClient } from "@/lib/supabase/client";
 import { ensureProfile } from "@/lib/profile";
 
@@ -19,6 +20,14 @@ export function LoginForm() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const supabase = useMemo(() => createClient(), []);
+
+  function authMessage(messageText: string) {
+    if (messageText.toLowerCase().includes("email not confirmed")) {
+      return "邮箱未验证，请先检查邮箱，或在 Supabase 关闭邮箱验证。";
+    }
+
+    return messageText;
+  }
 
   useEffect(() => {
     if (!supabase) {
@@ -55,7 +64,7 @@ export function LoginForm() {
           : await supabase.auth.signUp({ email, password });
 
       if (result.error) {
-        setMessage(result.error.message);
+        setMessage(authMessage(result.error.message));
         return;
       }
 
@@ -85,11 +94,12 @@ export function LoginForm() {
   }
 
   return (
-    <section className="space-y-4 px-5 pt-5">
+    <MobileSection>
+      <div className="space-y-4">
       {!supabase ? (
-        <div className="rounded-lg bg-amber-50 p-4 text-sm leading-6 text-amber-800 ring-1 ring-amber-100">
+        <Notice tone="amber">
           请先配置 `.env.local` 中的 Supabase URL 和 anon key，然后重启 dev server。
-        </div>
+        </Notice>
       ) : null}
 
       <div className="grid grid-cols-2 rounded-lg bg-slate-100 p-1">
@@ -113,7 +123,8 @@ export function LoginForm() {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+      <MobileCard>
+      <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className="text-sm font-semibold text-slate-800">邮箱</span>
           <input
@@ -148,6 +159,7 @@ export function LoginForm() {
           {isLoading ? "处理中..." : mode === "login" ? "登录" : "注册"}
         </button>
       </form>
+      </MobileCard>
 
       <button
         type="button"
@@ -162,6 +174,7 @@ export function LoginForm() {
           {message}
         </p>
       ) : null}
-    </section>
+      </div>
+    </MobileSection>
   );
 }

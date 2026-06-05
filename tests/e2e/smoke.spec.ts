@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const protectedRoutes = ["/upload", "/questions", "/reports"];
+const protectedRoutes = ["/upload", "/import", "/questions", "/reports"];
 const utilityRoutes = ["/settings", "/sprint"];
 
 async function expectPageHasNoHorizontalOverflow(page: Page) {
@@ -16,7 +16,7 @@ async function expectBottomNav(page: Page) {
   await expect(page.locator("nav").getByRole("link", { name: /首页|棣栭〉/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /拍题|鎷嶉/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /复习|澶嶄範/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /设置|璁剧疆/ })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
 }
 
 async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
@@ -35,6 +35,16 @@ test("home page is accessible and includes bottom navigation", async ({ page }) 
 
   expect(response?.status()).toBeLessThan(400);
   await expectBottomNav(page);
+  await expect(page.getByRole("link", { name: /导入 ChatGPT 错题卡/ })).toBeVisible();
+});
+
+test("home mobile first screen exposes primary study actions", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  await expect(page.getByRole("link", { name: /拍题上传/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /导入 ChatGPT 错题卡/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /开始今日复习/ })).toBeVisible();
 });
 
 test("login page is accessible", async ({ page }) => {
@@ -42,6 +52,51 @@ test("login page is accessible", async ({ page }) => {
 
   expect(response?.status()).toBeLessThan(400);
   await expect(page).toHaveURL(/\/login/);
+});
+
+test("import page can parse example JSON into preview cards when reachable", async ({ page }) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("button", { name: "插入示例 JSON" }).click();
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
+  await expect(page.getByText("文字错题卡")).toBeVisible();
+  await expect(page.getByText("二重积分 / 题目文字")).toBeVisible();
+});
+
+test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
+  const response = await page.goto("/upload");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await expect(
+    page.getByRole("radio", { name: /只保存图片，稍后用 ChatGPT 整理/ }),
+  ).toBeChecked();
+});
+
+test("reports page presents report tabs instead of raw JSON", async ({ page }) => {
+  const response = await page.goto("/reports");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await expect(page.getByRole("button", { name: "日报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "周报" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "月报" })).toBeVisible();
 });
 
 for (const route of protectedRoutes) {
@@ -84,8 +139,23 @@ test("mobile viewport has no obvious horizontal scroll and keeps bottom nav visi
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
 
-  await expectPageHasNoHorizontalOverflow(page);
-  await expectBottomNav(page);
+  for (const route of [
+    "/",
+    "/import",
+    "/settings",
+    "/sprint",
+    "/questions",
+    "/upload",
+    "/review",
+    "/reports",
+    "/login",
+  ]) {
+    await page.goto(route);
+    await expectPageHasNoHorizontalOverflow(page);
+
+    if (!page.url().includes("/login")) {
+      await expectBottomNav(page);
+    }
+  }
 });

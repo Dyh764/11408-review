@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingState, MobileCard, MobileSection, Notice } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { defaultTimeZone, normalizeTimeZone } from "@/lib/dates";
@@ -210,35 +212,65 @@ export default function SettingsPage() {
   return (
     <div>
       <PageHeader
-        title="设置与导出"
-        subtitle="查看配置状态、保存 timezone，并导出当前账号自己的错题数据。"
+        title="我的"
+        subtitle="账号、导入、报告、导出、系统检查和 PWA 安装入口。"
       />
 
       {isLoading ? (
-        <p className="px-5 pt-5 text-sm text-slate-500">正在读取设置...</p>
+        <MobileSection>
+          <LoadingState label="正在读取我的页面..." />
+        </MobileSection>
       ) : null}
 
       {message ? (
-        <section className="px-5 pt-5">
+        <MobileSection>
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
-        </section>
+        </MobileSection>
       ) : null}
 
-      <section className="space-y-4 px-5 pt-5">
-        <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-sm font-semibold text-slate-800">账号</h2>
+      <MobileSection>
+        <div className="space-y-4">
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">账号</h2>
           <p className="mt-2 break-words text-sm text-slate-600">
             当前登录邮箱：{email || "未登录"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Profile：{profile ? profile.id : "未读取"}
           </p>
-        </article>
+        </MobileCard>
 
-        <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-sm font-semibold text-slate-800">Timezone</h2>
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">常用入口</h2>
+          <div className="mt-3 grid gap-2">
+            <Link
+              href="/import"
+              className="flex min-h-12 items-center justify-between rounded-lg bg-blue-50 px-4 text-sm font-semibold text-blue-700 ring-1 ring-blue-100"
+            >
+              <span>导入 ChatGPT 错题卡</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+            <Link
+              href="/reports"
+              className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
+            >
+              <span>学习报告</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+            <Link
+              href="/settings/system-check"
+              className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
+            >
+              <span>系统检查</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+          </div>
+        </MobileCard>
+
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">Timezone</h2>
           <div className="mt-3 grid gap-3">
             <select
               value={timezone}
@@ -263,10 +295,10 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs leading-5 text-slate-500">
             缺失或无效 timezone 会默认使用 Asia/Shanghai。复习日期和导出文件名优先使用该设置。
           </p>
-        </article>
+        </MobileCard>
 
-        <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-sm font-semibold text-slate-800">配置状态</h2>
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">配置状态</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <StatusPill
               label={status?.supabase.configured ? "Supabase 已配置" : "Supabase 未配置"}
@@ -284,10 +316,10 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs leading-5 text-slate-500">
             设置页只显示是否配置，不显示 API Key、service role key 或 token。
           </p>
-        </article>
+        </MobileCard>
 
-        <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-sm font-semibold text-slate-800">数据导出</h2>
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">数据导出</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             JSON 用于完整备份；Markdown 便于阅读；CSV 便于 Excel 查看。图片不会打包进文件，但会保留 image_path。
           </p>
@@ -304,14 +336,14 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-        </article>
+        </MobileCard>
 
-        <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
-          <h2 className="text-sm font-semibold text-slate-800">PWA 安装</h2>
+        <Notice>
+          <h2 className="text-sm font-bold text-slate-800">PWA 安装</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             手机浏览器打开部署地址后，iPhone Safari 使用分享菜单“添加到主屏幕”，Android Chrome 使用“安装应用”或“添加到主屏幕”。
           </p>
-        </article>
+        </Notice>
 
         <button
           type="button"
@@ -320,7 +352,8 @@ export default function SettingsPage() {
         >
           退出登录
         </button>
-      </section>
+        </div>
+      </MobileSection>
     </div>
   );
 }

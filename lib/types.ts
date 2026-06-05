@@ -16,6 +16,13 @@ export type ReviewPriority = "low" | "medium" | "high";
 
 export type Confidence = "low" | "medium" | "high";
 
+export type QuestionSource =
+  | "upload"
+  | "chatgpt_import"
+  | "ai_analysis"
+  | "manual"
+  | "pending_chatgpt";
+
 export type MockAnalysis = {
   question_text: string;
   question_text_status: QuestionTextStatus;

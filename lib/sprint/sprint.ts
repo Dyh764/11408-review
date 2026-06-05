@@ -1,11 +1,19 @@
-import type { MasteryStatus, QuestionTextStatus, ReviewPriority, ReviewResult, Subject } from "@/lib/types";
+import type {
+  MasteryStatus,
+  QuestionSource,
+  QuestionTextStatus,
+  ReviewPriority,
+  ReviewResult,
+  Subject,
+} from "@/lib/types";
 
 export type SprintQuestionInput = {
   id: string;
   subject: Subject;
   chapter: string | null;
   knowledge_point: string | null;
-  image_path: string;
+  image_path: string | null;
+  source: QuestionSource;
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
   mistake_types: string[] | null;

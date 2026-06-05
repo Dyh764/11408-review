@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseBucket } from "@/lib/env";
-import type { MasteryStatus, QuestionTextStatus, ReviewPriority, Subject } from "@/lib/types";
+import type {
+  MasteryStatus,
+  QuestionSource,
+  QuestionTextStatus,
+  ReviewPriority,
+  Subject,
+} from "@/lib/types";
 
 export type QuestionRecord = {
   id: string;
@@ -8,7 +14,7 @@ export type QuestionRecord = {
   subject: Subject;
   chapter: string | null;
   knowledge_point: string | null;
-  image_path: string;
+  image_path: string | null;
   question_text: string | null;
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
@@ -19,6 +25,7 @@ export type QuestionRecord = {
   review_priority: ReviewPriority | null;
   confidence: string | null;
   needs_manual_check: boolean;
+  source: QuestionSource;
   created_at: string;
   analyzed_at: string | null;
 };
@@ -44,6 +51,7 @@ const questionColumns = `
   review_priority,
   confidence,
   needs_manual_check,
+  source,
   created_at,
   analyzed_at
 `;
@@ -52,6 +60,13 @@ async function addSignedImageUrl(
   supabase: SupabaseClient,
   question: QuestionRecord,
 ): Promise<QuestionWithImage> {
+  if (!question.image_path) {
+    return {
+      ...question,
+      signedImageUrl: null,
+    };
+  }
+
   const { data, error } = await supabase.storage
     .from(supabaseBucket)
     .createSignedUrl(question.image_path, 60 * 10);

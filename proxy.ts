@@ -2,7 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabasePublicConfig } from "@/lib/env";
 
-const protectedRoutes = ["/upload", "/review", "/questions", "/reports", "/settings", "/sprint"];
+const protectedRoutes = [
+  "/upload",
+  "/import",
+  "/review",
+  "/questions",
+  "/reports",
+  "/settings",
+  "/sprint",
+];
 
 function isProtectedPath(pathname: string) {
   return protectedRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));

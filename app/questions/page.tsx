@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
+import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjectFilters: Array<Subject | "全部"> = [
@@ -391,28 +393,30 @@ export default function QuestionsPage() {
       </section>
 
       {isLoading ? (
-        <p className="px-5 pt-5 text-sm text-slate-500">正在读取错题库...</p>
+        <MobileSection>
+          <LoadingState label="正在读取错题库..." />
+        </MobileSection>
       ) : null}
 
       {message ? (
-        <section className="px-5 pt-5">
+        <MobileSection>
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
-        </section>
+        </MobileSection>
       ) : null}
 
-      <section className="space-y-4 px-5 pt-5">
+      <MobileSection>
+        <div className="space-y-4">
         {!isLoading && filteredQuestions.length === 0 ? (
-          <div className="rounded-lg bg-white p-5 text-sm leading-6 text-slate-600 shadow-sm ring-1 ring-slate-100">
-            没有符合当前筛选条件的错题。可以清空搜索词或切换筛选条件。
-          </div>
+          <EmptyState
+            title="还没有符合条件的错题"
+            description="可以清空筛选条件，或先拍一题、导入 ChatGPT 错题卡。"
+            action={{ href: "/upload", label: "去拍题" }}
+          />
         ) : null}
         {filteredQuestions.map((question) => (
-          <article
-            key={question.id}
-            className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100"
-          >
+          <MobileCard key={question.id}>
             <div className="flex gap-3">
               <label className="flex h-20 shrink-0 items-start pt-1">
                 <input
@@ -437,7 +441,7 @@ export default function QuestionsPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  "无预览"
+                  <ImagePlaceholder label={question.image_path ? "无预览" : "文字错题卡"} />
                 )}
               </Link>
               <div className="min-w-0 flex-1">
@@ -445,6 +449,7 @@ export default function QuestionsPage() {
                   <StatusPill label={question.subject} tone="blue" />
                   <StatusPill label={question.mastery_status} tone="amber" />
                   <StatusPill label={question.question_text_status} tone="slate" />
+                  <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
                   {question.needs_manual_check ? (
                     <StatusPill label="需人工核对" tone="red" />
                   ) : null}
@@ -467,9 +472,10 @@ export default function QuestionsPage() {
                 </Link>
               </div>
             </div>
-          </article>
+          </MobileCard>
         ))}
-      </section>
+        </div>
+      </MobileSection>
     </div>
   );
 }

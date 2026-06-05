@@ -12,6 +12,7 @@ Build a mobile-first 11408 postgraduate exam wrong-question review system. The c
 4. AI-recognized text is auxiliary and must default to `ai_unverified`.
 5. API keys must never be hard-coded or committed.
 6. Follow the rules in `.skills` before changing related behavior.
+   - UI changes must follow `.skills/mobile-ui-redesign/SKILL.md`.
 7. After each code change, run `npm run lint` and `npm run build` when available.
 8. If verification cannot run, explain the concrete reason.
 9. Do not install unknown third-party dependencies or templates.

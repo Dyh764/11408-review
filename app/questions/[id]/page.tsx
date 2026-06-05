@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
@@ -9,6 +10,7 @@ import {
   buildQuestionUpdatePayload,
   type QuestionEditForm,
 } from "@/lib/questions/edit-question";
+import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import { createClient } from "@/lib/supabase/client";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
@@ -210,19 +212,22 @@ export default function QuestionDetailPage() {
       />
 
       {isLoading ? (
-        <p className="px-5 pt-5 text-sm text-slate-500">正在读取错题详情...</p>
+        <MobileSection>
+          <LoadingState label="正在读取错题详情..." />
+        </MobileSection>
       ) : null}
 
       {message ? (
-        <section className="px-5 pt-5">
+        <MobileSection>
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
-        </section>
+        </MobileSection>
       ) : null}
 
       {question ? (
-        <section className="space-y-4 px-5 pt-5">
+        <MobileSection>
+          <div className="space-y-4">
           <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
             {question.signedImageUrl ? (
               <button type="button" onClick={() => setIsPreviewOpen(true)} className="block w-full">
@@ -236,17 +241,18 @@ export default function QuestionDetailPage() {
                 />
               </button>
             ) : (
-              <div className="grid h-64 place-items-center bg-slate-100 text-sm text-slate-500">
-                原题图片暂不可预览
+              <div className="grid h-64 place-items-center bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
+                {question.image_path ? "原题图片暂不可预览" : "未绑定原图，可后续补图"}
               </div>
             )}
           </div>
 
-          <article className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+          <MobileCard>
             <div className="flex flex-wrap gap-2">
               <StatusPill label={question.subject} tone="blue" />
               <StatusPill label={question.mastery_status} tone="amber" />
               <StatusPill label={question.question_text_status} tone="slate" />
+              <StatusPill label={getQuestionSourceLabel(question)} tone="blue" />
             </div>
 
             <button
@@ -425,8 +431,9 @@ export default function QuestionDetailPage() {
                 </dd>
               </div>
             </dl>
-          </article>
-        </section>
+          </MobileCard>
+          </div>
+        </MobileSection>
       ) : null}
 
       {isPreviewOpen && question?.signedImageUrl ? (

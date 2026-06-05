@@ -4,7 +4,7 @@ export type ExportQuestion = {
   subject: string;
   chapter: string | null;
   knowledge_point: string | null;
-  image_path: string;
+  image_path: string | null;
   question_text: string | null;
   question_text_status: string;
   mastery_status: string;
@@ -15,6 +15,7 @@ export type ExportQuestion = {
   review_priority: string | null;
   confidence: string | null;
   needs_manual_check: boolean;
+  source: string | null;
   created_at: string;
   analyzed_at: string | null;
 };
@@ -144,7 +145,7 @@ export function buildMarkdownExport(dataset: ExportDataset) {
         `- 掌握状态：${question.mastery_status}`,
         `- 知识点：${question.knowledge_point ?? "未分类"}`,
         `- 错因：${question.mistake_types?.join("、") || "未填写"}`,
-        `- 题目图片：${question.image_path}`,
+        `- 题目图片：${question.image_path ?? "未绑定原图"}`,
         `- 题目文字：${question.question_text ?? "暂无"}`,
         `- 我的备注：${question.user_note ?? "无"}`,
         `- 正确思路：${question.solution_summary ?? "暂无"}`,
@@ -170,6 +171,7 @@ export function buildCsvExport(dataset: ExportDataset) {
     "knowledge_point",
     "mastery_status",
     "question_text_status",
+    "source",
     "mistake_types",
     "user_note",
     "solution_summary",
@@ -192,7 +194,7 @@ export async function fetchCurrentUserExportDataset(
     supabase
       .from("questions")
       .select(
-        "id,user_id,subject,chapter,knowledge_point,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,one_sentence_tip,review_priority,confidence,needs_manual_check,created_at,analyzed_at",
+        "id,user_id,subject,chapter,knowledge_point,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,one_sentence_tip,review_priority,confidence,needs_manual_check,source,created_at,analyzed_at",
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),

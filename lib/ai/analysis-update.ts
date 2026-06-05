@@ -41,6 +41,7 @@ export function buildAnalysisUpdatePayload(
     review_priority: analysis.review_priority,
     confidence: analysis.confidence,
     needs_manual_check: analysis.needs_manual_check,
+    source: "ai_analysis",
     analyzed_at: new Date().toISOString(),
   };
 }
