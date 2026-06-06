@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
+import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import {
   getQuestionTextStatusLabel,
 } from "@/lib/questions/meta-labels";
@@ -275,6 +276,50 @@ export default function QuestionsPage() {
     }
   }
 
+  async function handleBatchDelete() {
+    if (selectedIds.length === 0) {
+      setMessage("请先选择至少一道错题。");
+      return;
+    }
+
+    const selectedCount = selectedIds.length;
+    const shouldDelete = window.confirm(
+      `确定删除选中的 ${selectedCount} 道错题吗？\n删除后它们不会出现在错题库、今日复习和报告统计中。\n此操作暂不提供批量撤销。`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsBatchProcessing(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/questions/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        deletedCount?: number;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setMessage(result.error ?? "批量删除失败。");
+        return;
+      }
+
+      setQuestions((current) => current.filter((question) => !selectedIds.includes(question.id)));
+      setSelectedIds([]);
+      setMessage(`已删除 ${result.deletedCount ?? selectedCount} 道错题。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "批量删除失败。");
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }
+
   return (
     <MobilePageShell>
       <PageHeader
@@ -344,36 +389,56 @@ export default function QuestionsPage() {
 
       <section className="px-5">
         <SectionCard>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-800">
-              已选择 {selectedIds.length} 道
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowBatchTools((value) => !value)}
-                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
-              >
-                {showBatchTools ? "收起批量" : "批量操作"}
-              </button>
+          {!showBatchTools ? (
+            <button
+              type="button"
+              onClick={() => setShowBatchTools(true)}
+              className="min-h-11 w-full rounded-lg bg-blue-50 px-4 text-sm font-semibold text-blue-700"
+            >
+              批量管理
+            </button>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">
+                  已选择 {selectedIds.length} 题
+                </p>
+                <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={selectAllFiltered}
                 className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
               >
-                全选当前
+                全选当前页
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
                 className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
               >
-                清空
+                取消选择
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIds([]);
+                  setShowBatchTools(false);
+                }}
+                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+              >
+                退出批量
+              </button>
+                </div>
             </div>
-          </div>
-          {showBatchTools ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleBatchDelete}
+              disabled={isBatchProcessing || selectedIds.length === 0}
+              className="min-h-11 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              删除所选
+            </button>
             <button
               type="button"
               onClick={() => handleBatchAction("mastered")}
@@ -399,9 +464,10 @@ export default function QuestionsPage() {
               加入冲刺复习
             </button>
           </div>
-          ) : null}
+            </>
+          )}
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            不提供批量删除，避免误删原图和错题记录。
+            批量删除只会软删除错题，不会删除 Storage 图片或复习记录。
           </p>
         </SectionCard>
       </section>
@@ -432,22 +498,24 @@ export default function QuestionsPage() {
         {filteredQuestions.map((question) => {
           const hasAnswer = Boolean(question.standard_answer?.trim());
           const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
+          const questionDisplay = getQuestionStemAndChoices(question.question_text, question.choices);
 
           return (
           <QuestionListCard
             key={question.id}
             href={`/questions/${question.id}`}
             title={title}
-            summary={question.question_text ?? question.user_note}
+            summary={questionDisplay.questionText || question.user_note}
             subject={question.subject}
             difficulty={question.difficulty}
             masteryStatus={question.mastery_status}
             hasAnswer={hasAnswer}
+            isChoiceQuestion={questionDisplay.choices.length > 0}
             createdAt={`创建：${formatDate(question.created_at)}`}
             imageUrl={question.signedImageUrl}
             hasImagePath={Boolean(question.image_path)}
             selected={selectedIds.includes(question.id)}
-            onSelect={() => toggleSelected(question.id)}
+            onSelect={showBatchTools ? () => toggleSelected(question.id) : undefined}
           />
           );
         })}

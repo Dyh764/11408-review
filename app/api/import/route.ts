@@ -29,6 +29,7 @@ function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
     difficulty: card.difficulty ?? null,
     image_path: card.image_path ?? null,
     question_text: card.question_text ?? null,
+    choices: card.choices,
     question_text_status: card.question_text_status,
     mastery_status: card.mastery_status,
     user_note: card.image_code

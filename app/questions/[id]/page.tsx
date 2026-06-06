@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
+import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
 import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
+import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import {
   getAnswerStatusLabel,
   getAnswerStatusTone,
@@ -390,6 +392,10 @@ export default function QuestionDetailPage() {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  const questionDisplay = question
+    ? getQuestionStemAndChoices(question.question_text, question.choices)
+    : { questionText: "", choices: [] };
+
   return (
     <MobilePageShell>
       <PageHeader
@@ -451,7 +457,7 @@ export default function QuestionDetailPage() {
                     原题图片暂不可预览
                   </div>
                   {question.question_text ? (
-                    <MathText text={question.question_text} className="mt-3 text-slate-700" />
+                    <MathText text={questionDisplay.questionText} className="mt-3 text-slate-700" />
                   ) : null}
                 </MobileCard>
               ) : (
@@ -460,7 +466,7 @@ export default function QuestionDetailPage() {
                   chapter={question.chapter}
                   knowledge_point={question.knowledge_point}
                   difficulty={question.difficulty}
-                  question_text={question.question_text}
+                  question_text={questionDisplay.questionText}
                   mastery_status={question.mastery_status}
                   question_text_status={question.question_text_status}
                   source={question.source}
@@ -468,6 +474,7 @@ export default function QuestionDetailPage() {
                   hideMeta
                 />
               )}
+              <ChoiceList choices={questionDisplay.choices} />
             </div>
           </MobileSection>
 

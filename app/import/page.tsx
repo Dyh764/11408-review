@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { MobileCard, MobilePageShell, MobileSection, Notice, SectionCard, StatCard } from "@/components/mobile/primitives";
+import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
@@ -25,6 +26,7 @@ type ImportApiResult = {
 function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
   const { card } = item;
   const hasAnswer = Boolean(card.standard_answer?.trim());
+  const hasChoices = card.choices.length > 0;
 
   return (
     <MobileCard>
@@ -37,6 +39,9 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
           <StatusPill label="文字错题卡" tone="amber" />
         )}
         <StatusPill label={card.difficulty ? `难度：${card.difficulty}` : "难度待补充"} tone="slate" />
+        {hasChoices ? (
+          <StatusPill label={`选择题 / ${card.choices.length} 个选项`} tone="blue" />
+        ) : null}
         <StatusPill label={hasAnswer ? "包含答案" : "未包含答案，可后续补充"} tone={hasAnswer ? "blue" : "amber"} />
         <StatusPill label={getAnswerStatusLabel(card.answer_status)} tone="amber" />
       </div>
@@ -62,6 +67,11 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
           className="mt-1 text-slate-600"
         />
       )}
+      {hasChoices ? (
+        <div className="mt-3">
+          <ChoiceList choices={card.choices} compact />
+        </div>
+      ) : null}
       <dl className="mt-3 space-y-2 text-sm">
         {hasAnswer ? (
           <div className="rounded-lg bg-slate-50 p-3">
@@ -158,6 +168,9 @@ export default function ImportPage() {
           </ol>
           <p className="mt-2 text-sm leading-6">
             数学公式请使用 LaTeX：行内写作 $\\sum_&#123;n=1&#125;^&#123;\\infty&#125; u_n$，块级公式使用 $$...$$。
+          </p>
+          <p className="mt-2 text-sm leading-6">
+            选择题请尽量把 A/B/C/D 放进 choices，不要全部塞进 question_text。
           </p>
         </Notice>
       </MobileSection>

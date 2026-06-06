@@ -4,6 +4,7 @@ import { supabaseBucket } from "@/lib/env";
 import type {
   AnswerSource,
   AnswerStatus,
+  ChoiceOption,
   Difficulty,
   MasteryStatus,
   QuestionTextStatus,
@@ -29,6 +30,7 @@ export type DueReview = {
     image_path: string | null;
     source: QuestionSource;
     question_text: string | null;
+    choices: ChoiceOption[];
     question_text_status: QuestionTextStatus;
     mastery_status: MasteryStatus;
     mistake_types: string[] | null;
@@ -65,6 +67,7 @@ const dueReviewColumns = `
     image_path,
     source,
     question_text,
+    choices,
     question_text_status,
     mastery_status,
     mistake_types,

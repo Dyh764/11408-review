@@ -11,6 +11,7 @@ type QuestionListCardProps = {
   difficulty?: Difficulty | string | null;
   masteryStatus?: MasteryStatus | string | null;
   hasAnswer: boolean;
+  isChoiceQuestion?: boolean;
   createdAt: string;
   imageUrl?: string | null;
   hasImagePath?: boolean;
@@ -26,6 +27,7 @@ export function QuestionListCard({
   difficulty,
   masteryStatus,
   hasAnswer,
+  isChoiceQuestion = false,
   createdAt,
   imageUrl,
   hasImagePath,
@@ -36,6 +38,7 @@ export function QuestionListCard({
     { label: subject, tone: "blue" as const },
     difficulty ? { label: difficulty, tone: "slate" as const } : null,
     masteryStatus ? { label: masteryStatus, tone: "amber" as const } : null,
+    isChoiceQuestion ? { label: "选择题", tone: "blue" as const } : null,
     { label: hasAnswer ? "有答案" : "无答案", tone: hasAnswer ? "green" as const : "amber" as const },
   ].filter(Boolean) as Array<{ label: string; tone: "blue" | "green" | "amber" | "red" | "slate" }>;
 
@@ -86,7 +89,7 @@ export function QuestionListCard({
           </Link>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {badges.slice(0, 4).map((badge) => (
+            {badges.slice(0, 5).map((badge) => (
               <StatusPill key={badge.label} label={badge.label} tone={badge.tone} />
             ))}
           </div>

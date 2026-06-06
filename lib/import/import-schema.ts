@@ -1,6 +1,7 @@
 import type {
   AnswerSource,
   AnswerStatus,
+  ChoiceOption,
   Confidence,
   Difficulty,
   MasteryStatus,
@@ -9,6 +10,7 @@ import type {
   ReviewPriority,
   Subject,
 } from "@/lib/types";
+import { extractChoicesFromQuestionText, splitQuestionTextAndChoices } from "@/lib/questions/extract-choices";
 
 export type ImportQuestionCard = {
   image_code?: string;
@@ -18,6 +20,7 @@ export type ImportQuestionCard = {
   knowledge_point?: string;
   difficulty?: Difficulty;
   question_text?: string;
+  choices: ChoiceOption[];
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
   user_note?: string;
@@ -83,6 +86,10 @@ export const importExampleJson = JSON.stringify(
       knowledge_point: "积分区域与换序",
       difficulty: "中等",
       question_text: "题目文字",
+      choices: [
+        { label: "A", text: "选项 A 内容" },
+        { label: "B", text: "选项 B 内容" },
+      ],
       question_text_status: "ai_unverified",
       mastery_status: "思路对但卡住",
       user_note: "我想先算0-1先积x，但是积分那里卡住了",
@@ -203,6 +210,12 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     throw new Error("needs_manual_check 必须是 boolean。");
   }
 
+  const choices = extractChoicesFromQuestionText(questionText, value.choices);
+  const displayQuestionText =
+    choices.length > 0 && value.choices === undefined
+      ? splitQuestionTextAndChoices(questionText).questionText
+      : questionText;
+
   return {
     image_code: optionalString(value.image_code, "image_code") || undefined,
     image_path: optionalString(value.image_path, "image_path") || undefined,
@@ -210,7 +223,8 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     chapter: optionalString(value.chapter, "chapter") || undefined,
     knowledge_point: optionalString(value.knowledge_point, "knowledge_point") || undefined,
     difficulty,
-    question_text: questionText || undefined,
+    question_text: displayQuestionText || undefined,
+    choices,
     question_text_status: questionTextStatus,
     mastery_status: masteryStatus,
     user_note: userNote || undefined,

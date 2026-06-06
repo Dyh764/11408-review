@@ -29,6 +29,11 @@ export type QuestionSource =
   | "manual"
   | "pending_chatgpt";
 
+export type ChoiceOption = {
+  label: string;
+  text: string;
+};
+
 export type MockAnalysis = {
   question_text: string;
   question_text_status: QuestionTextStatus;

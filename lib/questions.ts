@@ -3,6 +3,7 @@ import { supabaseBucket } from "@/lib/env";
 import type {
   AnswerSource,
   AnswerStatus,
+  ChoiceOption,
   Difficulty,
   MasteryStatus,
   QuestionSource,
@@ -20,6 +21,7 @@ export type QuestionRecord = {
   difficulty: Difficulty | null;
   image_path: string | null;
   question_text: string | null;
+  choices: ChoiceOption[];
   question_text_status: QuestionTextStatus;
   mastery_status: MasteryStatus;
   user_note: string | null;
@@ -54,6 +56,7 @@ const questionColumns = `
   difficulty,
   image_path,
   question_text,
+  choices,
   question_text_status,
   mastery_status,
   user_note,

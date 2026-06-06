@@ -172,6 +172,60 @@ test("import preview renders LaTeX formulas with KaTeX when reachable", async ({
   await expectPageHasNoHorizontalOverflow(page);
 });
 
+test("import preview shows structured choices when JSON includes choices", async ({ page }) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(
+    JSON.stringify(
+      [
+        {
+          subject: "数学",
+          chapter: "级数",
+          knowledge_point: "正项级数",
+          difficulty: "中等",
+          question_text: "下列选项正确的是（ ）。",
+          choices: [
+            { label: "A", text: "若 $\\sum u_n$ 收敛" },
+            { label: "B", text: "若 $u_{2n}$ 收敛" },
+            { label: "C", text: "若部分和有界" },
+            { label: "D", text: "若极限存在" },
+          ],
+          question_text_status: "ai_unverified",
+          mastery_status: "思路对但卡住",
+          user_note: "选项需要结构化。",
+          mistake_types: ["选项混排"],
+          solution_summary: "先看每个选项条件。",
+          standard_answer: "答案：A",
+          answer_explanation: "A 正确。",
+          key_steps: ["判断 A", "排除 B"],
+          one_sentence_tip: "选项逐个代入。",
+          review_priority: "high",
+          confidence: "medium",
+          needs_manual_check: true,
+          answer_status: "ai_unverified",
+          answer_source: "chatgpt_import",
+        },
+      ],
+      null,
+      2,
+    ),
+  );
+  await page.getByRole("button", { name: "解析" }).click();
+
+  const previewCard = page.locator("section").filter({ hasText: "预览 1 张错题卡" });
+
+  await expect(previewCard.getByText("选择题 / 4 个选项")).toBeVisible();
+  await expect(previewCard.getByText("若部分和有界", { exact: true })).toBeVisible();
+  await expect(previewCard.locator(".katex").first()).toBeVisible();
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
 test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
   const response = await page.goto("/upload");
 
