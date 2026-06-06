@@ -4,11 +4,31 @@ export const supabaseBucket =
   "question-images";
 
 export const defaultDeepSeekModel = "deepseek-v4-flash";
+export const defaultGeminiModel = "gemini-2.5-flash";
+
+export type AiProviderName = "gemini" | "deepseek" | "none";
+
+export function getAiProviderName(): AiProviderName {
+  const value = process.env.AI_PROVIDER;
+
+  if (value === "gemini" || value === "deepseek" || value === "none") {
+    return value;
+  }
+
+  return process.env.DEEPSEEK_API_KEY ? "deepseek" : "none";
+}
 
 export function getDeepSeekConfig() {
   return {
     apiKey: process.env.DEEPSEEK_API_KEY ?? "",
     model: process.env.DEEPSEEK_MODEL ?? defaultDeepSeekModel,
+  };
+}
+
+export function getGeminiConfig() {
+  return {
+    apiKey: process.env.GEMINI_API_KEY ?? "",
+    model: process.env.GEMINI_MODEL ?? defaultGeminiModel,
   };
 }
 

@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  generateLearningInsightWithDeepSeek,
-  getDeepSeekStatus,
-} from "@/lib/ai/deepseek";
+import { generateLearningInsights, getAiProviderStatus } from "@/lib/ai/provider";
 import { todayIsoDate } from "@/lib/dates";
 import { buildRuleReportContent } from "@/lib/reports/rule-report";
 import type { ReportType } from "@/lib/reports";
@@ -48,7 +45,7 @@ async function readJson(request: Request) {
 export async function POST(request: Request) {
   const body = await readJson(request);
   const type = reportTypes.includes(body.type as ReportType) ? (body.type as ReportType) : "daily";
-  const source = body.source === "deepseek" ? "deepseek" : "rule";
+  const source = body.source === "deepseek" || body.source === "ai" ? "ai" : "rule";
 
   const supabase = await createClient();
 
@@ -112,9 +109,9 @@ export async function POST(request: Request) {
   let finalContent: Record<string, unknown> = content;
   let finalSource = "rule";
 
-  if (source === "deepseek" && getDeepSeekStatus().configured) {
+  if (source === "ai" && getAiProviderStatus().configured) {
     try {
-      const insight = await generateLearningInsightWithDeepSeek({
+      const insightResult = await generateLearningInsights({
         type,
         startDate,
         endDate,
@@ -135,6 +132,7 @@ export async function POST(request: Request) {
           result: review.review_result,
         })),
       });
+      const insight = insightResult.result;
 
       finalContent = {
         ...content,
@@ -145,12 +143,11 @@ export async function POST(request: Request) {
           count: task.estimated_minutes,
         })),
       };
-      finalSource = "deepseek";
+      finalSource = insightResult.source;
     } catch (error) {
       finalContent = {
         ...content,
-        deepseek_error:
-          error instanceof Error ? error.message : "DeepSeek 分析失败，已保留规则版报告。",
+        ai_error: error instanceof Error ? error.message : "AI 分析失败，已保留规则版报告。",
       };
       finalSource = "rule_fallback";
     }

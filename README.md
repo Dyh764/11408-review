@@ -45,6 +45,7 @@
 - Supabase Auth / Database / Storage / RLS。
 - Supabase Edge Functions / Cron。
 - OpenAI Responses API。
+- Optional Gemini / DeepSeek learning analysis。
 
 ## 快速开始
 
@@ -88,8 +89,13 @@ NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET=question-images
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_STORAGE_BUCKET=question-images
+AI_PROVIDER=gemini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-v4-flash
 CRON_SECRET=
 ```
 
@@ -98,6 +104,7 @@ CRON_SECRET=
 - 不提交 `.env.local`。
 - 不把真实 key 写入 README、docs 或源码。
 - `OPENAI_API_KEY` 不能加 `NEXT_PUBLIC_`。
+- `GEMINI_API_KEY` 和 `DEEPSEEK_API_KEY` 不能加 `NEXT_PUBLIC_`。
 - `SUPABASE_SERVICE_ROLE_KEY` 只能放在 Supabase Edge Functions secrets。
 
 ## Supabase 设置
@@ -110,12 +117,14 @@ supabase/migrations/002_allow_profile_insert.sql
 supabase/migrations/003_allow_question_image_delete.sql
 supabase/migrations/004_allow_review_delete.sql
 supabase/migrations/005_add_question_delete_fields.sql
+supabase/migrations/006_add_question_choices.sql
 ```
 
 检查：
 
 - `profiles`、`questions`、`reviews`、`reports`、`knowledge_stats` 已创建。
 - `questions.deleted_at`、`questions.deleted_reason` 已创建；正常页面默认过滤已删除错题。
+- `questions.choices` 已创建；选择题选项使用 JSON 数组保存。
 - RLS 已开启，用户只能访问自己的数据。
 - `question-images` bucket 为 private。
 - Storage 路径为 `users/{user_id}/questions/{question_id}.{jpg|png|webp}`。
@@ -188,6 +197,10 @@ OPENAI_MODEL=gpt-4.1
 - 页面不会白屏。
 - 单题分析和 Edge Function 分析会使用 mock fallback。
 - mock 结果会明确标记为 fallback，不伪装真实 AI 结果。
+
+## AI Provider 配置
+
+`AI_PROVIDER` 支持 `gemini`、`deepseek`、`none`。Gemini 和 DeepSeek 都是可选学习分析增强；未配置 key 时，上传、导入、查看答案、复习和报告仍可使用。配置方法见 `docs/ai-provider.md`。
 
 ## 手机端使用流程
 

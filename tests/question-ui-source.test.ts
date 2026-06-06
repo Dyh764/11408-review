@@ -78,6 +78,8 @@ test("home page is a today learning cockpit, not a technical menu", () => {
   assert.match(source, /拍题上传/);
   assert.match(source, /导入 ChatGPT 错题卡/);
   assert.match(source, /更多入口/);
+  assert.match(source, /loadDashboardStats/);
+  assert.doesNotMatch(source, /dashboardStats/);
   assert.doesNotMatch(source, /刷新智能分析/);
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
@@ -111,7 +113,7 @@ test("reports and settings use learning and account language instead of ops lang
   assert.match(settings, /账号与数据/);
   assert.match(settings, /主要功能状态/);
   assert.match(settings, /可选增强/);
-  assert.match(settings, /当前主流程不依赖 OpenAI 或 DeepSeek/);
+  assert.match(settings, /当前主流程不依赖 OpenAI、Gemini 或 DeepSeek/);
   assert.doesNotMatch(settings, /Bucket:|保存 timezone|image_path/);
 });
 

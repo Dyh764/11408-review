@@ -1,5 +1,10 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { defaultDeepSeekModel, getSupabasePublicConfig, supabaseBucket } from "@/lib/env";
+import {
+  defaultDeepSeekModel,
+  defaultGeminiModel,
+  getSupabasePublicConfig,
+  supabaseBucket,
+} from "@/lib/env";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 type EnvStatus = {
@@ -186,6 +191,26 @@ export async function getProductionConfigCheck() {
         label: "AI 自动分析：未启用（可选）",
         configuredLabel: "AI 自动分析：已配置",
         message: "OpenAI 自动分析是可选增强，不影响上传、导入、复习和错题库。",
+      }),
+      AI_PROVIDER: readEnv("AI_PROVIDER", {
+        status: "optional",
+        label: "AI Provider",
+        defaultValue: "none",
+        mask: false,
+        message: "可选值：gemini、deepseek、none。",
+      }),
+      GEMINI_API_KEY: readEnv("GEMINI_API_KEY", {
+        status: "optional",
+        label: "Gemini 未启用（可选）",
+        configuredLabel: "Gemini 已配置",
+        message: "Gemini 是可选学习分析增强，未配置时主流程继续可用。",
+      }),
+      GEMINI_MODEL: readEnv("GEMINI_MODEL", {
+        status: "optional",
+        label: "Gemini 模型",
+        defaultValue: defaultGeminiModel,
+        mask: false,
+        message: `未配置时默认使用 ${defaultGeminiModel}。`,
       }),
       DEEPSEEK_API_KEY: readEnv("DEEPSEEK_API_KEY", {
         status: "optional",

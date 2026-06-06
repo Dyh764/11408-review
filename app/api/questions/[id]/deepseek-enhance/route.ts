@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { enhanceQuestionWithDeepSeek, getDeepSeekStatus } from "@/lib/ai/deepseek";
+import { enhanceQuestionWithAI, getAiProviderStatus } from "@/lib/ai/provider";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -10,10 +10,10 @@ type RouteContext = {
 };
 
 export async function POST(_request: Request, context: RouteContext) {
-  const status = getDeepSeekStatus();
+  const status = getAiProviderStatus();
 
   if (!status.configured) {
-    return NextResponse.json({ error: "DeepSeek 未启用（可选）。" }, { status: 400 });
+    return NextResponse.json({ error: status.label }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -59,7 +59,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   try {
-    const enhancement = await enhanceQuestionWithDeepSeek({
+    const aiResult = await enhanceQuestionWithAI({
       subject: question.subject,
       chapter: question.chapter,
       knowledge_point: question.knowledge_point,
@@ -76,6 +76,7 @@ export async function POST(_request: Request, context: RouteContext) {
         result: review.review_result,
       })),
     });
+    const enhancement = aiResult.result;
 
     const { error: updateError } = await supabase
       .from("questions")
@@ -98,14 +99,14 @@ export async function POST(_request: Request, context: RouteContext) {
     }
 
     return NextResponse.json({
-      source: "deepseek",
-      model: status.model,
-      message: "DeepSeek 优化完成，题目文字和用户备注已保留。",
+      source: aiResult.source,
+      model: aiResult.model,
+      message: "AI 优化完成，题目文字和用户备注已保留。",
       enhancement,
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "DeepSeek 优化失败。" },
+      { error: error instanceof Error ? error.message : "AI 优化失败。" },
       { status: 502 },
     );
   }

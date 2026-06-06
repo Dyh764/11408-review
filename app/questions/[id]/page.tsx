@@ -43,6 +43,12 @@ const textStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_
 const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"];
 
 type StatusResponse = {
+  ai?: {
+    provider: "gemini" | "deepseek" | "none";
+    configured: boolean;
+    label: string;
+    model: string;
+  };
   deepseek?: {
     configured: boolean;
     label: string;
@@ -105,13 +111,20 @@ export default function QuestionDetailPage() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isAnswerVisible, setIsAnswerVisible] = useState(false);
   const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
+  const [aiStatus, setAiStatus] = useState<StatusResponse["ai"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/status")
       .then((response) => response.json())
-      .then((data: StatusResponse) => setDeepSeekStatus(data.deepseek ?? null))
-      .catch(() => setDeepSeekStatus(null));
+      .then((data: StatusResponse) => {
+        setDeepSeekStatus(data.deepseek ?? null);
+        setAiStatus(data.ai ?? null);
+      })
+      .catch(() => {
+        setDeepSeekStatus(null);
+        setAiStatus(null);
+      });
   }, []);
 
   useEffect(() => {
@@ -220,13 +233,13 @@ export default function QuestionDetailPage() {
   }
 
   async function handleDeepSeekEnhance() {
-    if (!deepSeekStatus?.configured) {
-      setMessage("DeepSeek 未启用（可选）。");
+    if (!aiStatus?.configured) {
+      setMessage(aiStatus?.label ?? "AI 学习分析未启用（可选）。");
       return;
     }
 
     const shouldContinue = window.confirm(
-      "DeepSeek 只会优化章节、知识点、错因、摘要、提醒和优先级，不会覆盖题目文字或用户备注。是否继续？",
+      "AI 只会优化知识点、错因、思路和一句话提醒，不会覆盖题目文字和用户备注。是否继续？",
     );
 
     if (!shouldContinue) {
@@ -249,15 +262,15 @@ export default function QuestionDetailPage() {
           "error" in result &&
           typeof result.error === "string"
             ? result.error
-            : "DeepSeek 优化失败。";
+            : "AI 优化失败。";
         setMessage(errorMessage);
         return;
       }
 
       await refreshQuestion();
-      setMessage("DeepSeek 优化完成，题目文字和用户备注已保留。");
+      setMessage("AI 优化完成，题目文字和用户备注已保留。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "DeepSeek 优化失败。");
+      setMessage(error instanceof Error ? error.message : "AI 优化失败。");
     } finally {
       setIsDeepSeekEnhancing(false);
     }
@@ -584,7 +597,7 @@ export default function QuestionDetailPage() {
           <MobileSection title="智能增强">
             <MobileCard>
               <p className="text-sm leading-6 text-slate-600">
-                DeepSeek 只优化章节、知识点、错因、正确思路和复习优先级，不会覆盖题目文字、用户备注或生成图片。
+                当前使用 {aiStatus?.provider === "gemini" ? "Gemini" : aiStatus?.provider === "deepseek" ? "DeepSeek" : "未启用"}。AI 只优化知识点、错因、思路和一句话提醒，不会覆盖题目文字和用户备注。
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -595,18 +608,18 @@ export default function QuestionDetailPage() {
                 >
                   {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "AI 自动分析"}
                 </button>
-                {deepSeekStatus?.configured ? (
+                {aiStatus?.configured ? (
                   <button
                     type="button"
                     onClick={handleDeepSeekEnhance}
                     disabled={isDeepSeekEnhancing}
                     className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    {isDeepSeekEnhancing ? "优化中..." : "优化题卡"}
+                    {isDeepSeekEnhancing ? "优化中..." : "AI 优化题卡"}
                   </button>
                 ) : (
                   <p className="text-xs leading-5 text-slate-500">
-                    DeepSeek 学习分析未启用（可选），不影响当前复习。配置 DEEPSEEK_API_KEY 后可用。
+                    {aiStatus?.label ?? deepSeekStatus?.label ?? "AI 学习分析未启用（可选）"}，不影响当前复习。
                   </p>
                 )}
               </div>

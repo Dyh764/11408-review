@@ -1,8 +1,3 @@
-export type MathTextPart =
-  | { type: "text"; value: string }
-  | { type: "inlineMath"; value: string }
-  | { type: "blockMath"; value: string };
-
 const mathCommandRules: Array<[RegExp, string]> = [
   [/(?<!\\)sum_/g, "\\sum_"],
   [/(?<!\\)sum\{/g, "\\sum{"],
@@ -31,7 +26,11 @@ function normalizePlainTextSegment(segment: string) {
   });
 }
 
-function normalizeMathText(input: string) {
+export function normalizeMathText(input?: string | null) {
+  if (!input) {
+    return "";
+  }
+
   const parts: string[] = [];
   let index = 0;
 
@@ -61,53 +60,4 @@ function normalizeMathText(input: string) {
   }
 
   return parts.join("");
-}
-
-export function splitMathText(input: string): MathTextPart[] {
-  const normalizedInput = normalizeMathText(input);
-  const parts: MathTextPart[] = [];
-  let index = 0;
-
-  function pushText(value: string) {
-    if (!value) {
-      return;
-    }
-
-    const previous = parts[parts.length - 1];
-    if (previous?.type === "text") {
-      previous.value += value;
-      return;
-    }
-
-    parts.push({ type: "text", value });
-  }
-
-  while (index < normalizedInput.length) {
-    const next = normalizedInput.indexOf("$", index);
-
-    if (next === -1) {
-      pushText(normalizedInput.slice(index));
-      break;
-    }
-
-    if (next > index) {
-      pushText(normalizedInput.slice(index, next));
-    }
-
-    const isBlock = normalizedInput.startsWith("$$", next);
-    const delimiter = isBlock ? "$$" : "$";
-    const contentStart = next + delimiter.length;
-    const contentEnd = normalizedInput.indexOf(delimiter, contentStart);
-
-    if (contentEnd === -1) {
-      pushText(normalizedInput.slice(next));
-      break;
-    }
-
-    const value = normalizedInput.slice(contentStart, contentEnd).trim();
-    parts.push({ type: isBlock ? "blockMath" : "inlineMath", value });
-    index = contentEnd + delimiter.length;
-  }
-
-  return parts.filter((part) => part.value.length > 0);
 }

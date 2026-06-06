@@ -217,15 +217,15 @@ export default function ReportsPage() {
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [isGenerating, setIsGenerating] = useState(false);
-  const [deepSeekConfigured, setDeepSeekConfigured] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings/status")
       .then((response) => response.json())
-      .then((data: { deepseek?: { configured: boolean } }) => {
-        setDeepSeekConfigured(Boolean(data.deepseek?.configured));
+      .then((data: { ai?: { configured: boolean } }) => {
+        setAiConfigured(Boolean(data.ai?.configured));
       })
-      .catch(() => setDeepSeekConfigured(false));
+      .catch(() => setAiConfigured(false));
   }, []);
 
   useEffect(() => {
@@ -260,7 +260,7 @@ export default function ReportsPage() {
   const selectedReport =
     reportsForTab.find((report) => report.id === selectedReportId) ?? reportsForTab[0] ?? null;
 
-  async function handleGenerateReport(source: "rule" | "deepseek" = "rule") {
+  async function handleGenerateReport(source: "rule" | "ai" = "rule") {
     setIsGenerating(true);
     setMessage("");
 
@@ -357,19 +357,19 @@ export default function ReportsPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-800">智能总结（可选）</h2>
             <StatusPill
-              label={deepSeekConfigured ? "已启用" : "未启用（可选）"}
-              tone={deepSeekConfigured ? "blue" : "amber"}
+              label={aiConfigured ? "已启用" : "未启用（可选）"}
+              tone={aiConfigured ? "blue" : "amber"}
             />
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            {deepSeekConfigured
+            {aiConfigured
               ? "可在现有统计基础上生成一版学习建议；普通报告始终可用。"
               : "当前先使用普通学习统计，不影响报告生成。"}
           </p>
           <button
             type="button"
-            onClick={() => handleGenerateReport("deepseek")}
-            disabled={isGenerating || !deepSeekConfigured}
+            onClick={() => handleGenerateReport("ai")}
+            disabled={isGenerating || !aiConfigured}
             className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
           >
             生成智能总结

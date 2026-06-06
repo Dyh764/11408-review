@@ -29,6 +29,19 @@ type StatusResponse = {
     optional: boolean;
     label: string;
   };
+  ai: {
+    provider: "gemini" | "deepseek" | "none";
+    configured: boolean;
+    label: string;
+    model: string;
+  };
+  gemini: {
+    configured: boolean;
+    model: string;
+    modelConfigured: boolean;
+    optional: boolean;
+    label: string;
+  };
   deepseek: {
     configured: boolean;
     model: string;
@@ -311,7 +324,7 @@ export default function SettingsPage() {
             />
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            当前主流程不依赖 OpenAI 或 DeepSeek。你可以正常上传、导入、复习和查看答案。
+            当前主流程不依赖 OpenAI、Gemini 或 DeepSeek。你可以正常上传、导入、复习和查看答案。
           </p>
         </SectionCard>
       </MobileSection>
@@ -320,8 +333,12 @@ export default function SettingsPage() {
         <SectionCard>
           <div className="flex flex-wrap gap-2">
             <StatusPill
-              label={status?.openai.label ?? "AI 自动分析：未启用（可选）"}
-              tone={status?.openai.configured ? "blue" : "amber"}
+              label={`AI 学习分析：${status?.ai.label ?? "未启用（可选）"}`}
+              tone={status?.ai.configured ? "blue" : "amber"}
+            />
+            <StatusPill
+              label={status?.gemini.label ?? "Gemini 未启用（可选）"}
+              tone={status?.gemini.configured ? "blue" : "amber"}
             />
             <StatusPill
               label={status?.deepseek.label ?? "DeepSeek 学习分析：未启用（可选）"}

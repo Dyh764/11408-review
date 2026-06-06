@@ -356,6 +356,9 @@ test("production system check API returns sanitized readiness fields", async ({ 
   expect(body.variables.OPENAI_API_KEY.value).not.toMatch(/^sk-/);
   expect(body.variables.OPENAI_API_KEY.status).toBe("optional");
   expect(body.variables.OPENAI_API_KEY.label).toBe("AI 自动分析：未启用（可选）");
+  expect(body.variables.AI_PROVIDER.status).toBe("optional");
+  expect(body.variables.GEMINI_API_KEY.status).toBe("optional");
+  expect(body.variables.GEMINI_MODEL.value).toBe("gemini-2.5-flash");
   expect(body.variables.DEEPSEEK_API_KEY.status).toBe("optional");
   expect(body.variables.DEEPSEEK_API_KEY.label).toBe("DeepSeek 学习分析：未启用（可选）");
   expect(body.variables.DEEPSEEK_MODEL.value).toBe("deepseek-v4-flash");

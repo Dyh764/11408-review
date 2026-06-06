@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
+import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +31,9 @@ export default function ReviewPage() {
   const [reviews, setReviews] = useState<DueReview[]>([]);
   const [completed, setCompleted] = useState<Record<string, ReviewResult>>({});
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
+  const [selectedChoices, setSelectedChoices] = useState<Record<string, string[]>>({});
+  const [submittedChoices, setSubmittedChoices] = useState<Record<string, boolean>>({});
+  const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
@@ -173,6 +177,23 @@ export default function ReviewPage() {
   const overdueCount = reviews.filter((review) => isOverdue(review.scheduled_date)).length;
   const todayCount = reviews.length - overdueCount;
 
+  function toggleChoice(reviewId: string, label: string, isMultiple: boolean) {
+    setSelectedChoices((current) => {
+      const selected = current[reviewId] ?? [];
+
+      if (!isMultiple) {
+        return { ...current, [reviewId]: selected.includes(label) ? [] : [label] };
+      }
+
+      return {
+        ...current,
+        [reviewId]: selected.includes(label)
+          ? selected.filter((item) => item !== label)
+          : [...selected, label],
+      };
+    });
+  }
+
   return (
     <MobilePageShell>
       <PageHeader
@@ -229,6 +250,13 @@ export default function ReviewPage() {
             review.questions.question_text,
             review.questions.choices,
           );
+          const answerChoices = parseAnswerChoiceLabels(review.questions.standard_answer);
+          const isChoiceQuestion = questionDisplay.choices.length > 0;
+          const selected = selectedChoices[review.id] ?? [];
+          const isChoiceSubmitted = Boolean(submittedChoices[review.id]);
+          const choiceIsCorrect =
+            answerChoices.labels.length > 0 &&
+            areChoiceAnswersEqual(selected, answerChoices.labels);
 
           return (
             <MobileCard key={review.id}>
@@ -278,7 +306,18 @@ export default function ReviewPage() {
                   ) : null}
                   {questionDisplay.choices.length > 0 ? (
                     <div className="mt-3">
-                      <ChoiceList choices={questionDisplay.choices} compact />
+                      <ChoiceList
+                        choices={questionDisplay.choices}
+                        compact
+                        mode={isChoiceSubmitted ? "reviewed" : "answering"}
+                        selectedLabels={selected}
+                        correctLabels={answerChoices.labels}
+                        revealAnswer={isAnswerRevealed}
+                        disabled={isAnswerRevealed}
+                        onToggleChoice={(label) =>
+                          toggleChoice(review.id, label, answerChoices.isMultiple)
+                        }
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -288,20 +327,74 @@ export default function ReviewPage() {
                 计划 {review.scheduled_date}；章节 {review.questions.chapter ?? "待识别"}；错因 {review.questions.mistake_types?.join("、") || "待分析"}
               </p>
 
+              {!isChoiceQuestion ? (
+                <div className="mt-4">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-slate-800">
+                      写下你的答案或思路（仅本次复习记录，可不填）
+                    </span>
+                    <textarea
+                      value={draftAnswers[review.id] ?? ""}
+                      onChange={(event) =>
+                        setDraftAnswers((current) => ({
+                          ...current,
+                          [review.id]: event.target.value,
+                        }))
+                      }
+                      rows={3}
+                      className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6"
+                    />
+                  </label>
+                </div>
+              ) : null}
+
               {hasAnswer ? (
                 <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
-                    }
-                    disabled={isAnswerRevealed}
-                    className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-500"
-                  >
-                    {isAnswerRevealed ? "答案已显示" : "我做完了，查看答案"}
-                  </button>
+                  {isChoiceQuestion && !isAnswerRevealed ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
+                        setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
+                      }}
+                      disabled={selected.length === 0 && answerChoices.labels.length > 0}
+                      className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      提交答案
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
+                      }
+                      disabled={isAnswerRevealed}
+                      className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      {isAnswerRevealed ? "答案已显示" : "我做完了，查看答案"}
+                    </button>
+                  )}
                   {isAnswerRevealed ? (
-                    <div className="mt-3">
+                    <div className="mt-3 space-y-3">
+                      {isChoiceQuestion && answerChoices.labels.length > 0 ? (
+                        <p
+                          className={`rounded-lg p-3 text-sm font-semibold ${
+                            choiceIsCorrect
+                              ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
+                              : "bg-red-50 text-red-800 ring-1 ring-red-100"
+                          }`}
+                        >
+                          {choiceIsCorrect ? "回答正确" : "回答错误"}；正确答案：{answerChoices.labels.join("、")}
+                        </p>
+                      ) : null}
+                      {!isChoiceQuestion ? (
+                        <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-800 ring-1 ring-blue-100">
+                          <p>请对照标准答案自行判断，本工具暂不自动判定填空题对错。</p>
+                          {draftAnswers[review.id]?.trim() ? (
+                            <p className="mt-2 break-words">本次答案/思路：{draftAnswers[review.id]}</p>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <AnswerPanel
                         standard_answer={review.questions.standard_answer}
                         answer_explanation={review.questions.answer_explanation}
