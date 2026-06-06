@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoadingState, MobileCard, MobileSection, Notice } from "@/components/mobile/primitives";
+import { LoadingState, MobilePageShell, MobileSection, Notice, SectionCard } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { defaultTimeZone, normalizeTimeZone } from "@/lib/dates";
@@ -18,7 +18,6 @@ import {
 import {
   fetchCurrentProfile,
   updateCurrentProfileTimezone,
-  type ProfileRecord,
 } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/client";
 
@@ -84,7 +83,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [email, setEmail] = useState("");
-  const [profile, setProfile] = useState<ProfileRecord | null>(null);
   const [timezone, setTimezone] = useState(defaultTimeZone);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [message, setMessage] = useState(
@@ -127,7 +125,6 @@ export default function SettingsPage() {
 
         if (isActive) {
           setEmail(user.email ?? "");
-          setProfile(currentProfile);
           setTimezone(normalizeTimeZone(currentProfile.timezone));
           setMessage("");
         }
@@ -165,15 +162,15 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser();
 
       if (error || !user) {
-        setMessage("请先登录，再保存 timezone。");
+        setMessage("请先登录，再保存复习日期时区。");
         return;
       }
 
       const normalized = await updateCurrentProfileTimezone(supabase, user, timezone);
       setTimezone(normalized);
-      setMessage(`timezone 已保存为 ${normalized}。`);
+      setMessage(`复习日期时区已保存为 ${normalized}。`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存 timezone 失败。");
+      setMessage(error instanceof Error ? error.message : "保存复习日期时区失败。");
     } finally {
       setIsSavingTimezone(false);
     }
@@ -202,7 +199,7 @@ export default function SettingsPage() {
       const dataset = await fetchCurrentUserExportDataset(supabase, user.id);
       const exportContent = buildExportContent(format, dataset);
       downloadTextFile(exportContent.fileName, exportContent.mimeType, exportContent.content);
-      setMessage(`已生成 ${exportContent.fileName}。图片未打包，导出中保留 image_path。`);
+      setMessage(`已生成 ${exportContent.fileName}。图片文件不会打包进导出文件。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "导出失败。");
     } finally {
@@ -222,10 +219,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="我的"
-        subtitle="账号、导入、报告、导出、系统检查和 PWA 安装入口。"
+        subtitle="管理账号和自己的学习数据。主流程不依赖可选 AI 服务。"
       />
 
       {isLoading ? (
@@ -242,76 +239,68 @@ export default function SettingsPage() {
         </MobileSection>
       ) : null}
 
-      <MobileSection>
-        <div className="space-y-4">
-        <MobileCard>
-          <h2 className="text-sm font-bold text-slate-800">账号</h2>
-          <p className="mt-2 break-words text-sm text-slate-600">
-            当前登录邮箱：{email || "未登录"}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Profile：{profile ? profile.id : "未读取"}
-          </p>
-        </MobileCard>
+      <MobileSection title="账号与数据">
+        <div className="space-y-3">
+          <SectionCard>
+            <p className="text-sm font-semibold text-slate-900">当前账号</p>
+            <p className="mt-2 break-words text-sm text-slate-600">
+              {email || "未登录"}
+            </p>
+          </SectionCard>
 
-        <MobileCard>
-          <h2 className="text-sm font-bold text-slate-800">常用入口</h2>
-          <div className="mt-3 grid gap-2">
-            <Link
-              href="/import"
-              className="flex min-h-12 items-center justify-between rounded-lg bg-blue-50 px-4 text-sm font-semibold text-blue-700 ring-1 ring-blue-100"
-            >
-              <span>导入 ChatGPT 错题卡</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-            <Link
-              href="/reports"
-              className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
-            >
-              <span>学习报告</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-            <Link
-              href="/settings/system-check"
-              className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
-            >
-              <span>系统检查</span>
-              <span aria-hidden="true">›</span>
-            </Link>
-          </div>
-        </MobileCard>
-
-        <MobileCard>
-          <h2 className="text-sm font-bold text-slate-800">Timezone</h2>
-          <div className="mt-3 grid gap-3">
-            <select
-              value={timezone}
-              onChange={(event) => setTimezone(event.target.value)}
-              className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
-            >
-              {timezoneOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
+          <SectionCard title="导出数据" subtitle="导出当前账号的错题、复习和报告。图片文件不会打包进导出文件。">
+            <div className="grid gap-2">
+              {(["json", "markdown", "csv"] as ExportFormat[]).map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  onClick={() => handleExport(format)}
+                  disabled={Boolean(exportingFormat)}
+                  className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:text-slate-400"
+                >
+                  {exportingFormat === format ? "导出中..." : `导出 ${format.toUpperCase()}`}
+                </button>
               ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleSaveTimezone}
-              disabled={isSavingTimezone}
-              className="min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
-            >
-              {isSavingTimezone ? "保存中..." : "保存 timezone"}
-            </button>
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            缺失或无效 timezone 会默认使用 Asia/Shanghai。复习日期和导出文件名优先使用该设置。
-          </p>
-        </MobileCard>
+            </div>
+          </SectionCard>
 
-        <MobileCard>
-          <h2 className="text-sm font-bold text-slate-800">配置状态</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <SectionCard title="复习日期时区" subtitle="用于安排复习日期和生成导出文件名，默认使用 Asia/Shanghai。">
+            <div className="grid gap-3">
+              <select
+                value={timezone}
+                onChange={(event) => setTimezone(event.target.value)}
+                className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+              >
+                {timezoneOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveTimezone}
+                disabled={isSavingTimezone}
+                className="min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+              >
+                {isSavingTimezone ? "保存中..." : "保存复习日期时区"}
+              </button>
+            </div>
+          </SectionCard>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+          >
+            退出登录
+          </button>
+        </div>
+      </MobileSection>
+
+      <MobileSection title="主要功能状态">
+        <SectionCard>
+          <div className="flex flex-wrap gap-2">
             <StatusPill
               label={status?.supabase.configured ? "Supabase 已配置" : "Supabase 未配置"}
               tone={status?.supabase.configured ? "blue" : "red"}
@@ -320,6 +309,16 @@ export default function SettingsPage() {
               label={status?.storage.configured ? "图片存储已配置" : "图片存储未配置"}
               tone={status?.storage.configured ? "blue" : "red"}
             />
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            当前主流程不依赖 OpenAI 或 DeepSeek。你可以正常上传、导入、复习和查看答案。
+          </p>
+        </SectionCard>
+      </MobileSection>
+
+      <MobileSection title="可选增强">
+        <SectionCard>
+          <div className="flex flex-wrap gap-2">
             <StatusPill
               label={status?.openai.label ?? "AI 自动分析：未启用（可选）"}
               tone={status?.openai.configured ? "blue" : "amber"}
@@ -328,61 +327,42 @@ export default function SettingsPage() {
               label={status?.deepseek.label ?? "DeepSeek 学习分析：未启用（可选）"}
               tone={status?.deepseek.configured ? "blue" : "amber"}
             />
-            <StatusPill
-              label={status?.storage.configured ? `Bucket: ${status.storage.bucket}` : "Bucket 未配置"}
-              tone={status?.storage.configured ? "slate" : "red"}
-            />
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            AI 自动分析和 DeepSeek 学习分析都是可选增强，不配置也不影响上传、导入、复习和错题库。设置页只显示是否配置，不显示 API Key、service role key 或 token。
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            这些能力只用来辅助整理错因、思路和提醒，不影响日常复习。
           </p>
-          <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800 ring-1 ring-amber-100">
-            <p className="font-semibold">当前推荐流程</p>
-            <ol className="mt-2 grid gap-1">
-              <li>1. 白天在 ChatGPT 中提问和整理错题；</li>
-              <li>2. 晚上复制 ChatGPT 生成的 JSON；</li>
-              <li>3. 在“导入 ChatGPT 错题卡”中导入；</li>
-              <li>4. 系统负责保存错题、安排复习和统计薄弱点。</li>
-            </ol>
-          </div>
-        </MobileCard>
+        </SectionCard>
+      </MobileSection>
 
-        <MobileCard>
-          <h2 className="text-sm font-bold text-slate-800">数据导出</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            JSON 用于完整备份；Markdown 便于阅读；CSV 便于 Excel 查看。图片不会打包进文件，但会保留 image_path。
-          </p>
-          <div className="mt-3 grid gap-2">
-            {(["json", "markdown", "csv"] as ExportFormat[]).map((format) => (
-              <button
-                key={format}
-                type="button"
-                onClick={() => handleExport(format)}
-                disabled={Boolean(exportingFormat)}
-                className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:text-slate-400"
+      <MobileSection title="低频入口">
+        <div className="space-y-3">
+          <SectionCard>
+            <div className="grid gap-2">
+              <Link
+                href="/settings/system-check"
+                className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
               >
-                {exportingFormat === format ? "导出中..." : `导出 ${format.toUpperCase()}`}
-              </button>
-            ))}
-          </div>
-        </MobileCard>
+                <span>系统检查</span>
+                <span aria-hidden="true">&gt;</span>
+              </Link>
+              <Link
+                href="/reports"
+                className="flex min-h-12 items-center justify-between rounded-lg bg-slate-50 px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-100"
+              >
+                <span>学习报告</span>
+                <span aria-hidden="true">&gt;</span>
+              </Link>
+            </div>
+          </SectionCard>
 
-        <Notice>
-          <h2 className="text-sm font-bold text-slate-800">PWA 安装</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            手机浏览器打开部署地址后，iPhone Safari 使用分享菜单“添加到主屏幕”，Android Chrome 使用“安装应用”或“添加到主屏幕”。
-          </p>
-        </Notice>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
-        >
-          退出登录
-        </button>
+          <Notice>
+            <h2 className="text-sm font-bold text-slate-800">安装到手机桌面</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              手机浏览器打开部署地址后，可以通过浏览器菜单添加到主屏幕。
+            </p>
+          </Notice>
         </div>
       </MobileSection>
-    </div>
+    </MobilePageShell>
   );
 }

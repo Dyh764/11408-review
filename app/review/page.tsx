@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
-import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { EmptyState, ImagePlaceholder, LoadingState, MobileCard, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
-import { getQuestionSourceLabel } from "@/lib/questions/source-label";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -171,10 +170,10 @@ export default function ReviewPage() {
   const todayCount = reviews.length - overdueCount;
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="今日复习"
-        subtitle="读取今天及以前未完成的 reviews，逾期任务优先补完。"
+        subtitle="先看题，做完后再展开答案，然后记录这次复习结果。"
       />
 
       <MobileSection>
@@ -245,10 +244,6 @@ export default function ReviewPage() {
                   <div className="flex flex-wrap gap-2">
                     <StatusPill label={review.questions.subject} tone="blue" />
                     <StatusPill
-                      label={getQuestionSourceLabel(review.questions)}
-                      tone="blue"
-                    />
-                    <StatusPill
                       label={isOverdue(review.scheduled_date) ? "已逾期" : "今日到期"}
                       tone={isOverdue(review.scheduled_date) ? "red" : "amber"}
                     />
@@ -276,10 +271,8 @@ export default function ReviewPage() {
                 </div>
               </div>
 
-              <p className="mt-3 break-words text-sm leading-6 text-slate-500">
-                计划日期：{review.scheduled_date}；章节：
-                {review.questions.chapter ?? "待识别"}；上次错因：
-                {review.questions.mistake_types?.join("、") || "待分析"}
+              <p className="mt-3 break-words text-xs leading-5 text-slate-500">
+                计划 {review.scheduled_date}；章节 {review.questions.chapter ?? "待识别"}；错因 {review.questions.mistake_types?.join("、") || "待分析"}
               </p>
 
               {hasAnswer ? (
@@ -336,6 +329,6 @@ export default function ReviewPage() {
         })}
         </div>
       </MobileSection>
-    </div>
+    </MobilePageShell>
   );
 }

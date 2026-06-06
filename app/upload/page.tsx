@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   MobileCard,
+  MobilePageShell,
   MobileSection,
   Notice,
 } from "@/components/mobile/primitives";
@@ -236,7 +237,7 @@ export default function UploadPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="拍题上传"
         subtitle="默认先保存原图和卡点，稍后用 ChatGPT 整理；也可以立即自动分析。"
@@ -245,8 +246,7 @@ export default function UploadPage() {
       {!supabase ? (
         <MobileSection>
           <Notice tone="amber">
-            请配置 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-            后再上传。页面仍可访问，但真实保存会被禁用。
+            当前还不能保存到你的账号。配置完成后，拍题、导入和复习会正常写入个人错题库。
           </Notice>
         </MobileSection>
       ) : null}
@@ -271,7 +271,7 @@ export default function UploadPage() {
           ) : (
             <div className="py-8">
               <p className="text-lg font-bold text-blue-700">拍照 / 从相册选择</p>
-              <p className="mt-2 text-sm text-blue-700/80">原图是证据，必须保存 image_path</p>
+              <p className="mt-2 text-sm text-blue-700/80">先把原题拍清楚，后面整理时会绑定这张图。</p>
             </div>
           )}
         </label>
@@ -353,7 +353,9 @@ export default function UploadPage() {
                 className="mr-2"
               />
               <span className="font-bold">只保存图片，稍后用 ChatGPT 整理</span>
-              <span className="mt-1 block text-xs opacity-75">推荐：白天先留图，晚上导入整理好的 JSON。</span>
+              <span className="mt-1 block text-xs opacity-75">
+                适合白天先拍题，晚上统一让 ChatGPT 整理成错题卡。
+              </span>
             </label>
             <label
               className={`min-h-16 rounded-lg p-3 ring-1 ${
@@ -392,7 +394,7 @@ export default function UploadPage() {
         {selectedFile ? (
           <MobileCard className="text-sm leading-6 text-slate-600">
             <p>原图大小：{formatFileSize(originalFileSize)}</p>
-            <p>上传大小：{formatFileSize(selectedFile.size)}</p>
+            <p>保存大小：{formatFileSize(selectedFile.size)}</p>
             <p>{isCompressing ? "压缩中..." : compressionMessage}</p>
           </MobileCard>
         ) : null}
@@ -492,6 +494,6 @@ export default function UploadPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </MobilePageShell>
   );
 }

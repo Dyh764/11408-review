@@ -1,18 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
-import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
+import { EmptyState, LoadingState, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
+import { QuestionListCard } from "@/components/mobile/QuestionListCard";
 import { PageHeader } from "@/components/page-header";
-import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 import {
-  getQuestionSourceLabel,
   getQuestionTextStatusLabel,
-  getQuestionTextStatusTone,
 } from "@/lib/questions/meta-labels";
 import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
@@ -67,6 +63,7 @@ export default function QuestionsPage() {
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [showBatchTools, setShowBatchTools] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -276,13 +273,13 @@ export default function QuestionsPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="错题库"
-        subtitle="读取当前登录用户自己的 questions 数据，支持科目和掌握状态筛选。"
+        subtitle="这里用于浏览和筛选，做题、看答案和编辑都放到详情页。"
       />
 
-      <section className="space-y-3 px-5 pt-5">
+      <section className="space-y-3 px-5">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {subjectFilters.map((item) => (
             <button
@@ -342,13 +339,20 @@ export default function QuestionsPage() {
         />
       </section>
 
-      <section className="px-5 pt-4">
-        <div className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-100">
+      <section className="px-5">
+        <SectionCard>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-slate-800">
               已选择 {selectedIds.length} 道
             </p>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBatchTools((value) => !value)}
+                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
+              >
+                {showBatchTools ? "收起批量" : "批量操作"}
+              </button>
               <button
                 type="button"
                 onClick={selectAllFiltered}
@@ -365,6 +369,7 @@ export default function QuestionsPage() {
               </button>
             </div>
           </div>
+          {showBatchTools ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
               type="button"
@@ -391,10 +396,11 @@ export default function QuestionsPage() {
               加入冲刺复习
             </button>
           </div>
+          ) : null}
           <p className="mt-2 text-xs leading-5 text-slate-500">
             不提供批量删除，避免误删原图和错题记录。
           </p>
-        </div>
+        </SectionCard>
       </section>
 
       {isLoading ? (
@@ -405,7 +411,7 @@ export default function QuestionsPage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
             {message}
           </p>
         </MobileSection>
@@ -425,95 +431,25 @@ export default function QuestionsPage() {
           const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
 
           return (
-          <MobileCard key={question.id}>
-            <div className="flex gap-3">
-              <label className="flex h-20 shrink-0 items-start pt-1">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(question.id)}
-                  onChange={() => toggleSelected(question.id)}
-                  className="h-5 w-5 rounded border-slate-300"
-                  aria-label={`选择 ${question.knowledge_point ?? question.id}`}
-                />
-              </label>
-              <Link
-                href={`/questions/${question.id}`}
-                className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs font-semibold text-slate-500"
-              >
-                {question.signedImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={question.signedImageUrl}
-                    alt="原题图片缩略图"
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="px-2 text-center">{question.image_path ? "无预览" : "文字卡"}</span>
-                )}
-              </Link>
-              <div className="min-w-0 flex-1">
-                <p className="break-words text-sm font-semibold text-slate-950">
-                  {title}
-                </p>
-                {!question.image_path ? (
-                  <div className="mt-1">
-                    <TextQuestionPreview
-                      subject={question.subject}
-                      chapter={question.chapter}
-                      knowledge_point={question.knowledge_point}
-                      difficulty={question.difficulty}
-                      question_text={question.question_text}
-                      mastery_status={question.mastery_status}
-                      question_text_status={question.question_text_status}
-                      source={question.source}
-                      hasAnswer={hasAnswer}
-                      compact
-                      hideMeta
-                      hideTitle
-                    />
-                  </div>
-                ) : (
-                  <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
-                    {question.question_text ?? "暂无题目文字"}
-                  </p>
-                )}
-                <div className="mt-2 space-y-2">
-                  <div className="flex flex-wrap gap-2" aria-label="基础信息">
-                    <StatusPill label={question.subject} tone="blue" />
-                    {question.difficulty ? <StatusPill label={question.difficulty} tone="slate" /> : null}
-                  </div>
-                  <div className="flex flex-wrap gap-2" aria-label="学习状态">
-                    <StatusPill label={question.mastery_status} tone="amber" />
-                    <StatusPill label={hasAnswer ? "有答案" : "无答案"} tone={hasAnswer ? "blue" : "amber"} />
-                    <StatusPill
-                      label={getQuestionTextStatusLabel(question.question_text_status)}
-                      tone={getQuestionTextStatusTone(question.question_text_status)}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2" aria-label="来源信息">
-                    <StatusPill label={getQuestionSourceLabel(question.source)} tone="slate" />
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-slate-500">
-                    创建时间：{formatDate(question.created_at)}
-                  </p>
-                  <Link
-                    href={`/questions/${question.id}`}
-                    className="inline-flex min-h-9 items-center rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700"
-                  >
-                    查看详情
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </MobileCard>
+          <QuestionListCard
+            key={question.id}
+            href={`/questions/${question.id}`}
+            title={title}
+            summary={question.question_text ?? question.user_note}
+            subject={question.subject}
+            difficulty={question.difficulty}
+            masteryStatus={question.mastery_status}
+            hasAnswer={hasAnswer}
+            createdAt={`创建：${formatDate(question.created_at)}`}
+            imageUrl={question.signedImageUrl}
+            hasImagePath={Boolean(question.image_path)}
+            selected={selectedIds.includes(question.id)}
+            onSelect={() => toggleSelected(question.id)}
+          />
           );
         })}
         </div>
       </MobileSection>
-    </div>
+    </MobilePageShell>
   );
 }

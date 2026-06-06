@@ -1,107 +1,78 @@
-import { ActionCard, MobileCard, MobileSection, StatCard } from "@/components/mobile/primitives";
+import Link from "next/link";
+import { MobilePageShell, MobileSection, PrimaryActionCard, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
-import { StatusPill } from "@/components/status-pill";
-import { isDeepSeekConfigured } from "@/lib/env";
-import { dashboardStats, mockQuestions } from "@/lib/mock-data";
+import { dashboardStats } from "@/lib/mock-data";
 
-const quickActions = [
-  { href: "/upload", label: "拍题上传", description: "先留住原图和卡点" },
-  { href: "/import", label: "导入 ChatGPT 错题卡", description: "粘贴 JSON，生成复习计划" },
-  { href: "/review", label: "开始今日复习", description: "处理今天到期的错题" },
-  { href: "/sprint", label: "考前冲刺", description: "优先处理最危险的题" },
-  { href: "/questions", label: "错题库", description: "按科目和薄弱点筛选" },
-  { href: "/reports", label: "学习报告", description: "看本周薄弱点和建议" },
+const primaryActions = [
+  {
+    href: "/review",
+    title: "开始今日复习",
+    description: "先清掉今天到期的错题，做完再看答案。",
+    tone: "blue" as const,
+    kicker: "第一步",
+  },
+  {
+    href: "/upload",
+    title: "拍题上传",
+    description: "白天先拍题，保留原图和当时卡点。",
+    tone: "cyan" as const,
+    kicker: "新增错题",
+  },
+  {
+    href: "/import",
+    title: "导入 ChatGPT 错题卡",
+    description: "晚上粘贴 JSON，把错题整理成可复习卡片。",
+    tone: "slate" as const,
+    kicker: "整理题卡",
+  },
+];
+
+const secondaryLinks = [
+  { href: "/questions", title: "错题库", description: "浏览、筛选和进入详情" },
+  { href: "/reports", title: "学习报告", description: "查看薄弱点和下一步建议" },
+  { href: "/sprint", title: "考前冲刺", description: "优先处理高风险错题" },
+  { href: "/settings", title: "我的", description: "账号、导出和可选增强" },
 ];
 
 export default function DashboardPage() {
-  const deepSeekEnabled = isDeepSeekConfigured();
-
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
-        title="今天先把该复习的题清掉"
-        subtitle="拍题留原图，晚上导入 ChatGPT 错题卡，系统负责复习计划和薄弱点统计。"
+        title="今日学习驾驶舱"
+        subtitle="先复习，再整理新题。这里保留今天最该做的三件事。"
       />
 
       <MobileSection>
         <div className="grid grid-cols-3 gap-3">
-          <StatCard label="待复习" value={dashboardStats.dueToday} tone="blue" />
+          <StatCard label="今日待复习" value={dashboardStats.dueToday} tone="blue" />
           <StatCard label="今日新增" value={dashboardStats.addedToday} />
-          <StatCard label="本周完成" value={dashboardStats.weeklyCompletionRate} tone="green" />
+          <StatCard label="本周完成率" value={dashboardStats.weeklyCompletionRate} tone="green" />
         </div>
       </MobileSection>
 
-      <MobileSection title="今天要做的事">
+      <MobileSection title="现在应该点这里">
         <div className="grid gap-3">
-          {quickActions.map((action, index) => (
-            <ActionCard
-              key={action.href}
-              href={action.href}
-              title={action.label}
-              description={action.description}
-              tone={index === 0 ? "blue" : index === 1 ? "cyan" : "slate"}
-            />
+          {primaryActions.map((action) => (
+            <PrimaryActionCard key={action.href} {...action} />
           ))}
         </div>
       </MobileSection>
 
-      <MobileSection>
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-950">薄弱点 Top 3</h2>
-          <StatusPill label="mock" tone="blue" />
-        </div>
-        <div className="mt-3 space-y-3">
-          {dashboardStats.weakestTop3.map((item, index) => (
-            <MobileCard key={item.name} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-slate-950">
-                  {index + 1}. {item.name}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">薄弱分越高越需要优先复盘</p>
-              </div>
-              <p className="text-lg font-bold text-red-600">{item.score}</p>
-            </MobileCard>
+      <MobileSection title="更多入口" subtitle="低频查看放在下面，学习时不用先处理它们。">
+        <div className="grid gap-3">
+          {secondaryLinks.map((link) => (
+            <SectionCard key={link.href}>
+              <Link href={link.href} className="flex min-h-11 items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-slate-900">{link.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{link.description}</span>
+                </span>
+                <span className="shrink-0 text-sm font-bold text-blue-700">&gt;</span>
+              </Link>
+            </SectionCard>
           ))}
         </div>
       </MobileSection>
-
-      <MobileSection title="智能建议">
-        <MobileCard>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <StatusPill
-              label={deepSeekEnabled ? "DeepSeek 已启用" : "DeepSeek 未启用（可选）"}
-              tone={deepSeekEnabled ? "blue" : "amber"}
-            />
-          </div>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {deepSeekEnabled
-              ? "点击后会根据最近错题、复习结果和薄弱点摘要生成建议。"
-              : "当前使用规则统计，DeepSeek 可选启用。"}
-          </p>
-          <button
-            type="button"
-            disabled={!deepSeekEnabled}
-            className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
-          >
-            刷新智能分析
-          </button>
-        </MobileCard>
-      </MobileSection>
-
-      <MobileSection title="今日样例题">
-        <div className="mt-3 space-y-3">
-          {mockQuestions.slice(0, 2).map((question) => (
-            <MobileCard key={question.id}>
-              <div className="flex flex-wrap gap-2">
-                <StatusPill label={question.subject} tone="blue" />
-                <StatusPill label={question.masteryStatus} tone="amber" />
-              </div>
-              <p className="mt-3 font-bold text-slate-950">{question.knowledgePoint}</p>
-              <p className="mt-1 text-sm text-slate-600">{question.oneSentenceTip}</p>
-            </MobileCard>
-          ))}
-        </div>
-      </MobileSection>
-    </div>
+    </MobilePageShell>
   );
 }

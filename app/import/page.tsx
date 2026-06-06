@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MobileCard, MobileSection, Notice } from "@/components/mobile/primitives";
+import { MobileCard, MobilePageShell, MobileSection, Notice, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
-import { getQuestionSourceLabel } from "@/lib/questions/meta-labels";
 import {
   importExampleJson,
   parseImportJsonText,
@@ -97,6 +96,15 @@ export default function ImportPage() {
 
   const parsed = useMemo(() => parseImportJsonText(jsonText), [jsonText]);
   const previewCards = parsed.cards;
+  const previewStats = useMemo(() => {
+    const withAnswer = previewCards.filter((item) => item.card.standard_answer?.trim()).length;
+    const withoutImage = previewCards.filter((item) => !item.card.image_path).length;
+    const needsCheck = previewCards.filter(
+      (item) => item.card.needs_manual_check || item.card.question_text_status !== "verified",
+    ).length;
+
+    return { withAnswer, withoutImage, needsCheck };
+  }, [previewCards]);
   const canImport = previewCards.length > 0 && !isImporting;
 
   function handleParse() {
@@ -131,7 +139,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="导入 ChatGPT 错题卡"
         subtitle="粘贴 ChatGPT 生成的 JSON 数组，先预览，再写入错题库和复习计划。"
@@ -139,20 +147,19 @@ export default function ImportPage() {
 
       <MobileSection>
         <Notice tone="blue">
-          <p className="font-bold">推荐流程</p>
+          <p className="font-bold">3 步完成导入</p>
           <ol className="mt-2 grid gap-1">
-            <li>1. 白天在 ChatGPT 里讨论错题</li>
-            <li>2. 晚上让 ChatGPT 生成 JSON</li>
-            <li>3. 粘贴到这里确认导入</li>
-            <li>4. 第二天按复习计划清掉</li>
+            <li>1. 复制 ChatGPT 生成的 JSON</li>
+            <li>2. 粘贴到这里</li>
+            <li>3. 预览确认后导入</li>
           </ol>
         </Notice>
       </MobileSection>
 
-      <MobileSection title="粘贴 JSON">
-        <MobileCard>
+      <MobileSection title="粘贴错题卡">
+        <SectionCard subtitle="不用手改格式，先粘贴，点解析后再检查每一题。">
           <label className="block">
-            <span className="text-sm font-semibold text-slate-800">JSON 错题卡数组</span>
+            <span className="text-sm font-semibold text-slate-800">ChatGPT 输出内容</span>
             <textarea
               value={jsonText}
               onChange={(event) => {
@@ -161,8 +168,8 @@ export default function ImportPage() {
                 setApiResult(null);
               }}
               rows={12}
-              className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-sm leading-6 text-slate-950 outline-none focus:border-blue-500"
-              placeholder="粘贴 ChatGPT 生成的 JSON 数组"
+              className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-3 text-sm leading-6 text-slate-950 outline-none focus:border-blue-500"
+              placeholder="把 ChatGPT 生成的 JSON 粘贴到这里。"
             />
           </label>
 
@@ -186,7 +193,7 @@ export default function ImportPage() {
               解析
             </button>
           </div>
-        </MobileCard>
+        </SectionCard>
       </MobileSection>
 
       {parseErrors.length > 0 ? (
@@ -208,12 +215,18 @@ export default function ImportPage() {
       {previewCards.length > 0 ? (
         <MobileSection>
           <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-950">
-              预览 {previewCards.length} 张错题卡
-            </h2>
-            <StatusPill label={getQuestionSourceLabel("chatgpt_import")} tone="blue" />
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">解析结果</h2>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <StatCard label="共解析" value={previewCards.length} tone="blue" />
+              <StatCard label="包含答案" value={previewStats.withAnswer} tone="green" />
+              <StatCard label="未绑定原图" value={previewStats.withoutImage} tone="amber" />
+              <StatCard label="需要核对" value={previewStats.needsCheck} />
+            </div>
           </div>
+          <h2 className="text-base font-semibold text-slate-950">
+            预览 {previewCards.length} 张错题卡
+          </h2>
           {previewCards.map((item) => (
             <ImportPreviewCard key={item.index} item={item} />
           ))}
@@ -263,6 +276,6 @@ export default function ImportPage() {
           </div>
         </MobileSection>
       ) : null}
-    </div>
+    </MobilePageShell>
   );
 }

@@ -85,7 +85,7 @@ test("import page previews ChatGPT answer fields when JSON includes an answer", 
     return;
   }
 
-  await page.getByRole("textbox", { name: "JSON 错题卡数组" }).fill(
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(
     JSON.stringify(
       [
         {
@@ -117,7 +117,7 @@ test("import page previews ChatGPT answer fields when JSON includes an answer", 
   );
   await page.getByRole("button", { name: "解析" }).click();
 
-  await expect(page.getByText("包含答案")).toBeVisible();
+  await expect(page.getByText("包含答案")).toHaveCount(2);
   await expect(page.getByText("难度：中等")).toBeVisible();
   await expect(page.getByText("标准答案预览")).toBeVisible();
   await expect(
@@ -166,8 +166,8 @@ test("reports page uses user-facing empty copy and exposes manual rule report ge
     return;
   }
 
-  await expect(page.getByText("暂无日报")).toBeVisible();
-  await expect(page.getByText("完成上传、导入或复习后，这里会生成学习总结。")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "还没有报告" })).toBeVisible();
+  await expect(page.getByText("还没有报告。完成几次导入或复习后，可以生成学习总结。")).toBeVisible();
   await expect(page.getByRole("button", { name: "生成今日报告" })).toBeVisible();
   await expect(page.getByText(/Cron|Edge Function/)).toHaveCount(0);
 });
@@ -213,13 +213,14 @@ test("review flow asks users to reveal answers before result buttons when reacha
   await expect(page.getByRole("button", { name: "仍不会" }).first()).toBeVisible();
 });
 
-test("home page explains optional DeepSeek suggestions without auto analysis", async ({ page }) => {
+test("home page keeps optional DeepSeek out of the primary cockpit", async ({ page }) => {
   const response = await page.goto("/");
 
   expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByText("智能建议")).toBeVisible();
-  await expect(page.getByText("当前使用规则统计，DeepSeek 可选启用。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "刷新智能分析" })).toBeDisabled();
+  await expect(page.getByText("今日学习驾驶舱")).toBeVisible();
+  await expect(page.getByText("现在应该点这里")).toBeVisible();
+  await expect(page.getByText("智能建议")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "刷新智能分析" })).toHaveCount(0);
 });
 
 for (const route of protectedRoutes) {

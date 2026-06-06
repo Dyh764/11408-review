@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserReports, type ReportRecord, type ReportType } from "@/lib/reports";
@@ -105,7 +105,7 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
   return (
     <MobileSection>
       <div className="space-y-4">
-      <MobileCard>
+      <SectionCard title="今日总结">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="break-words font-semibold text-slate-950">
@@ -115,14 +115,14 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
               {report.start_date} 至 {report.end_date}
             </p>
           </div>
-          <StatusPill label="real report" tone="blue" />
         </div>
-      </MobileCard>
+      </SectionCard>
 
-      <section className="grid grid-cols-2 gap-3">
+      <SectionCard title="有答案 / 无答案 / 待核对">
+      <div className="grid grid-cols-2 gap-3">
         {metrics.length > 0 ? (
           metrics.map(([key]) => (
-            <div key={key} className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <div key={key} className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
               <p className="text-xs text-slate-500">{metricLabels[key]}</p>
               <p className="mt-2 break-words text-2xl font-bold text-slate-950">
                 {formatMetric(key, summary[key])}
@@ -130,16 +130,17 @@ function LatestReport({ report, tab }: { report: ReportRecord; tab: ReportType }
             </div>
           ))
         ) : (
-          <div className="col-span-2 rounded-lg bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-100">
+          <div className="col-span-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-600 ring-1 ring-slate-100">
             这份报告暂无总结数据。
           </div>
         )}
-      </section>
+      </div>
+      </SectionCard>
 
-      <ReportList title="科目分布" items={subjectDistribution} empty="暂无科目分布。" />
+      <ReportList title="薄弱点 Top 3" items={weakPoints.slice(0, 3)} empty="暂无薄弱点。" showScore />
       <ReportList title="高频错因" items={mistakeTypes} empty="暂无高频错因。" />
-      <ReportList title="薄弱知识点" items={weakPoints} empty="暂无薄弱知识点。" showScore />
-      <ReportList title="重复错误点" items={repeatedWrong} empty="暂无重复错误点。" showScore />
+      <ReportList title="科目分布" items={subjectDistribution} empty="暂无科目分布。" />
+      <ReportList title="重复错误点" items={repeatedWrong.slice(0, 3)} empty="暂无重复错误点。" showScore />
       <ReportList title="下一步建议" items={nextActions} empty="暂无下一步建议。" />
       </div>
     </MobileSection>
@@ -287,10 +288,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="学习报告"
-        subtitle="手动生成学习总结，查看近期错因、薄弱点和下一步建议。"
+        subtitle="像复盘小结一样看今天学得怎么样，以及下一步先补哪里。"
       />
 
       <section className="px-5 pt-5">
@@ -330,12 +331,9 @@ export default function ReportsPage() {
       {!isLoading && !selectedReport ? (
         <MobileSection>
           <MobileCard>
-            <h2 className="text-base font-bold text-slate-950">暂无{tabLabels[tab]}</h2>
+            <h2 className="text-base font-bold text-slate-950">还没有报告</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              完成上传、导入或复习后，这里会生成学习总结。
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              你也可以手动生成一次报告。
+              还没有报告。完成几次导入或复习后，可以生成学习总结。
             </p>
             <button
               type="button"
@@ -354,16 +352,16 @@ export default function ReportsPage() {
       <MobileSection>
         <MobileCard>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-slate-800">DeepSeek 分析</h2>
+            <h2 className="text-sm font-bold text-slate-800">智能总结（可选）</h2>
             <StatusPill
-              label={deepSeekConfigured ? "DeepSeek 已启用" : "DeepSeek 未启用（可选）"}
+              label={deepSeekConfigured ? "已启用" : "未启用（可选）"}
               tone={deepSeekConfigured ? "blue" : "amber"}
             />
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {deepSeekConfigured
-              ? "可在规则统计基础上生成学习建议；规则版报告始终可用。"
-              : "DeepSeek 未启用，当前使用规则统计。"}
+              ? "可在现有统计基础上生成一版学习建议；普通报告始终可用。"
+              : "当前先使用普通学习统计，不影响报告生成。"}
           </p>
           <button
             type="button"
@@ -371,7 +369,7 @@ export default function ReportsPage() {
             disabled={isGenerating || !deepSeekConfigured}
             className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
           >
-            刷新智能分析
+            生成智能总结
           </button>
         </MobileCard>
       </MobileSection>
@@ -404,6 +402,6 @@ export default function ReportsPage() {
           </MobileCard>
         </MobileSection>
       ) : null}
-    </div>
+    </MobilePageShell>
   );
 }

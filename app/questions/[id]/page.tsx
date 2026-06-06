@@ -4,17 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
-import { LoadingState, MobileCard, MobileSection } from "@/components/mobile/primitives";
+import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import {
-  getAnswerSourceLabel,
   getAnswerStatusLabel,
   getAnswerStatusTone,
 } from "@/lib/questions/answer-labels";
 import {
+  getQuestionSourceLabel,
   getQuestionTextStatusLabel,
   getQuestionTextStatusTone,
 } from "@/lib/questions/meta-labels";
@@ -346,7 +346,7 @@ export default function QuestionDetailPage() {
   }
 
   return (
-    <div>
+    <MobilePageShell>
       <PageHeader
         title="错题详情"
         subtitle="查看原题或文字题卡，做完后再核对答案。"
@@ -427,24 +427,64 @@ export default function QuestionDetailPage() {
           </MobileSection>
 
           <MobileSection title="学习状态">
-            <MobileCard>
-              <div className="flex flex-wrap gap-2">
-                <StatusPill label={question.mastery_status} tone="amber" />
-                <StatusPill
-                  label={getQuestionTextStatusLabel(question.question_text_status)}
-                  tone={getQuestionTextStatusTone(question.question_text_status)}
+            <SectionCard>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <DetailField label="掌握状态" value={question.mastery_status} />
+                <DetailField
+                  label="题目状态"
+                  value={getQuestionTextStatusLabel(question.question_text_status)}
                 />
-                <StatusPill
-                  label={question.standard_answer ? "有答案" : "无答案"}
-                  tone={question.standard_answer ? "blue" : "amber"}
+                <DetailField
+                  label="答案状态"
+                  value={question.standard_answer ? "已录入答案" : "还没有答案"}
                 />
+                <DetailField label="来源" value={getQuestionSourceLabel(question.source)} />
+              </dl>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <StatusPill
                   label={getAnswerStatusLabel(question.answer_status)}
                   tone={getAnswerStatusTone(question.answer_status)}
                 />
-                <StatusPill label={getAnswerSourceLabel(question.answer_source)} tone="slate" />
+                <StatusPill
+                  label={getQuestionTextStatusLabel(question.question_text_status)}
+                  tone={getQuestionTextStatusTone(question.question_text_status)}
+                />
               </div>
-            </MobileCard>
+            </SectionCard>
+          </MobileSection>
+
+          <MobileSection title="先做题">
+            <SectionCard>
+              <p className="text-sm font-semibold leading-6 text-slate-900">
+                先自己做一遍，做完后再看答案。
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                这一步只保留题目和必要信息，避免答案提前干扰回忆。
+              </p>
+            </SectionCard>
+          </MobileSection>
+
+          <MobileSection title="查看答案" subtitle="默认折叠，做完后再展开标准答案、解析和关键步骤。">
+            <SectionCard>
+              <button
+                type="button"
+                onClick={() => setIsAnswerVisible((value) => !value)}
+                className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+              >
+                {isAnswerVisible ? "隐藏答案" : "查看答案"}
+              </button>
+              {isAnswerVisible ? (
+                <div className="mt-3">
+                  <AnswerPanel
+                    standard_answer={question.standard_answer}
+                    answer_explanation={question.answer_explanation}
+                    key_steps={question.key_steps}
+                    answer_status={question.answer_status}
+                    answer_source={question.answer_source}
+                  />
+                </div>
+              ) : null}
+            </SectionCard>
           </MobileSection>
 
           <MobileSection title="我的卡点">
@@ -480,40 +520,17 @@ export default function QuestionDetailPage() {
             </MobileCard>
           </MobileSection>
 
-          <MobileSection title="查看答案" subtitle="默认折叠，做完后再展开标准答案、解析和关键步骤。">
-            <MobileCard>
-              <button
-                type="button"
-                onClick={() => setIsAnswerVisible((value) => !value)}
-                className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
-              >
-                {isAnswerVisible ? "隐藏答案" : "查看答案"}
-              </button>
-              {isAnswerVisible ? (
-                <div className="mt-3">
-                  <AnswerPanel
-                    standard_answer={question.standard_answer}
-                    answer_explanation={question.answer_explanation}
-                    key_steps={question.key_steps}
-                    answer_status={question.answer_status}
-                    answer_source={question.answer_source}
-                  />
-                </div>
-              ) : null}
-            </MobileCard>
-          </MobileSection>
-
           <MobileSection title="智能增强">
             <MobileCard>
               <p className="text-sm leading-6 text-slate-600">
                 DeepSeek 只优化章节、知识点、错因、正确思路和复习优先级，不会覆盖题目文字、用户备注或生成图片。
               </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className="min-h-11 rounded-lg bg-white px-4 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 disabled:text-slate-400"
+                  className="min-h-10 rounded-lg bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 disabled:text-slate-400"
                 >
                   {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "AI 自动分析"}
                 </button>
@@ -522,9 +539,9 @@ export default function QuestionDetailPage() {
                     type="button"
                     onClick={handleDeepSeekEnhance}
                     disabled={isDeepSeekEnhancing}
-                    className="min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+                    className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    {isDeepSeekEnhancing ? "优化中..." : "DeepSeek 优化题卡"}
+                    {isDeepSeekEnhancing ? "优化中..." : "优化题卡"}
                   </button>
                 ) : (
                   <p className="text-xs leading-5 text-slate-500">
@@ -777,6 +794,6 @@ export default function QuestionDetailPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </MobilePageShell>
   );
 }
