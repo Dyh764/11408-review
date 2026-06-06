@@ -140,12 +140,14 @@ export default function ReviewPage() {
       await supabase
         .from("questions")
         .update({ review_priority: "low", mastery_status: "完全掌握" })
-        .eq("id", review.question_id);
+        .eq("id", review.question_id)
+        .is("deleted_at", null);
     } else if (shouldIncrementRepeatedWrongCount(result)) {
       await supabase
         .from("questions")
         .update({ review_priority: "high" })
-        .eq("id", review.question_id);
+        .eq("id", review.question_id)
+        .is("deleted_at", null);
     }
 
     try {

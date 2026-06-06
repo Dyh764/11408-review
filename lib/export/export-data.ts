@@ -24,6 +24,8 @@ export type ExportQuestion = {
   source: string | null;
   created_at: string;
   analyzed_at: string | null;
+  deleted_at?: string | null;
+  deleted_reason?: string | null;
 };
 
 export type ExportReview = {
@@ -203,19 +205,29 @@ export async function fetchCurrentUserExportDataset(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ExportDataset> {
-  const [questionsResult, reviewsResult, reportsResult, statsResult] = await Promise.all([
-    supabase
-      .from("questions")
-      .select(
-        "id,user_id,subject,chapter,knowledge_point,difficulty,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,standard_answer,answer_explanation,key_steps,answer_status,answer_source,one_sentence_tip,review_priority,confidence,needs_manual_check,source,created_at,analyzed_at",
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("reviews")
-      .select("id,user_id,question_id,scheduled_date,completed_at,review_result,created_at")
-      .eq("user_id", userId)
-      .order("scheduled_date", { ascending: false }),
+  const questionsResult = await supabase
+    .from("questions")
+    .select(
+      "id,user_id,subject,chapter,knowledge_point,difficulty,image_path,question_text,question_text_status,mastery_status,user_note,mistake_types,solution_summary,standard_answer,answer_explanation,key_steps,answer_status,answer_source,one_sentence_tip,review_priority,confidence,needs_manual_check,source,created_at,analyzed_at,deleted_at,deleted_reason",
+    )
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  if (questionsResult.error) {
+    throw questionsResult.error;
+  }
+
+  const questionIds = (questionsResult.data ?? []).map((question) => question.id);
+  const reviewsQuery = supabase
+    .from("reviews")
+    .select("id,user_id,question_id,scheduled_date,completed_at,review_result,created_at")
+    .eq("user_id", userId)
+    .order("scheduled_date", { ascending: false });
+  const reviewsResult =
+    questionIds.length > 0 ? await reviewsQuery.in("question_id", questionIds) : { data: [], error: null };
+
+  const [reportsResult, statsResult] = await Promise.all([
     supabase
       .from("reports")
       .select("id,user_id,type,start_date,end_date,content_json,created_at")

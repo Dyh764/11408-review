@@ -1,4 +1,5 @@
 import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
+import { MathText } from "@/components/mobile/MathText";
 import { StatusPill } from "@/components/status-pill";
 import type {
   Difficulty,
@@ -92,13 +93,13 @@ export function TextQuestionPreview({
           {[chapter, knowledge_point].filter(Boolean).join(" / ")}
         </p>
       ) : null}
-      <p
-        className={`${hideMeta && hideTitle ? "" : "mt-3"} whitespace-pre-wrap break-words text-sm leading-6 text-slate-900 ${
+      <MathText
+        text={question_text}
+        compact={compact}
+        className={`${hideMeta && hideTitle ? "" : "mt-3"} text-slate-900 ${
           compact ? "line-clamp-2" : ""
         }`}
-      >
-        {question_text}
-      </p>
+      />
     </article>
   );
 }

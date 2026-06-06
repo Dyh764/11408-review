@@ -25,6 +25,7 @@ test("TextQuestionPreview exposes compact, hideMeta, and hideTitle controls", ()
   assert.match(source, /compact\?: boolean/);
   assert.match(source, /hideMeta\?: boolean/);
   assert.match(source, /hideTitle\?: boolean/);
+  assert.match(source, /<MathText/);
 });
 
 test("/questions/[id] keeps detail information in the requested groups", () => {

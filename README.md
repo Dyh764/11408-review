@@ -27,6 +27,8 @@
 - `verified` 题干重新分析时默认保留，只有明确允许才覆盖题目文字。
 - 今日复习写入复习结果，并按结果调整后续复习计划。
 - 错题库筛选、搜索、排序和基础批量管理。
+- 题目、答案、解析和关键步骤支持 `$...$` / `$$...$$` LaTeX 公式渲染。
+- 错题详情支持软删除；删除后不再进入错题库、复习和报告统计，不会自动删除 Storage 图片。
 - 报告页展示日报、周报、月报和历史报告。
 - 设置页显示账号、timezone、配置状态、数据导出和 PWA 安装说明。
 - 数据导出支持 JSON、Markdown、CSV，只导出当前用户数据。
@@ -39,6 +41,7 @@
 - React。
 - TypeScript。
 - Tailwind CSS。
+- KaTeX。
 - Supabase Auth / Database / Storage / RLS。
 - Supabase Edge Functions / Cron。
 - OpenAI Responses API。
@@ -106,11 +109,13 @@ supabase/migrations/001_initial_schema.sql
 supabase/migrations/002_allow_profile_insert.sql
 supabase/migrations/003_allow_question_image_delete.sql
 supabase/migrations/004_allow_review_delete.sql
+supabase/migrations/005_add_question_delete_fields.sql
 ```
 
 检查：
 
 - `profiles`、`questions`、`reviews`、`reports`、`knowledge_stats` 已创建。
+- `questions.deleted_at`、`questions.deleted_reason` 已创建；正常页面默认过滤已删除错题。
 - RLS 已开启，用户只能访问自己的数据。
 - `question-images` bucket 为 private。
 - Storage 路径为 `users/{user_id}/questions/{question_id}.{jpg|png|webp}`。
@@ -193,11 +198,12 @@ OPENAI_MODEL=gpt-4.1
 5. 写一句卡点备注。
 6. 保存错题。
 7. 在“错题”里查看详情，核对题目文字。
-8. 点击 AI 分析或使用 mock fallback。
-9. 在“复习”里完成今日或逾期任务。
-10. 在“报告”里查看日报、周报、月报。
-11. 考前进入“冲刺”处理高危题。
-12. 在“设置”里导出 JSON、Markdown 或 CSV。
+8. 数学公式请使用 LaTeX：行内 `$...$`，块级 `$$...$$`。
+9. 点击 AI 分析或使用 mock fallback。
+10. 在“复习”里完成今日或逾期任务。
+11. 在“报告”里查看日报、周报、月报。
+12. 考前进入“冲刺”处理高危题。
+13. 在“设置”里导出 JSON、Markdown 或 CSV。
 
 普通用户说明见 `docs/user-guide.md`。
 
@@ -219,6 +225,8 @@ OPENAI_MODEL=gpt-4.1
 - `knowledge_stats`
 
 图片不会打包进导出文件，只保留 `image_path`。备份说明见 `docs/backup-and-restore.md`。
+
+已软删除的错题默认不会进入导出文件。
 
 ## 文档目录
 

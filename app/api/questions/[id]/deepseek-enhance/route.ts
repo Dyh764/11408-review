@@ -39,6 +39,7 @@ export async function POST(_request: Request, context: RouteContext) {
     )
     .eq("id", id)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .single();
 
   if (questionError || !question) {
@@ -89,7 +90,8 @@ export async function POST(_request: Request, context: RouteContext) {
         needs_manual_check: enhancement.needs_manual_check,
       })
       .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });

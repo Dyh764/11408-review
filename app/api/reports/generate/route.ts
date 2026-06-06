@@ -66,27 +66,38 @@ export async function POST(request: Request) {
   }
 
   const { today, startDate, endDate } = getReportRange(type);
-  const [questionsResult, reviewsResult, statsResult] = await Promise.all([
+  const [questionsResult, statsResult] = await Promise.all([
     supabase
       .from("questions")
       .select(
-        "subject,chapter,knowledge_point,mastery_status,mistake_types,standard_answer,answer_status,created_at",
+        "id,subject,chapter,knowledge_point,mastery_status,mistake_types,standard_answer,answer_status,created_at",
       )
-      .eq("user_id", user.id),
-    supabase
-      .from("reviews")
-      .select("scheduled_date,completed_at,review_result")
-      .eq("user_id", user.id),
+      .eq("user_id", user.id)
+      .is("deleted_at", null),
     supabase
       .from("knowledge_stats")
       .select("subject,chapter,knowledge_point,weakness_score,wrong_count")
       .eq("user_id", user.id),
   ]);
 
-  const error = questionsResult.error ?? reviewsResult.error ?? statsResult.error;
+  const error = questionsResult.error ?? statsResult.error;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const activeQuestionIds = (questionsResult.data ?? []).map((question) => question.id);
+  const reviewsResult =
+    activeQuestionIds.length > 0
+      ? await supabase
+          .from("reviews")
+          .select("scheduled_date,completed_at,review_result,question_id")
+          .eq("user_id", user.id)
+          .in("question_id", activeQuestionIds)
+      : { data: [], error: null };
+
+  if (reviewsResult.error) {
+    return NextResponse.json({ error: reviewsResult.error.message }, { status: 500 });
   }
 
   const content = buildRuleReportContent({

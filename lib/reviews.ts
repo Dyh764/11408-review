@@ -40,6 +40,7 @@ export type DueReview = {
     one_sentence_tip: string | null;
     review_priority: ReviewPriority | null;
     created_at: string;
+    deleted_at: string | null;
   };
   signedImageUrl: string | null;
 };
@@ -74,7 +75,8 @@ const dueReviewColumns = `
     answer_source,
     one_sentence_tip,
     review_priority,
-    created_at
+    created_at,
+    deleted_at
   )
 `;
 
@@ -109,6 +111,7 @@ export async function fetchDueReviews(supabase: SupabaseClient) {
     .select(dueReviewColumns)
     .lte("scheduled_date", todayIsoDate())
     .is("completed_at", null)
+    .is("questions.deleted_at", null)
     .order("scheduled_date", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -122,7 +125,7 @@ export async function fetchDueReviews(supabase: SupabaseClient) {
       questions: Array.isArray(review.questions) ? review.questions[0] : review.questions,
     }))
     .filter((review): review is Omit<DueReview, "signedImageUrl"> =>
-      Boolean(review.questions),
+      Boolean(review.questions) && review.questions.deleted_at === null,
     );
 
   return Promise.all(reviews.map((review) => addSignedImageUrl(supabase, review)));

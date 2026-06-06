@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
+import { MathText } from "@/components/mobile/MathText";
 import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
@@ -86,6 +87,7 @@ function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
 
 export default function QuestionDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [question, setQuestion] = useState<QuestionWithImage | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
@@ -96,6 +98,7 @@ export default function QuestionDetailPage() {
   const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isAnswerVisible, setIsAnswerVisible] = useState(false);
@@ -124,7 +127,7 @@ export default function QuestionDetailPage() {
       });
 
     async function loadQuestion() {
-      await fetchCurrentUserQuestion(client, params.id)
+      await fetchCurrentUserQuestion(client, params.id, { includeDeleted: true })
       .then((item) => {
         if (isActive) {
           setQuestion(item);
@@ -148,7 +151,7 @@ export default function QuestionDetailPage() {
       return;
     }
 
-    const item = await fetchCurrentUserQuestion(supabase, params.id);
+    const item = await fetchCurrentUserQuestion(supabase, params.id, { includeDeleted: true });
     setQuestion(item);
     setForm(formFromQuestion(item));
   }
@@ -282,7 +285,8 @@ export default function QuestionDetailPage() {
         .from("questions")
         .update(buildQuestionUpdatePayload(form))
         .eq("id", question.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
 
       if (error) {
         setMessage(`保存失败：${error.message}`);
@@ -341,6 +345,47 @@ export default function QuestionDetailPage() {
     }
   }
 
+  async function handleDeleteQuestion() {
+    if (!question) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      "确定删除这道错题吗？\n删除后它不会出现在错题库、今日复习和报告统计中。",
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${question.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleted_reason: "user_deleted" }),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        setMessage(result.error ?? "删除错题失败。");
+        return;
+      }
+
+      setMessage("已删除错题");
+      setTimeout(() => {
+        router.replace("/questions");
+        router.refresh();
+      }, 500);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "删除错题失败。");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function updateForm<K extends keyof QuestionEditForm>(key: K, value: QuestionEditForm[K]) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
@@ -367,6 +412,19 @@ export default function QuestionDetailPage() {
       ) : null}
 
       {question ? (
+        question.deleted_at ? (
+          <MobileSection>
+            <MobileCard>
+              <h2 className="text-base font-bold text-slate-950">该错题已删除</h2>
+              <Link
+                href="/questions"
+                className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+              >
+                返回错题库
+              </Link>
+            </MobileCard>
+          </MobileSection>
+        ) : (
         <>
           <MobileSection title="题目区">
             <div className="space-y-4">
@@ -393,9 +451,7 @@ export default function QuestionDetailPage() {
                     原题图片暂不可预览
                   </div>
                   {question.question_text ? (
-                    <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
-                      {question.question_text}
-                    </p>
+                    <MathText text={question.question_text} className="mt-3 text-slate-700" />
                   ) : null}
                 </MobileCard>
               ) : (
@@ -489,9 +545,7 @@ export default function QuestionDetailPage() {
 
           <MobileSection title="我的卡点">
             <MobileCard>
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
-                {question.user_note?.trim() || "暂无记录。"}
-              </p>
+              <MathText text={question.user_note} fallback="暂无记录。" className="text-slate-700" />
             </MobileCard>
           </MobileSection>
 
@@ -500,8 +554,8 @@ export default function QuestionDetailPage() {
               <dl className="space-y-4 text-sm">
                 <div>
                   <dt className="font-semibold text-slate-800">思路摘要</dt>
-                  <dd className="mt-1 whitespace-pre-wrap break-words leading-6 text-slate-600">
-                    {question.solution_summary?.trim() || "待补充"}
+                  <dd className="mt-1 text-slate-600">
+                    <MathText text={question.solution_summary} fallback="待补充" />
                   </dd>
                 </div>
                 <div>
@@ -512,8 +566,8 @@ export default function QuestionDetailPage() {
                 </div>
                 <div>
                   <dt className="font-semibold text-slate-800">一句话提醒</dt>
-                  <dd className="mt-1 break-words text-slate-600">
-                    {question.one_sentence_tip?.trim() || "待补充"}
+                  <dd className="mt-1 text-slate-600">
+                    <MathText text={question.one_sentence_tip} fallback="待补充" />
                   </dd>
                 </div>
               </dl>
@@ -582,6 +636,14 @@ export default function QuestionDetailPage() {
                 >
                   开始复习
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleDeleteQuestion}
+                  disabled={isDeleting}
+                  className="min-h-12 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+                >
+                  {isDeleting ? "删除中..." : "删除错题"}
+                </button>
               </div>
             </MobileCard>
           </MobileSection>
@@ -773,6 +835,7 @@ export default function QuestionDetailPage() {
             </MobileSection>
           ) : null}
         </>
+        )
       ) : null}
 
       {isPreviewOpen && question?.signedImageUrl ? (

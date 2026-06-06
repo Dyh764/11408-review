@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
+import { MathText } from "@/components/mobile/MathText";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { fetchCurrentUserReports, type ReportRecord, type ReportType } from "@/lib/reports";
@@ -181,10 +182,12 @@ function ReportList({
                 className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                  <span className="min-w-0 flex-1 break-words">{label}</span>
+                  <span className="min-w-0 flex-1">
+                    <MathText text={label} compact />
+                  </span>
                   {value ? <span className="shrink-0 text-xs text-slate-500">{value}</span> : null}
                 </div>
-                {meta ? <p className="mt-1 break-words text-xs text-slate-500">{meta}</p> : null}
+                {meta ? <MathText text={meta} compact className="mt-1 text-slate-500" /> : null}
                 {title === "科目分布" && typeof item.count === "number" ? (
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
                     <div

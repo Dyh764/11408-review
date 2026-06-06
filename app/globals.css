@@ -36,6 +36,18 @@ canvas {
   max-width: 100%;
 }
 
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.125rem 0;
+}
+
+.katex {
+  max-width: 100%;
+  white-space: normal;
+}
+
 p,
 dd,
 li,

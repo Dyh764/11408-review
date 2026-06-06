@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MathText } from "@/components/mobile/MathText";
 import { StatusPill } from "@/components/status-pill";
 import type { Difficulty, MasteryStatus, Subject } from "@/lib/types";
 
@@ -76,9 +77,12 @@ export function QuestionListCard({
             <h2 className="break-words text-sm font-bold leading-5 text-slate-950">
               {title}
             </h2>
-            <p className="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">
-              {summary?.trim() || "暂无题目摘要，进入详情后补充题干或卡点。"}
-            </p>
+            <MathText
+              text={summary}
+              fallback="暂无题目摘要，进入详情后补充题干或卡点。"
+              compact
+              className="mt-1 line-clamp-2 text-slate-500"
+            />
           </Link>
 
           <div className="mt-2 flex flex-wrap gap-1.5">

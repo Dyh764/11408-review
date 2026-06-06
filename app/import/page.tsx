@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { MobileCard, MobilePageShell, MobileSection, Notice, SectionCard, StatCard } from "@/components/mobile/primitives";
+import { MathText } from "@/components/mobile/MathText";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
@@ -56,17 +57,17 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
           />
         </div>
       ) : (
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          {card.chapter ? `${card.chapter} / ` : ""}
-          {card.question_text ?? card.user_note}
-        </p>
+        <MathText
+          text={`${card.chapter ? `${card.chapter} / ` : ""}${card.question_text ?? card.user_note ?? ""}`}
+          className="mt-1 text-slate-600"
+        />
       )}
       <dl className="mt-3 space-y-2 text-sm">
         {hasAnswer ? (
           <div className="rounded-lg bg-slate-50 p-3">
             <dt className="font-semibold text-slate-800">标准答案预览</dt>
-            <dd className="mt-1 whitespace-pre-wrap break-words text-slate-600">
-              {card.standard_answer}
+            <dd className="mt-1 text-slate-600">
+              <MathText text={card.standard_answer} />
             </dd>
             <dd className="mt-2 text-xs text-slate-500">
               关键步骤 {card.key_steps.length} 步
@@ -81,7 +82,9 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
         </div>
         <div>
           <dt className="font-semibold text-slate-800">一句话提醒</dt>
-          <dd className="mt-1 text-slate-600">{card.one_sentence_tip ?? "待补充"}</dd>
+          <dd className="mt-1 text-slate-600">
+            <MathText text={card.one_sentence_tip} fallback="待补充" />
+          </dd>
         </div>
       </dl>
     </MobileCard>
@@ -153,6 +156,9 @@ export default function ImportPage() {
             <li>2. 粘贴到这里</li>
             <li>3. 预览确认后导入</li>
           </ol>
+          <p className="mt-2 text-sm leading-6">
+            数学公式请使用 LaTeX：行内写作 $\\sum_&#123;n=1&#125;^&#123;\\infty&#125; u_n$，块级公式使用 $$...$$。
+          </p>
         </Notice>
       </MobileSection>
 

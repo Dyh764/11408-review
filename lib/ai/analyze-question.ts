@@ -39,7 +39,8 @@ const questionColumns = `
   needs_manual_check,
   source,
   created_at,
-  analyzed_at
+  analyzed_at,
+  deleted_at
 `;
 
 function mimeFromPath(path: string) {
@@ -105,6 +106,7 @@ async function fetchQuestion(supabase: SupabaseClient, questionId: string) {
     .from("questions")
     .select(questionColumns)
     .eq("id", questionId)
+    .is("deleted_at", null)
     .single();
 
   if (error) {
@@ -123,7 +125,8 @@ async function updateQuestionAnalysis(
   const { error } = await supabase
     .from("questions")
     .update(buildAnalysisUpdatePayload(question, analysis, allowOverwriteQuestionText))
-    .eq("id", question.id);
+    .eq("id", question.id)
+    .is("deleted_at", null);
 
   if (error) {
     throw new Error(`写回分析结果失败：${error.message}`);

@@ -1,3 +1,4 @@
+import { MathText } from "@/components/mobile/MathText";
 import { StatusPill } from "@/components/status-pill";
 import {
   getAnswerSourceLabel,
@@ -42,14 +43,12 @@ export function AnswerPanel({
         <div className="mt-3 space-y-4">
           <div>
             <p className="font-semibold text-slate-900">答案：</p>
-            <p className="mt-1 whitespace-pre-wrap break-words">{standard_answer}</p>
+            <MathText text={standard_answer} className="mt-1" />
           </div>
 
           <div>
             <p className="font-semibold text-slate-900">过程：</p>
-            <p className="mt-1 whitespace-pre-wrap break-words">
-              {answer_explanation?.trim() || "暂无完整过程。"}
-            </p>
+            <MathText text={answer_explanation} fallback="暂无完整过程。" className="mt-1" />
           </div>
 
           <div>
@@ -57,8 +56,8 @@ export function AnswerPanel({
             {steps.length > 0 ? (
               <ol className="mt-1 list-decimal space-y-1 pl-5">
                 {steps.map((step, index) => (
-                  <li key={`${step}-${index}`} className="whitespace-pre-wrap break-words">
-                    {step}
+                  <li key={`${step}-${index}`}>
+                    <MathText text={step} />
                   </li>
                 ))}
               </ol>

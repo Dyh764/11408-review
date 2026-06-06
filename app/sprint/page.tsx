@@ -128,7 +128,8 @@ export default function SprintPage() {
         .from("questions")
         .update({ mastery_status: "完全掌握", review_priority: "low" })
         .eq("id", item.question.id)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
 
       if (updateError) {
         setMessage(`标记已掌握失败：${updateError.message}`);

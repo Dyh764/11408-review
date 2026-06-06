@@ -37,6 +37,8 @@ export type QuestionRecord = {
   answer_source: AnswerSource;
   created_at: string;
   analyzed_at: string | null;
+  deleted_at: string | null;
+  deleted_reason: string | null;
 };
 
 export type QuestionWithImage = QuestionRecord & {
@@ -68,7 +70,9 @@ const questionColumns = `
   answer_status,
   answer_source,
   created_at,
-  analyzed_at
+  analyzed_at,
+  deleted_at,
+  deleted_reason
 `;
 
 async function addSignedImageUrl(
@@ -96,6 +100,7 @@ export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("questions")
     .select(questionColumns)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -107,12 +112,21 @@ export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
   );
 }
 
-export async function fetchCurrentUserQuestion(supabase: SupabaseClient, id: string) {
-  const { data, error } = await supabase
+export async function fetchCurrentUserQuestion(
+  supabase: SupabaseClient,
+  id: string,
+  options: { includeDeleted?: boolean } = {},
+) {
+  let query = supabase
     .from("questions")
     .select(questionColumns)
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  if (!options.includeDeleted) {
+    query = query.is("deleted_at", null);
+  }
+
+  const { data, error } = await query.single();
 
   if (error) {
     throw error;

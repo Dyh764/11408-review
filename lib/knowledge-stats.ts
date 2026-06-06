@@ -12,6 +12,7 @@ type QuestionStatSource = {
   chapter: string | null;
   knowledge_point: string | null;
   mastery_status: string;
+  deleted_at: string | null;
 };
 
 type ReviewStatSource = {
@@ -54,7 +55,7 @@ export async function updateKnowledgeStatsForQuestionId(
 ) {
   const { data: question, error: questionError } = await supabase
     .from("questions")
-    .select("id, user_id, subject, chapter, knowledge_point, mastery_status")
+    .select("id, user_id, subject, chapter, knowledge_point, mastery_status, deleted_at")
     .eq("id", questionId)
     .single();
 
@@ -63,12 +64,18 @@ export async function updateKnowledgeStatsForQuestionId(
   }
 
   const source = question as QuestionStatSource;
+
+  if (source.deleted_at) {
+    return;
+  }
+
   const knowledgePoint = normalizePoint(source.knowledge_point);
   let query = supabase
     .from("questions")
     .select("id, mastery_status")
     .eq("user_id", source.user_id)
     .eq("subject", source.subject)
+    .is("deleted_at", null)
     .eq("knowledge_point", source.knowledge_point ?? knowledgePoint);
 
   if (source.chapter === null) {

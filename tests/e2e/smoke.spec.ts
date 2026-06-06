@@ -127,6 +127,51 @@ test("import page previews ChatGPT answer fields when JSON includes an answer", 
   await expect(page.getByText("待核对", { exact: true })).toBeVisible();
 });
 
+test("import preview renders LaTeX formulas with KaTeX when reachable", async ({ page }) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(
+    JSON.stringify(
+      [
+        {
+          subject: "数学",
+          chapter: "级数",
+          knowledge_point: "正项级数",
+          difficulty: "中等",
+          question_text: "若 $\\sum_{n=1}^{\\infty} u_n$ 收敛，讨论 $u_{2n}$。",
+          question_text_status: "ai_unverified",
+          mastery_status: "思路对但卡住",
+          user_note: "公式显示要可读。",
+          mistake_types: ["公式识别"],
+          solution_summary: "$$\\sum_{n=1}^{\\infty} u_n$$ 是正项级数。",
+          standard_answer: "$\\frac{1}{n}$ 不一定收敛。",
+          answer_explanation: "比较 $u_{2n}$ 与原级数子列。",
+          key_steps: ["写出 $u_{2n}$", "使用子级数比较"],
+          one_sentence_tip: "先看 $\\sqrt{x}$ 的定义域。",
+          review_priority: "high",
+          confidence: "medium",
+          needs_manual_check: true,
+          source: "chatgpt",
+          answer_status: "ai_unverified",
+          answer_source: "chatgpt_import",
+        },
+      ],
+      null,
+      2,
+    ),
+  );
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(page.locator(".katex").first()).toBeVisible();
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
 test("upload page defaults to save now and organize with ChatGPT later", async ({ page }) => {
   const response = await page.goto("/upload");
 

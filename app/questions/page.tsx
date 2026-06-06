@@ -190,7 +190,8 @@ export default function QuestionsPage() {
           .from("questions")
           .update({ mastery_status: "完全掌握", review_priority: "low" })
           .in("id", selectedIds)
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .is("deleted_at", null);
 
         if (updateError) {
           setMessage(`批量标记已掌握失败：${updateError.message}`);
@@ -211,7 +212,8 @@ export default function QuestionsPage() {
           .from("questions")
           .update({ question_text_status: "needs_fix", needs_manual_check: true })
           .in("id", selectedIds)
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .is("deleted_at", null);
 
         if (updateError) {
           setMessage(`批量标记题目需修正失败：${updateError.message}`);
@@ -247,7 +249,8 @@ export default function QuestionsPage() {
           .from("questions")
           .update({ review_priority: "high" })
           .in("id", selectedIds)
-          .eq("user_id", user.id);
+          .eq("user_id", user.id)
+          .is("deleted_at", null);
 
         if (updateError) {
           setMessage(`已加入冲刺复习，但更新优先级失败：${updateError.message}`);
