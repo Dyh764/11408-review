@@ -19,6 +19,28 @@ test("/questions uses compact text previews without duplicate title or meta", ()
   assert.doesNotMatch(source, />chatgpt_import</);
 });
 
+test("/questions groups cards by subject and delegates difficulty ordering", () => {
+  const source = read("app/questions/page.tsx");
+
+  assert.match(source, /groupQuestionsBySubjectAndDifficulty/);
+  assert.match(source, /groupedQuestions/);
+  assert.match(source, /group\.subject/);
+  assert.match(source, /group\.count/);
+});
+
+test("QuestionListCard only exposes chapter, difficulty, and question-kind badges", () => {
+  const source = read("components/mobile/QuestionListCard.tsx");
+
+  assert.match(source, /chapter/);
+  assert.match(source, /questionKind/);
+  assert.doesNotMatch(source, /subject:/);
+  assert.doesNotMatch(source, /masteryStatus/);
+  assert.doesNotMatch(source, /hasAnswer/);
+  assert.doesNotMatch(source, /imageUrl/);
+  assert.doesNotMatch(source, /hasImagePath/);
+  assert.doesNotMatch(source, /文字卡/);
+});
+
 test("TextQuestionPreview exposes compact, hideMeta, and hideTitle controls", () => {
   const source = read("components/mobile/TextQuestionPreview.tsx");
 
@@ -28,23 +50,48 @@ test("TextQuestionPreview exposes compact, hideMeta, and hideTitle controls", ()
   assert.match(source, /<MathText/);
 });
 
-test("/questions/[id] keeps detail information in the requested groups", () => {
+test("/questions/[id] renders the question directly and keeps metadata collapsed", () => {
+  const source = read("app/questions/[id]/page.tsx");
+
+  assert.doesNotMatch(source, /TextQuestionPreview/);
+  assert.doesNotMatch(source, /文字错题卡/);
+  assert.doesNotMatch(source, /<MobileSection title="[^"]*基础信息/);
+  assert.doesNotMatch(source, /<MobileSection title="[^"]*学习状态/);
+  assert.match(source, /<details/);
+  assert.match(source, /<summary/);
+  assert.doesNotMatch(source, /<details[^>]*open/);
+});
+
+test("/review records non-choice results only after answer reveal", () => {
+  const source = read("app/review/page.tsx");
+
+  assert.match(source, /canRecordReview/);
+  assert.match(source, /!isChoiceQuestion/);
+  assert.match(source, /draftAnswers/);
+  assert.match(source, /setRevealedAnswers/);
+  assert.match(source, /canRecordReview \?/);
+});
+
+test("/questions/[id] keeps detail information in the requested learning-flow order", () => {
   const source = read("app/questions/[id]/page.tsx");
 
   for (const title of [
-    "题目区",
-    "基础信息",
-    "学习状态",
+    "题目",
     "先做题",
     "查看答案",
     "我的卡点",
     "正确思路",
     "智能增强",
+    "更多信息",
     "更多操作",
   ]) {
     assert.match(source, new RegExp(title));
   }
 
+  assert.ok(
+    source.indexOf("题目") < source.indexOf("先做题"),
+    "question should lead the detail page",
+  );
   assert.ok(
     source.indexOf("先做题") < source.indexOf("查看答案"),
     "detail page should prompt self-solving before answer reveal",

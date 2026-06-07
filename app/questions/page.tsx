@@ -8,6 +8,7 @@ import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
+import { groupQuestionsBySubjectAndDifficulty } from "@/lib/questions/question-list-view";
 import {
   getQuestionTextStatusLabel,
 } from "@/lib/questions/meta-labels";
@@ -39,8 +40,6 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
   "needs_fix",
 ];
 
-type SortMode = "created_desc" | "created_asc" | "weak_first";
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -50,13 +49,24 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getQuestionKind(question: QuestionWithImage, choiceCount: number) {
+  if (choiceCount > 0) {
+    return "选择题";
+  }
+
+  if (question.image_path || question.signedImageUrl) {
+    return "图片题";
+  }
+
+  return "文字题";
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [subject, setSubject] = useState<Subject | "全部">("全部");
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
   const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
   const [keyword, setKeyword] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("created_desc");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
@@ -98,7 +108,6 @@ export default function QuestionsPage() {
   const filteredQuestions = useMemo(
     () => {
       const normalizedKeyword = keyword.trim().toLowerCase();
-      const priorityRank = { high: 3, medium: 2, low: 1 } as const;
 
       return questions
         .filter((question) => {
@@ -119,25 +128,14 @@ export default function QuestionsPage() {
               .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
 
           return subjectMatch && masteryMatch && textStatusMatch && keywordMatch;
-        })
-        .sort((a, b) => {
-          if (sortMode === "created_asc") {
-            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-          }
-
-          if (sortMode === "weak_first") {
-            return (
-              (priorityRank[b.review_priority ?? "low"] ?? 0) -
-                (priorityRank[a.review_priority ?? "low"] ?? 0) ||
-              Number(b.needs_manual_check) - Number(a.needs_manual_check) ||
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            );
-          }
-
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
     },
-    [keyword, masteryStatus, questions, sortMode, subject, textStatus],
+    [keyword, masteryStatus, questions, subject, textStatus],
+  );
+
+  const groupedQuestions = useMemo(
+    () => groupQuestionsBySubjectAndDifficulty(filteredQuestions),
+    [filteredQuestions],
   );
 
   function toggleSelected(id: string) {
@@ -344,7 +342,7 @@ export default function QuestionsPage() {
             </button>
           ))}
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <select
             value={masteryStatus}
             onChange={(event) => setMasteryStatus(event.target.value as MasteryStatus | "全部")}
@@ -368,15 +366,6 @@ export default function QuestionsPage() {
                 {item === "全部" ? item : getQuestionTextStatusLabel(item)}
               </option>
             ))}
-          </select>
-          <select
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
-            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
-          >
-            <option value="created_desc">最新优先</option>
-            <option value="created_asc">最早优先</option>
-            <option value="weak_first">薄弱优先</option>
           </select>
         </div>
         <input
@@ -495,30 +484,39 @@ export default function QuestionsPage() {
             action={{ href: "/upload", label: "去拍题" }}
           />
         ) : null}
-        {filteredQuestions.map((question) => {
-          const hasAnswer = Boolean(question.standard_answer?.trim());
-          const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
-          const questionDisplay = getQuestionStemAndChoices(question.question_text, question.choices);
+        {groupedQuestions.map((group) => (
+          <section key={group.subject} className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold text-slate-950">
+                {group.subject} · {group.count} 题
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {group.items.map((question) => {
+                const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
+                const questionDisplay = getQuestionStemAndChoices(
+                  question.question_text,
+                  question.choices,
+                );
 
-          return (
-          <QuestionListCard
-            key={question.id}
-            href={`/questions/${question.id}`}
-            title={title}
-            summary={questionDisplay.questionText || question.user_note}
-            subject={question.subject}
-            difficulty={question.difficulty}
-            masteryStatus={question.mastery_status}
-            hasAnswer={hasAnswer}
-            isChoiceQuestion={questionDisplay.choices.length > 0}
-            createdAt={`创建：${formatDate(question.created_at)}`}
-            imageUrl={question.signedImageUrl}
-            hasImagePath={Boolean(question.image_path)}
-            selected={selectedIds.includes(question.id)}
-            onSelect={showBatchTools ? () => toggleSelected(question.id) : undefined}
-          />
-          );
-        })}
+                return (
+                  <QuestionListCard
+                    key={question.id}
+                    href={`/questions/${question.id}`}
+                    title={title}
+                    summary={questionDisplay.questionText || question.user_note}
+                    chapter={question.chapter}
+                    difficulty={question.difficulty}
+                    questionKind={getQuestionKind(question, questionDisplay.choices.length)}
+                    createdAt={formatDate(question.created_at)}
+                    selected={selectedIds.includes(question.id)}
+                    onSelect={showBatchTools ? () => toggleSelected(question.id) : undefined}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
         </div>
       </MobileSection>
     </MobilePageShell>

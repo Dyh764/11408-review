@@ -245,7 +245,7 @@ export default function ReviewPage() {
           const result = completed[review.id];
           const isProcessing = processingReviewId === review.id;
           const hasAnswer = Boolean(review.questions.standard_answer?.trim());
-          const isAnswerRevealed = revealedAnswers[review.id] || !hasAnswer;
+          const isAnswerRevealed = Boolean(revealedAnswers[review.id]);
           const questionDisplay = getQuestionStemAndChoices(
             review.questions.question_text,
             review.questions.choices,
@@ -257,6 +257,11 @@ export default function ReviewPage() {
           const choiceIsCorrect =
             answerChoices.labels.length > 0 &&
             areChoiceAnswersEqual(selected, answerChoices.labels);
+          const canRecordReview = hasAnswer
+            ? isChoiceQuestion
+              ? isChoiceSubmitted && isAnswerRevealed
+              : !isChoiceQuestion && isAnswerRevealed
+            : true;
 
           return (
             <MobileCard key={review.id}>
@@ -411,7 +416,7 @@ export default function ReviewPage() {
                 </p>
               )}
 
-              {isAnswerRevealed ? (
+              {canRecordReview ? (
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
                     <button

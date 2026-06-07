@@ -1,20 +1,16 @@
 import Link from "next/link";
 import { MathText } from "@/components/mobile/MathText";
 import { StatusPill } from "@/components/status-pill";
-import type { Difficulty, MasteryStatus, Subject } from "@/lib/types";
+import type { Difficulty } from "@/lib/types";
 
 type QuestionListCardProps = {
   href: string;
   title: string;
   summary?: string | null;
-  subject: Subject | string;
+  chapter?: string | null;
   difficulty?: Difficulty | string | null;
-  masteryStatus?: MasteryStatus | string | null;
-  hasAnswer: boolean;
-  isChoiceQuestion?: boolean;
+  questionKind: string;
   createdAt: string;
-  imageUrl?: string | null;
-  hasImagePath?: boolean;
   selected?: boolean;
   onSelect?: () => void;
 };
@@ -23,27 +19,21 @@ export function QuestionListCard({
   href,
   title,
   summary,
-  subject,
+  chapter,
   difficulty,
-  masteryStatus,
-  hasAnswer,
-  isChoiceQuestion = false,
+  questionKind,
   createdAt,
-  imageUrl,
-  hasImagePath,
   selected,
   onSelect,
 }: QuestionListCardProps) {
   const badges = [
-    { label: subject, tone: "blue" as const },
-    difficulty ? { label: difficulty, tone: "slate" as const } : null,
-    masteryStatus ? { label: masteryStatus, tone: "amber" as const } : null,
-    isChoiceQuestion ? { label: "选择题", tone: "blue" as const } : null,
-    { label: hasAnswer ? "有答案" : "无答案", tone: hasAnswer ? "green" as const : "amber" as const },
-  ].filter(Boolean) as Array<{ label: string; tone: "blue" | "green" | "amber" | "red" | "slate" }>;
+    { label: chapter?.trim() || "未标章节", tone: "slate" as const },
+    { label: difficulty?.trim() || "未标记", tone: "slate" as const },
+    { label: questionKind, tone: "blue" as const },
+  ];
 
   return (
-    <article className="rounded-lg border border-slate-100 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+    <article className="rounded-lg border border-slate-100 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
       <div className="flex gap-3">
         {onSelect ? (
           <label className="flex shrink-0 items-start pt-1">
@@ -57,45 +47,29 @@ export function QuestionListCard({
           </label>
         ) : null}
 
-        <Link
-          href={href}
-          className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-lg bg-blue-50 text-center text-xs font-bold leading-5 text-blue-700 ring-1 ring-blue-100"
-        >
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imageUrl}
-              alt="原题缩略图"
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="px-2">{hasImagePath ? "有图" : "文字卡"}</span>
-          )}
-        </Link>
-
         <div className="min-w-0 flex-1">
           <Link href={href} className="block">
-            <h2 className="break-words text-sm font-bold leading-5 text-slate-950">
-              {title}
-            </h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="min-w-0 break-words text-base font-bold leading-6 text-slate-950">
+                {title}
+              </h2>
+              <span className="shrink-0 pt-0.5 text-xs text-slate-500">{createdAt}</span>
+            </div>
             <MathText
               text={summary}
               fallback="暂无题目摘要，进入详情后补充题干或卡点。"
               compact
-              className="mt-1 line-clamp-2 text-slate-500"
+              className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600"
             />
           </Link>
 
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {badges.slice(0, 5).map((badge) => (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {badges.map((badge) => (
               <StatusPill key={badge.label} label={badge.label} tone={badge.tone} />
             ))}
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">{createdAt}</p>
+          <div className="mt-3 flex justify-end">
             <Link
               href={href}
               className="inline-flex min-h-9 shrink-0 items-center rounded-lg bg-blue-50 px-3 text-xs font-bold text-blue-700"

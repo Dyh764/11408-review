@@ -7,7 +7,6 @@ import { AnswerPanel } from "@/components/mobile/AnswerPanel";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
 import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
-import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
@@ -413,7 +412,7 @@ export default function QuestionDetailPage() {
     <MobilePageShell>
       <PageHeader
         title="错题详情"
-        subtitle="查看原题或文字题卡，做完后再核对答案。"
+        subtitle="先看题，做完后再核对答案和整理卡点。"
       />
 
       {isLoading ? (
@@ -445,88 +444,55 @@ export default function QuestionDetailPage() {
           </MobileSection>
         ) : (
         <>
-          <MobileSection title="题目区">
-            <div className="space-y-4">
-              {question.signedImageUrl ? (
-                <MobileCard>
-                  <button
-                    type="button"
-                    onClick={() => setIsPreviewOpen(true)}
-                    className="block w-full overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={question.signedImageUrl}
-                      alt="原题图片"
-                      loading="lazy"
-                      decoding="async"
-                      className="max-h-[520px] w-full object-contain"
-                    />
-                  </button>
-                </MobileCard>
-              ) : question.image_path ? (
-                <MobileCard>
-                  <div className="grid min-h-32 place-items-center rounded-lg bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
-                    原题图片暂不可预览
-                  </div>
-                  {question.question_text ? (
-                    <MathText text={questionDisplay.questionText} className="mt-3 text-slate-700" />
-                  ) : null}
-                </MobileCard>
-              ) : (
-                <TextQuestionPreview
-                  subject={question.subject}
-                  chapter={question.chapter}
-                  knowledge_point={question.knowledge_point}
-                  difficulty={question.difficulty}
-                  question_text={questionDisplay.questionText}
-                  mastery_status={question.mastery_status}
-                  question_text_status={question.question_text_status}
-                  source={question.source}
-                  hasAnswer={Boolean(question.standard_answer?.trim())}
-                  hideMeta
-                />
-              )}
-              <ChoiceList choices={questionDisplay.choices} />
-            </div>
-          </MobileSection>
-
-          <MobileSection title="基础信息">
+          <MobileSection title="题目">
             <MobileCard>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <DetailField label="科目" value={question.subject} />
-                <DetailField label="章节" value={question.chapter} />
-                <DetailField label="知识点" value={question.knowledge_point} />
-                <DetailField label="难度" value={question.difficulty} />
-              </dl>
-            </MobileCard>
-          </MobileSection>
-
-          <MobileSection title="学习状态">
-            <SectionCard>
-              <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <DetailField label="掌握状态" value={question.mastery_status} />
-                <DetailField
-                  label="题目状态"
-                  value={getQuestionTextStatusLabel(question.question_text_status)}
-                />
-                <DetailField
-                  label="答案状态"
-                  value={question.standard_answer ? "已录入答案" : "还没有答案"}
-                />
-                <DetailField label="来源" value={getQuestionSourceLabel(question.source)} />
-              </dl>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <StatusPill
-                  label={getAnswerStatusLabel(question.answer_status)}
-                  tone={getAnswerStatusTone(question.answer_status)}
-                />
-                <StatusPill
-                  label={getQuestionTextStatusLabel(question.question_text_status)}
-                  tone={getQuestionTextStatusTone(question.question_text_status)}
-                />
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold text-slate-900">
+                    {question.chapter?.trim() || "未标章节"}
+                  </p>
+                  {question.knowledge_point ? (
+                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+                      {question.knowledge_point}
+                    </p>
+                  ) : null}
+                </div>
+                <StatusPill label={question.difficulty || "未标记"} tone="slate" />
               </div>
-            </SectionCard>
+
+              {question.signedImageUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="mt-4 block w-full overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={question.signedImageUrl}
+                    alt="原题图片"
+                    loading="lazy"
+                    decoding="async"
+                    className="max-h-[520px] w-full object-contain"
+                  />
+                </button>
+              ) : question.image_path ? (
+                <div className="mt-4 grid min-h-32 place-items-center rounded-lg bg-slate-100 px-5 text-center text-sm leading-6 text-slate-500">
+                  原题图片暂不可预览
+                </div>
+              ) : null}
+
+              <MathText
+                text={questionDisplay.questionText}
+                fallback="暂无题目文字。"
+                className="mt-4 text-slate-900"
+              />
+
+              {questionDisplay.choices.length > 0 ? (
+                <div className="mt-4">
+                  <ChoiceList choices={questionDisplay.choices} />
+                </div>
+              ) : null}
+            </MobileCard>
           </MobileSection>
 
           <MobileSection title="先做题">
@@ -624,6 +590,36 @@ export default function QuestionDetailPage() {
                 )}
               </div>
             </MobileCard>
+          </MobileSection>
+
+          <MobileSection title="更多信息">
+            <details className="rounded-lg border border-slate-100 bg-white p-4 text-sm shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <summary className="cursor-pointer list-none font-semibold text-slate-800">
+                查看掌握状态、核对状态和来源
+              </summary>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                <DetailField label="掌握状态" value={question.mastery_status} />
+                <DetailField
+                  label="题目状态"
+                  value={getQuestionTextStatusLabel(question.question_text_status)}
+                />
+                <DetailField
+                  label="答案状态"
+                  value={question.standard_answer ? "已录入答案" : "还没有答案"}
+                />
+                <DetailField label="来源" value={getQuestionSourceLabel(question.source)} />
+              </dl>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusPill
+                  label={getAnswerStatusLabel(question.answer_status)}
+                  tone={getAnswerStatusTone(question.answer_status)}
+                />
+                <StatusPill
+                  label={getQuestionTextStatusLabel(question.question_text_status)}
+                  tone={getQuestionTextStatusTone(question.question_text_status)}
+                />
+              </div>
+            </details>
           </MobileSection>
 
           <MobileSection title="更多操作">
