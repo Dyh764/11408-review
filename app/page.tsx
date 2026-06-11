@@ -2,21 +2,41 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { MobilePageShell, MobileSection, PrimaryActionCard, SectionCard, StatCard } from "@/components/mobile/primitives";
-import { PageHeader } from "@/components/page-header";
+import { MobilePageShell, MobileSection } from "@/components/mobile/primitives";
+import {
+  MotivationBanner,
+  PrimaryStudyLink,
+  ProgressBar,
+  SecondaryStudyLink,
+  SectionHeader,
+  SprintStatCard,
+  StudyBadge,
+  StudyCard,
+  StudyDashboardCard,
+  StudyPageHeader,
+} from "@/components/study/study-ui";
 import { todayIsoDate } from "@/lib/dates";
+import { getDailyMotivation } from "@/lib/motivation";
 import { createClient } from "@/lib/supabase/client";
 
 type DashboardStats = {
   dueToday: number;
+  completedToday: number;
   addedToday: number;
-  weeklyCompletionRate: string;
+  totalQuestions: number;
+  completionRate: number;
+  focusChapters: string[];
+  subjectStats: Array<{ subject: string; total: number; highRisk: number }>;
 };
 
 const emptyStats: DashboardStats = {
   dueToday: 0,
+  completedToday: 0,
   addedToday: 0,
-  weeklyCompletionRate: "0%",
+  totalQuestions: 0,
+  completionRate: 0,
+  focusChapters: [],
+  subjectStats: [],
 };
 
 const primaryActions = [
@@ -43,11 +63,9 @@ const primaryActions = [
   },
 ];
 
-const secondaryLinks = [
+const quickLinks = [
   { href: "/questions", title: "错题库", description: "浏览、筛选和进入详情" },
-  { href: "/reports", title: "学习报告", description: "查看薄弱点和下一步建议" },
   { href: "/sprint", title: "考前冲刺", description: "优先处理高风险错题" },
-  { href: "/settings", title: "我的", description: "账号、导出和可选增强" },
 ];
 
 function addDays(dateKey: string, amount: number) {
@@ -85,8 +103,7 @@ export default function DashboardPage() {
       }
 
       const today = todayIsoDate();
-      const weekStart = addDays(today, -6);
-      const [dueResult, addedResult, weeklyResult] = await Promise.all([
+      const [dueResult, completedResult, addedResult, questionsResult] = await Promise.all([
         client
           .from("reviews")
           .select("id,questions!inner(deleted_at)", { count: "exact", head: true })
@@ -95,6 +112,12 @@ export default function DashboardPage() {
           .is("completed_at", null)
           .is("questions.deleted_at", null),
         client
+          .from("reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .gte("completed_at", `${today}T00:00:00.000Z`)
+          .lt("completed_at", startOfNextDay(today)),
+        client
           .from("questions")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
@@ -102,30 +125,66 @@ export default function DashboardPage() {
           .gte("created_at", `${today}T00:00:00.000Z`)
           .lt("created_at", startOfNextDay(today)),
         client
-          .from("reviews")
-          .select("completed_at")
+          .from("questions")
+          .select("subject,chapter,knowledge_point,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status")
           .eq("user_id", user.id)
-          .gte("scheduled_date", weekStart)
-          .lte("scheduled_date", today),
+          .is("deleted_at", null),
       ]);
 
-      const error = dueResult.error ?? addedResult.error ?? weeklyResult.error;
+      const error =
+        dueResult.error ?? completedResult.error ?? addedResult.error ?? questionsResult.error;
 
       if (error) {
         setMessage(`学习统计更新失败：${error.message}`);
         return;
       }
 
-      const weeklyRows = weeklyResult.data ?? [];
-      const completed = weeklyRows.filter((review) => review.completed_at).length;
-      const weeklyCompletionRate =
-        weeklyRows.length > 0 ? `${Math.round((completed / weeklyRows.length) * 100)}%` : "0%";
+      const completedToday = completedResult.count ?? 0;
+      const dueToday = dueResult.count ?? 0;
+      const todayTotal = completedToday + dueToday;
+      const completionRate = todayTotal > 0 ? Math.round((completedToday / todayTotal) * 100) : 0;
+      const questionRows = questionsResult.data ?? [];
+      const subjectMap = new Map<string, { subject: string; total: number; highRisk: number }>();
+      const focusMap = new Map<string, number>();
+
+      for (const question of questionRows) {
+        const subject = String(question.subject ?? "未标科目");
+        const current = subjectMap.get(subject) ?? { subject, total: 0, highRisk: 0 };
+        current.total += 1;
+
+        const isHighRisk =
+          question.review_priority === "high" ||
+          question.needs_manual_check ||
+          question.question_text_status === "needs_fix" ||
+          question.answer_status === "needs_fix" ||
+          question.mastery_status === "完全没思路" ||
+          question.mastery_status === "思路对但卡住";
+
+        if (isHighRisk) {
+          current.highRisk += 1;
+          const focus = String(question.knowledge_point ?? question.chapter ?? "待整理错题");
+          focusMap.set(focus, (focusMap.get(focus) ?? 0) + 1);
+        }
+
+        subjectMap.set(subject, current);
+      }
+
+      const focusChapters = Array.from(focusMap, ([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3)
+        .map((item) => item.label);
 
       if (isActive) {
         setStats({
-          dueToday: dueResult.count ?? 0,
+          dueToday,
+          completedToday,
           addedToday: addedResult.count ?? 0,
-          weeklyCompletionRate,
+          totalQuestions: questionRows.length,
+          completionRate,
+          focusChapters,
+          subjectStats: Array.from(subjectMap.values())
+            .sort((a, b) => b.highRisk - a.highRisk || b.total - a.total)
+            .slice(0, 5),
         });
         setMessage("");
       }
@@ -143,45 +202,151 @@ export default function DashboardPage() {
   }, [supabase]);
 
   return (
-    <MobilePageShell>
-      <PageHeader
+    <MobilePageShell className="bg-[#f4f0ff]">
+      <StudyPageHeader
         title="今日学习驾驶舱"
-        subtitle="先复习，再整理新题。这里保留今天最该做的三件事。"
+        subtitle="先清掉到期复习，再补充新错题。打开首页就知道今天从哪里开始。"
       />
 
       <MobileSection>
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="今日待复习" value={stats.dueToday} tone="blue" />
-          <StatCard label="今日新增" value={stats.addedToday} />
-          <StatCard label="本周完成率" value={stats.weeklyCompletionRate} tone="green" />
-        </div>
+        <StudyDashboardCard>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-white/75">今日待复习</p>
+              <p className="mt-2 text-4xl font-black tracking-normal">{stats.dueToday}</p>
+              <p className="mt-1 text-sm text-white/75">已完成 {stats.completedToday} 题</p>
+            </div>
+            <div className="rounded-lg bg-white/14 px-3 py-2 text-right">
+              <p className="text-xs font-bold text-white/75">错题总量</p>
+              <p className="text-2xl font-black">{stats.totalQuestions}</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <ProgressBar
+              value={stats.completionRate}
+              label="今日学习进度"
+              helper={`${stats.completionRate}%`}
+              inverse
+            />
+          </div>
+          <PrimaryStudyLink href="/review" className="mt-5 w-full bg-white text-[#4f23b6] shadow-none">
+            开始今日复习
+          </PrimaryStudyLink>
+        </StudyDashboardCard>
         {message ? (
-          <p className="mt-3 rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-600">
+          <p className="mt-3 rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 ring-1 ring-[#e4dcff]">
             {message}
           </p>
         ) : null}
       </MobileSection>
 
-      <MobileSection title="现在应该点这里">
+      <MobileSection>
+        <div className="grid grid-cols-3 gap-3">
+          <SprintStatCard label="今日完成" value={stats.completedToday} helper="已写入复习记录" />
+          <SprintStatCard label="今日新增" value={stats.addedToday} helper="新整理错题" />
+          <SprintStatCard label="错题总量" value={stats.totalQuestions} helper="当前题库" />
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <MotivationBanner text={getDailyMotivation()} />
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader title="现在应该点这里" subtitle="主流程入口保留，低频功能不抢首屏。" />
         <div className="grid gap-3">
-          {primaryActions.map((action) => (
-            <PrimaryActionCard key={action.href} {...action} />
+          {primaryActions.slice(1).map((action) => (
+            <StudyCard key={action.href}>
+              <Link href={action.href} className="flex min-h-12 items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-sm font-black text-[#211536]">{action.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{action.description}</span>
+                </span>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#ede7ff] text-sm font-black text-[#4f23b6]">
+                  &gt;
+                </span>
+              </Link>
+            </StudyCard>
+          ))}
+          <div className="grid grid-cols-2 gap-3">
+            {quickLinks.map((link) => (
+              <SecondaryStudyLink key={link.href} href={link.href} className="flex-col items-start text-left">
+                <span>{link.title}</span>
+                <span className="mt-1 text-xs font-semibold text-slate-500">{link.description}</span>
+              </SecondaryStudyLink>
+            ))}
+          </div>
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader title="科目入口" subtitle="按薄弱程度排序，先看高风险科目。" />
+        <div className="grid gap-3">
+          {stats.subjectStats.length === 0 ? (
+            <StudyCard>
+              <p className="text-sm font-black text-[#211536]">还没有错题数据</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                可以先拍题上传，或导入 ChatGPT 整理好的错题卡。
+              </p>
+            </StudyCard>
+          ) : null}
+          {stats.subjectStats.map((subject) => (
+            <StudyCard key={subject.subject}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-black text-[#211536]">{subject.subject}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {subject.total} 题 · 高风险 {subject.highRisk} 题
+                  </p>
+                </div>
+                <StudyBadge tone={subject.highRisk > 0 ? "amber" : "green"}>
+                  {subject.highRisk > 0 ? "需要关注" : "节奏稳定"}
+                </StudyBadge>
+              </div>
+            </StudyCard>
           ))}
         </div>
       </MobileSection>
 
-      <MobileSection title="更多入口" subtitle="低频查看放在下面，学习时不用先处理它们。">
-        <div className="grid gap-3">
-          {secondaryLinks.map((link) => (
-            <SectionCard key={link.href}>
-              <Link href={link.href} className="flex min-h-11 items-center justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-slate-900">{link.title}</span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">{link.description}</span>
-                </span>
-                <span className="shrink-0 text-sm font-bold text-blue-700">&gt;</span>
-              </Link>
-            </SectionCard>
+      <MobileSection>
+        <SectionHeader title="薄弱提醒" subtitle="优先处理会影响下一轮复盘的章节。" />
+        <StudyCard>
+          <div className="flex flex-wrap gap-2">
+            {(stats.focusChapters.length > 0 ? stats.focusChapters : ["先完成今日复习", "整理新错题"]).map((item) => (
+              <StudyBadge key={item} tone="purple">{item}</StudyBadge>
+            ))}
+          </div>
+        </StudyCard>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader title="智能自检" subtitle="本阶段只预留入口，不自动改题干、图片或标准答案。" />
+        <StudyCard>
+          <div className="grid gap-3">
+            <div>
+              <p className="text-sm font-black text-[#211536]">数据异常检查</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                后续用于检查章节、知识点、难度、标签和复习计划异常。
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <SecondaryStudyLink href="/settings/system-check">查看系统检查</SecondaryStudyLink>
+              <SecondaryStudyLink href="/questions">查看错题库</SecondaryStudyLink>
+            </div>
+          </div>
+        </StudyCard>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader title="更多入口" subtitle="低频查看放在下面，学习时不用先处理它们。" />
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { href: "/reports", title: "学习报告" },
+            { href: "/settings", title: "账号与导出" },
+          ].map((link) => (
+            <SecondaryStudyLink key={link.href} href={link.href}>
+              {link.title}
+            </SecondaryStudyLink>
           ))}
         </div>
       </MobileSection>

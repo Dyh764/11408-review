@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, LoadingState, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
-import { QuestionListCard } from "@/components/mobile/QuestionListCard";
-import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
+import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
+import { MathText } from "@/components/mobile/MathText";
+import {
+  AttentionBadge,
+  DifficultyBadge,
+  MasteryBadge,
+  ProgressBar,
+  SectionHeader,
+  SprintStatCard,
+  StudyBadge,
+  StudyCard,
+  StudyPageHeader,
+} from "@/components/study/study-ui";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
-import { groupQuestionsBySubjectAndDifficulty } from "@/lib/questions/question-list-view";
+import { buildQuestionDirectory, type QuestionChapterGroup, type QuestionSubjectDirectory } from "@/lib/taxonomy/question-taxonomy";
 import {
   getQuestionTextStatusLabel,
 } from "@/lib/questions/meta-labels";
-import type { MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
-
-const subjectFilters: Array<Subject | "全部"> = [
-  "全部",
-  "数学",
-  "数据结构",
-  "计算机组成原理",
-  "操作系统",
-  "计算机网络",
-];
+import type { MasteryStatus, QuestionTextStatus } from "@/lib/types";
 
 const masteryFilters: Array<MasteryStatus | "全部"> = [
   "全部",
@@ -63,10 +65,12 @@ function getQuestionKind(question: QuestionWithImage, choiceCount: number) {
 
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [subject, setSubject] = useState<Subject | "全部">("全部");
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
   const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
   const [keyword, setKeyword] = useState("");
+  const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
+  const [activeSubject, setActiveSubject] = useState("");
+  const [activeChapter, setActiveChapter] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
@@ -82,10 +86,22 @@ export default function QuestionsPage() {
     }
 
     let isActive = true;
-    fetchCurrentUserQuestions(supabase)
-      .then((items) => {
+    Promise.all([
+      fetchCurrentUserQuestions(supabase),
+      supabase
+        .from("reviews")
+        .select("question_id")
+        .lte("scheduled_date", todayIsoDate())
+        .is("completed_at", null),
+    ])
+      .then(([items, dueResult]) => {
+        if (dueResult.error) {
+          throw dueResult.error;
+        }
+
         if (isActive) {
           setQuestions(items);
+          setDueTodayIds(new Set((dueResult.data ?? []).map((row) => String(row.question_id))));
           setMessage(items.length === 0 ? "还没有上传真实错题。" : "");
         }
       })
@@ -110,8 +126,7 @@ export default function QuestionsPage() {
       const normalizedKeyword = keyword.trim().toLowerCase();
 
       return questions
-        .filter((question) => {
-        const subjectMatch = subject === "全部" || question.subject === subject;
+          .filter((question) => {
         const masteryMatch =
           masteryStatus === "全部" || question.mastery_status === masteryStatus;
           const textStatusMatch =
@@ -127,16 +142,19 @@ export default function QuestionsPage() {
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
 
-          return subjectMatch && masteryMatch && textStatusMatch && keywordMatch;
+          return masteryMatch && textStatusMatch && keywordMatch;
         });
     },
-    [keyword, masteryStatus, questions, subject, textStatus],
+    [keyword, masteryStatus, questions, textStatus],
   );
 
-  const groupedQuestions = useMemo(
-    () => groupQuestionsBySubjectAndDifficulty(filteredQuestions),
-    [filteredQuestions],
+  const directory = useMemo(
+    () => buildQuestionDirectory(filteredQuestions, dueTodayIds),
+    [dueTodayIds, filteredQuestions],
   );
+  const selectedSubject = directory.find((group) => group.subject === activeSubject) ?? null;
+  const selectedChapter =
+    selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
 
   function toggleSelected(id: string) {
     setSelectedIds((current) =>
@@ -319,34 +337,18 @@ export default function QuestionsPage() {
   }
 
   return (
-    <MobilePageShell>
-      <PageHeader
-        title="错题库"
-        subtitle="这里用于浏览和筛选，做题、看答案和编辑都放到详情页。"
+    <MobilePageShell className="bg-[#f4f0ff]">
+      <StudyPageHeader
+        title="错题库目录"
+        subtitle="按科目、章节、题目三层浏览。旧数学数据会先按章节和知识点归入高数、线代或概率统计。"
       />
 
       <section className="space-y-3 px-5">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {subjectFilters.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setSubject(item)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium ${
-                subject === item
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-slate-600 ring-1 ring-slate-200"
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <select
             value={masteryStatus}
             onChange={(event) => setMasteryStatus(event.target.value as MasteryStatus | "全部")}
-            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+            className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
           >
             {masteryFilters.map((item) => (
               <option key={item} value={item}>
@@ -359,7 +361,7 @@ export default function QuestionsPage() {
             onChange={(event) =>
               setTextStatus(event.target.value as QuestionTextStatus | "全部")
             }
-            className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+            className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
           >
             {textStatusFilters.map((item) => (
               <option key={item} value={item}>
@@ -371,18 +373,18 @@ export default function QuestionsPage() {
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+          className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
           placeholder="搜索题目文字、知识点、章节或备注"
         />
       </section>
 
       <section className="px-5">
-        <SectionCard>
+        <StudyCard>
           {!showBatchTools ? (
             <button
               type="button"
               onClick={() => setShowBatchTools(true)}
-              className="min-h-11 w-full rounded-lg bg-blue-50 px-4 text-sm font-semibold text-blue-700"
+              className="min-h-11 w-full rounded-lg bg-[#ede7ff] px-4 text-sm font-black text-[#4f23b6]"
             >
               批量管理
             </button>
@@ -396,14 +398,14 @@ export default function QuestionsPage() {
               <button
                 type="button"
                 onClick={selectAllFiltered}
-                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
               >
                 全选当前页
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
-                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
               >
                 取消选择
               </button>
@@ -413,7 +415,7 @@ export default function QuestionsPage() {
                   setSelectedIds([]);
                   setShowBatchTools(false);
                 }}
-                className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700"
+                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
               >
                 退出批量
               </button>
@@ -432,7 +434,7 @@ export default function QuestionsPage() {
               type="button"
               onClick={() => handleBatchAction("mastered")}
               disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+              className="min-h-11 rounded-lg bg-[#5b2bd6] px-3 text-sm font-black text-white disabled:bg-slate-300"
             >
               标记已掌握
             </button>
@@ -448,7 +450,7 @@ export default function QuestionsPage() {
               type="button"
               onClick={() => handleBatchAction("sprint")}
               disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-slate-900 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+              className="min-h-11 rounded-lg bg-[#211536] px-3 text-sm font-black text-white disabled:bg-slate-300"
             >
               加入冲刺复习
             </button>
@@ -458,7 +460,7 @@ export default function QuestionsPage() {
           <p className="mt-2 text-xs leading-5 text-slate-500">
             批量删除只会软删除错题，不会删除 Storage 图片或复习记录。
           </p>
-        </SectionCard>
+        </StudyCard>
       </section>
 
       {isLoading ? (
@@ -469,7 +471,7 @@ export default function QuestionsPage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-[#e4dcff]">
             {message}
           </p>
         </MobileSection>
@@ -484,41 +486,233 @@ export default function QuestionsPage() {
             action={{ href: "/upload", label: "去拍题" }}
           />
         ) : null}
-        {groupedQuestions.map((group) => (
-          <section key={group.subject} className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-slate-950">
-                {group.subject} · {group.count} 题
-              </h2>
-            </div>
-            <div className="space-y-3">
-              {group.items.map((question) => {
-                const title = question.knowledge_point ?? question.chapter ?? "待识别知识点";
-                const questionDisplay = getQuestionStemAndChoices(
-                  question.question_text,
-                  question.choices,
-                );
-
-                return (
-                  <QuestionListCard
-                    key={question.id}
-                    href={`/questions/${question.id}`}
-                    title={title}
-                    summary={questionDisplay.questionText || question.user_note}
-                    chapter={question.chapter}
-                    difficulty={question.difficulty}
-                    questionKind={getQuestionKind(question, questionDisplay.choices.length)}
-                    createdAt={formatDate(question.created_at)}
-                    selected={selectedIds.includes(question.id)}
-                    onSelect={showBatchTools ? () => toggleSelected(question.id) : undefined}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        ))}
+        {!selectedSubject ? (
+          <SubjectDirectory
+            directory={directory}
+            onSelectSubject={(subject) => {
+              setActiveSubject(subject);
+              setActiveChapter("");
+            }}
+          />
+        ) : null}
+        {selectedSubject && !selectedChapter ? (
+          <ChapterDirectory
+            subject={selectedSubject}
+            onBack={() => {
+              setActiveSubject("");
+              setActiveChapter("");
+            }}
+            onSelectChapter={setActiveChapter}
+          />
+        ) : null}
+        {selectedSubject && selectedChapter ? (
+          <QuestionDirectory
+            subject={selectedSubject}
+            chapter={selectedChapter}
+            selectedIds={selectedIds}
+            showBatchTools={showBatchTools}
+            onBack={() => setActiveChapter("")}
+            onSelect={toggleSelected}
+          />
+        ) : null}
         </div>
       </MobileSection>
     </MobilePageShell>
+  );
+}
+
+function SubjectDirectory({
+  directory,
+  onSelectSubject,
+}: {
+  directory: QuestionSubjectDirectory<QuestionWithImage>[];
+  onSelectSubject: (subject: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title="科目目录"
+        subtitle="默认先从科目入口进入，再看章节和题目。"
+        action={<StudyBadge tone="purple">{directory.length} 科目</StudyBadge>}
+      />
+      <div className="grid gap-3">
+        {directory.map((subject) => (
+          <button
+            key={subject.subject}
+            type="button"
+            onClick={() => onSelectSubject(subject.subject)}
+            className="text-left"
+          >
+            <StudyCard>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-lg font-black text-[#211536]">{subject.subject}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    今日待复习 {subject.dueTodayCount} · 困难 {subject.hardCount} · 需处理 {subject.needsAttentionCount}
+                  </p>
+                </div>
+                <StudyBadge tone={subject.needsAttentionCount > 0 ? "amber" : "green"}>
+                  {subject.totalCount} 题
+                </StudyBadge>
+              </div>
+              <div className="mt-3">
+                <ProgressBar
+                  value={subject.masteryRate}
+                  label="掌握进度"
+                  helper={`${subject.masteryRate}%`}
+                />
+              </div>
+            </StudyCard>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChapterDirectory({
+  subject,
+  onBack,
+  onSelectChapter,
+}: {
+  subject: QuestionSubjectDirectory<QuestionWithImage>;
+  onBack: () => void;
+  onSelectChapter: (chapter: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title={subject.subject}
+        subtitle="选择章节后进入题目列表。"
+        action={
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+          >
+            返回科目
+          </button>
+        }
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <SprintStatCard label="错题数量" value={subject.totalCount} />
+        <SprintStatCard label="需要处理" value={subject.needsAttentionCount} tone="amber" />
+      </div>
+      <div className="mt-4 grid gap-3">
+        {subject.chapters.map((chapter) => (
+          <button
+            key={chapter.chapter}
+            type="button"
+            onClick={() => onSelectChapter(chapter.chapter)}
+            className="text-left"
+          >
+            <StudyCard>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-black text-[#211536]">{chapter.chapter}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {chapter.totalCount} 题 · 困难 {chapter.hardCount} · 已掌握 {chapter.masteredCount}
+                  </p>
+                </div>
+                <StudyBadge tone={chapter.needsAttentionCount > 0 ? "amber" : "green"}>
+                  需核对/修正 {chapter.needsAttentionCount}
+                </StudyBadge>
+              </div>
+            </StudyCard>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuestionDirectory({
+  subject,
+  chapter,
+  selectedIds,
+  showBatchTools,
+  onBack,
+  onSelect,
+}: {
+  subject: QuestionSubjectDirectory<QuestionWithImage>;
+  chapter: QuestionChapterGroup<QuestionWithImage>;
+  selectedIds: string[];
+  showBatchTools: boolean;
+  onBack: () => void;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title={chapter.chapter}
+        subtitle={`${subject.subject} · ${chapter.totalCount} 题`}
+        action={
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+          >
+            返回章节
+          </button>
+        }
+      />
+      <div className="grid gap-3">
+        {chapter.questions.map((question) => {
+          const questionDisplay = getQuestionStemAndChoices(question.question_text, question.choices);
+          const needsFix =
+            question.question_text_status === "needs_fix" || question.answer_status === "needs_fix";
+
+          return (
+            <StudyCard key={question.id}>
+              <div className="flex gap-3">
+                {showBatchTools ? (
+                  <label className="flex shrink-0 items-start pt-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(question.id)}
+                      onChange={() => onSelect(question.id)}
+                      className="h-5 w-5 rounded border-[#d9cffd]"
+                      aria-label={`选择 ${question.knowledge_point ?? question.chapter ?? "错题"}`}
+                    />
+                  </label>
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="min-w-0 break-words text-base font-black leading-6 text-[#211536]">
+                      {question.knowledge_point ?? question.chapter ?? "待识别知识点"}
+                    </h2>
+                    <span className="shrink-0 text-[11px] font-bold text-slate-400">
+                      {formatDate(question.created_at)}
+                    </span>
+                  </div>
+                  <MathText
+                    text={questionDisplay.questionText || question.user_note}
+                    fallback="暂无题目摘要，进入详情后补充题干或卡点。"
+                    compact
+                    className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600"
+                  />
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <DifficultyBadge difficulty={question.difficulty} />
+                    <MasteryBadge mastery={question.mastery_status} />
+                    <StudyBadge tone="purple">
+                      {getQuestionKind(question, questionDisplay.choices.length)}
+                    </StudyBadge>
+                    <AttentionBadge needsFix={needsFix} needsManualCheck={question.needs_manual_check} />
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <Link
+                      href={`/questions/${question.id}`}
+                      className="inline-flex min-h-9 shrink-0 items-center rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+                    >
+                      进入详情
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </StudyCard>
+          );
+        })}
+      </div>
+    </section>
   );
 }

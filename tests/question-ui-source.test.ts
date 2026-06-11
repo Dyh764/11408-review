@@ -12,20 +12,28 @@ function read(path: string) {
 test("/questions uses compact text previews without duplicate title or meta", () => {
   const source = read("app/questions/page.tsx");
 
-  assert.match(source, /<QuestionListCard/);
+  assert.match(source, /<MathText/);
+  assert.match(source, /<DifficultyBadge/);
+  assert.match(source, /<MasteryBadge/);
+  assert.match(source, /<AttentionBadge/);
+  assert.match(source, /进入详情/);
   assert.doesNotMatch(source, /<MobileCard key=\{question\.id\}[\s\S]*<TextQuestionPreview/);
   assert.doesNotMatch(source, /getQuestionSourceLabel\(question\.source\)/);
   assert.doesNotMatch(source, />ai_unverified</);
   assert.doesNotMatch(source, />chatgpt_import</);
 });
 
-test("/questions groups cards by subject and delegates difficulty ordering", () => {
+test("/questions uses taxonomy directory browsing before the final question list", () => {
   const source = read("app/questions/page.tsx");
 
-  assert.match(source, /groupQuestionsBySubjectAndDifficulty/);
-  assert.match(source, /groupedQuestions/);
-  assert.match(source, /group\.subject/);
-  assert.match(source, /group\.count/);
+  assert.match(source, /buildQuestionDirectory/);
+  assert.match(source, /SubjectDirectory/);
+  assert.match(source, /ChapterDirectory/);
+  assert.match(source, /QuestionDirectory/);
+  assert.match(source, /activeSubject/);
+  assert.match(source, /activeChapter/);
+  assert.match(source, /科目目录/);
+  assert.match(source, /返回章节/);
 });
 
 test("QuestionListCard only exposes chapter, difficulty, and question-kind badges", () => {

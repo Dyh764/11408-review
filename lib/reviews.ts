@@ -41,6 +41,7 @@ export type DueReview = {
     answer_source: AnswerSource;
     one_sentence_tip: string | null;
     review_priority: ReviewPriority | null;
+    needs_manual_check: boolean;
     created_at: string;
     deleted_at: string | null;
   };
@@ -78,6 +79,7 @@ const dueReviewColumns = `
     answer_source,
     one_sentence_tip,
     review_priority,
+    needs_manual_check,
     created_at,
     deleted_at
   )
