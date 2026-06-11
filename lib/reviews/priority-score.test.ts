@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   calculateReviewPriorityScore,
+  explainReviewPriorityScore,
   sortDueReviewsByPriority,
   type PriorityReviewInput,
 } from "./priority-score.ts";
@@ -94,4 +95,31 @@ test("sortDueReviewsByPriority orders highest score first and keeps stable fallb
     sorted.map((review) => review.id),
     ["old-high", "today-medium", "today-basic"],
   );
+});
+
+test("explains priority as user-facing level and reasons without requiring raw score display", () => {
+  const explanation = explainReviewPriorityScore(
+    {
+      ...baseReview,
+      id: "explain",
+      scheduled_date: "2026-06-01",
+      review_result: "wrong_again",
+      questions: {
+        ...baseReview.questions,
+        difficulty: "较难",
+        needs_manual_check: true,
+        question_text_status: "needs_fix",
+        review_priority: "high",
+      },
+    },
+    "2026-06-11",
+  );
+
+  assert.equal(explanation.level, "今日重点");
+  assert.ok(explanation.score >= 100);
+  assert.ok(explanation.reasons.includes("已逾期"));
+  assert.ok(explanation.reasons.includes("又错过"));
+  assert.ok(explanation.reasons.includes("需要核对"));
+  assert.ok(explanation.reasons.includes("需要修正"));
+  assert.ok(explanation.reasons.includes("困难题"));
 });

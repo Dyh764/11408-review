@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import {
   MotivationBanner,
-  PrimaryStudyLink,
   ProgressBar,
   SecondaryStudyLink,
   SectionHeader,
@@ -229,9 +228,32 @@ export default function DashboardPage() {
               inverse
             />
           </div>
-          <PrimaryStudyLink href="/review" className="mt-5 w-full bg-white text-[#4f23b6] shadow-none">
-            开始今日复习
-          </PrimaryStudyLink>
+          {stats.dueToday > 0 ? (
+            <Link
+              href="/review"
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+            >
+              开始今日复习
+            </Link>
+          ) : (
+            <div className="mt-5 rounded-lg bg-white/14 p-3">
+              <p className="text-sm font-black text-white">今日暂无到期复习</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link
+                  href="/questions"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-xs font-black text-[#4f23b6]"
+                >
+                  去错题库看看
+                </Link>
+                <Link
+                  href="/upload"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/35 px-3 text-xs font-black text-white"
+                >
+                  拍题上传
+                </Link>
+              </div>
+            </div>
+          )}
         </StudyDashboardCard>
         {message ? (
           <p className="mt-3 rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 ring-1 ring-[#e4dcff]">
@@ -253,7 +275,7 @@ export default function DashboardPage() {
       </MobileSection>
 
       <MobileSection>
-        <SectionHeader title="现在应该点这里" subtitle="主流程入口保留，低频功能不抢首屏。" />
+        <SectionHeader title="快速开始" subtitle="先完成最重要的复习，再处理新增错题。" />
         <div className="grid gap-3">
           {primaryActions.slice(1).map((action) => (
             <StudyCard key={action.href}>

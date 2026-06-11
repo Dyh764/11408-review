@@ -80,6 +80,33 @@ test("/review records non-choice results only after answer reveal", () => {
   assert.match(source, /canRecordReview \?/);
 });
 
+test("/review presents priority as level and reasons, not raw score", () => {
+  const source = read("app/review/page.tsx");
+  const priority = read("lib/reviews/priority-score.ts");
+
+  assert.match(source, /explainReviewPriorityScore/);
+  assert.match(source, /priority\.level/);
+  assert.match(source, /priority\.reasons/);
+  assert.doesNotMatch(source, /优先级 \{Math\.round\(priority\.total\)\}/);
+  assert.match(priority, /今日重点/);
+  assert.match(priority, /高优先级/);
+  assert.match(priority, /建议复习/);
+  assert.match(priority, /普通复习/);
+});
+
+test("/review and /questions render math-capable text fields through MathText", () => {
+  const review = read("app/review/page.tsx");
+  const questions = read("app/questions/page.tsx");
+
+  assert.match(review, /<MathText[\s\S]*text=\{review\.questions\.knowledge_point/);
+  assert.match(review, /<MathText[\s\S]*text=\{review\.questions\.one_sentence_tip/);
+  assert.match(review, /<TextQuestionPreview/);
+  assert.match(review, /<ChoiceList/);
+  assert.match(review, /<AnswerPanel/);
+  assert.match(questions, /<MathText[\s\S]*text=\{question\.knowledge_point \?\?/);
+  assert.match(questions, /<MathText[\s\S]*text=\{questionDisplay\.questionText \|\| question\.user_note\}/);
+});
+
 test("/questions/[id] keeps detail information in the requested learning-flow order", () => {
   const source = read("app/questions/[id]/page.tsx");
 

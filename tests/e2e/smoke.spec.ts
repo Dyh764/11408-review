@@ -42,9 +42,14 @@ test("home mobile first screen exposes primary study actions", async ({ page }) 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /拍题上传/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /拍题上传/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /导入 ChatGPT 错题卡/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /开始今日复习/ })).toBeVisible();
+  const startReviewLink = page.getByRole("link", { name: /开始今日复习/ });
+  if ((await startReviewLink.count()) > 0) {
+    await expect(startReviewLink.first()).toBeVisible();
+  } else {
+    await expect(page.getByText("今日暂无到期复习")).toBeVisible();
+  }
 });
 
 test("login page is accessible", async ({ page }) => {
@@ -319,7 +324,9 @@ test("home page keeps optional DeepSeek out of the primary cockpit", async ({ pa
 
   expect(response?.status()).toBeLessThan(400);
   await expect(page.getByText("今日学习驾驶舱")).toBeVisible();
-  await expect(page.getByText("现在应该点这里")).toBeVisible();
+  await expect(page.getByText("快速开始")).toBeVisible();
+  await expect(page.getByText("现在应该点这里")).toHaveCount(0);
+  await expect(page.getByText("主流程入口保留，低频功能不抢首屏。")).toHaveCount(0);
   await expect(page.getByText("智能建议")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "刷新智能分析" })).toHaveCount(0);
 });

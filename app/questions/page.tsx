@@ -340,7 +340,7 @@ export default function QuestionsPage() {
     <MobilePageShell className="bg-[#f4f0ff]">
       <StudyPageHeader
         title="错题库目录"
-        subtitle="按科目、章节、题目三层浏览。旧数学数据会先按章节和知识点归入高数、线代或概率统计。"
+        subtitle="按科目、章节、题目三层浏览。数学题会拆到高数、线代和概率统计，找题更快。"
       />
 
       <section className="space-y-3 px-5">
@@ -678,9 +678,11 @@ function QuestionDirectory({
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="min-w-0 break-words text-base font-black leading-6 text-[#211536]">
-                      {question.knowledge_point ?? question.chapter ?? "待识别知识点"}
-                    </h2>
+                    <MathText
+                      text={question.knowledge_point ?? question.chapter}
+                      fallback="待识别知识点"
+                      className="min-w-0 text-base font-black leading-6 text-[#211536]"
+                    />
                     <span className="shrink-0 text-[11px] font-bold text-slate-400">
                       {formatDate(question.created_at)}
                     </span>

@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
+import { MathText } from "@/components/mobile/MathText";
 import { EmptyState, ImagePlaceholder, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import {
   AttentionBadge,
   DifficultyBadge,
   MotivationBanner,
-  PrimaryStudyLink,
   ProgressBar,
   SecondaryStudyLink,
   SectionHeader,
@@ -24,7 +24,7 @@ import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { getDailyMotivation } from "@/lib/motivation";
 import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
-import { calculateReviewPriorityScore, sortDueReviewsByPriority } from "@/lib/reviews/priority-score";
+import { explainReviewPriorityScore, sortDueReviewsByPriority } from "@/lib/reviews/priority-score";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -317,12 +317,18 @@ export default function ReviewPage() {
             ))}
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <PrimaryStudyLink href="/" className="bg-white text-[#4f23b6] shadow-none">
+            <Link
+              href="/"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+            >
               返回首页
-            </PrimaryStudyLink>
-            <PrimaryStudyLink href="/questions" className="bg-white text-[#4f23b6] shadow-none">
+            </Link>
+            <Link
+              href="/questions"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+            >
               去错题库
-            </PrimaryStudyLink>
+            </Link>
           </div>
         </StudyDashboardCard>
       </MobileSection>
@@ -333,7 +339,7 @@ export default function ReviewPage() {
     <MobilePageShell className="bg-[#f4f0ff]">
       <StudyPageHeader
         title="今日复习闪卡"
-        subtitle="按系统综合优先级排序，一次只处理一道题。先做题，再看答案，最后记录结果。"
+        subtitle="先处理最该复盘的题，一次只推进一道。先做题，再看答案，最后记录结果。"
       />
 
       <MobileSection>
@@ -477,20 +483,25 @@ function ReviewFlashcard({
       ? submittedChoice && answerRevealed
       : !isChoiceQuestion && answerRevealed
     : true;
-  const priority = calculateReviewPriorityScore(review, todayIsoDate());
+  const priority = explainReviewPriorityScore(review, todayIsoDate());
 
   return (
     <MobileSection>
       <SectionHeader
         title="当前题目卡片"
-        subtitle="默认只看题目，答案隐藏到你主动查看。"
-        action={<StudyBadge tone="purple">优先级 {Math.round(priority.total)}</StudyBadge>}
+        subtitle="先独立作答，答案会在你确认后展开。"
+        action={<StudyBadge tone="purple">{priority.level}</StudyBadge>}
       />
       <StudyCard className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <StudyBadge tone={isOverdue(review.scheduled_date) ? "red" : "amber"}>
             {isOverdue(review.scheduled_date) ? "已逾期" : "今日到期"}
           </StudyBadge>
+          {priority.reasons.slice(0, 4).map((reason) => (
+            <StudyBadge key={reason} tone="purple">
+              {reason}
+            </StudyBadge>
+          ))}
           <DifficultyBadge difficulty={review.questions.difficulty} />
           <AttentionBadge
             needsFix={
@@ -522,12 +533,16 @@ function ReviewFlashcard({
               <p className="text-xs font-black text-[#5b2bd6]">
                 {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
               </p>
-              <h2 className="mt-2 break-words text-lg font-black leading-7 text-[#211536]">
-                {review.questions.knowledge_point ?? "待识别知识点"}
-              </h2>
-              <p className="mt-1 break-words text-sm leading-6 text-slate-600">
-                {review.questions.one_sentence_tip ?? "先独立完成，再展开答案核对。"}
-              </p>
+              <MathText
+                text={review.questions.knowledge_point}
+                fallback="待识别知识点"
+                className="mt-2 text-lg font-black leading-7 text-[#211536]"
+              />
+              <MathText
+                text={review.questions.one_sentence_tip}
+                fallback="先独立完成，再展开答案核对。"
+                className="mt-1 text-sm leading-6 text-slate-600"
+              />
             </div>
           </div>
 
