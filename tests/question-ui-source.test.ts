@@ -147,6 +147,52 @@ test("import page explains JSON import with aggregate preview stats", () => {
   }
 });
 
+test("import page exposes copyable ChatGPT prompt and JSON example templates", () => {
+  const source = read("app/import/page.tsx");
+  const schema = read("lib/import/import-schema.ts");
+
+  assert.match(source, /copyChatGptPrompt/);
+  assert.match(source, /copyImportExampleJson/);
+  assert.match(source, /复制 ChatGPT 整理指令/);
+  assert.match(source, /复制 JSON 示例/);
+  assert.match(source, /已复制，可粘贴给 ChatGPT 使用。/);
+  assert.match(schema, /chatGptImportPrompt/);
+  assert.match(schema, /standard_answer 必须以“答案：”开头/);
+  assert.match(schema, /answer_explanation 必须以“过程：”开头/);
+});
+
+test("/review supports skipping and explicit next-step actions after recording", () => {
+  const source = read("app/review/page.tsx");
+
+  assert.match(source, /handleSkipReview/);
+  assert.match(source, /setLastCompletedReview/);
+  assert.match(source, /跳过本题/);
+  assert.match(source, /下一题/);
+  assert.match(source, /返回错题库/);
+  assert.match(source, /不记录本次结果/);
+});
+
+test("/questions/[id] shows AI enhancement change summaries and manual verification actions", () => {
+  const source = read("app/questions/[id]/page.tsx");
+  const route = read("app/api/questions/[id]/route.ts");
+  const summary = read("lib/questions/ai-enhancement-summary.ts");
+
+  assert.match(source, /buildAiEnhancementSummary/);
+  assert.match(source, /aiEnhancementSummary/);
+  assert.match(summary, /AI 已检查题卡，未发现需要明显修改的字段。/);
+  assert.match(source, /标记题目已核对/);
+  assert.match(source, /标记答案已核对/);
+  assert.match(source, /标记需要修正/);
+  assert.match(source, /handleMarkQuestionVerified/);
+  assert.match(source, /handleMarkAnswerVerified/);
+  assert.match(route, /export async function PATCH/);
+  assert.match(route, /question_text_status/);
+  assert.match(route, /answer_status/);
+  assert.doesNotMatch(route, /question_text:/);
+  assert.doesNotMatch(route, /standard_answer:/);
+  assert.doesNotMatch(route, /choices:/);
+});
+
 test("reports and settings use learning and account language instead of ops language", () => {
   const reports = read("app/reports/page.tsx");
   const settings = read("app/settings/page.tsx");

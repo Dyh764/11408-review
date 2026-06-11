@@ -63,6 +63,8 @@ test("import page can parse example JSON into preview cards when reachable", asy
     return;
   }
 
+  await expect(page.getByRole("button", { name: "复制 ChatGPT 整理指令" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "复制 JSON 示例" })).toBeVisible();
   await page.getByRole("button", { name: "插入示例 JSON" }).click();
   await page.getByRole("button", { name: "解析" }).click();
 
@@ -70,8 +72,8 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await expect(page.getByRole("heading", { name: "文字错题卡" })).toBeVisible();
   await expect(page.getByText("文字题卡预览")).toHaveCount(0);
   const textPreview = page.locator("article").filter({ hasText: "文字错题卡" });
-  await expect(textPreview.getByText("二重积分")).toBeVisible();
-  await expect(textPreview.getByText("题目文字", { exact: true })).toBeVisible();
+  await expect(textPreview.getByText("幂级数 / 幂级数收敛半径、比值法")).toBeVisible();
+  await expect(page.getByText("选择题 / 4 个选项")).toBeVisible();
 });
 
 test("import page previews ChatGPT answer fields when JSON includes an answer", async ({

@@ -35,6 +35,10 @@ export default function ReviewPage() {
   const [submittedChoices, setSubmittedChoices] = useState<Record<string, boolean>>({});
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
+  const [lastCompletedReview, setLastCompletedReview] = useState<{
+    result: ReviewResult;
+    remainingCount: number;
+  } | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实今日复习。",
@@ -168,8 +172,10 @@ export default function ReviewPage() {
       return;
     }
 
+    const nextReviews = reviews.filter((item) => item.id !== review.id);
     setCompleted((current) => ({ ...current, [review.id]: result }));
-    setReviews((current) => current.filter((item) => item.id !== review.id));
+    setReviews(nextReviews);
+    setLastCompletedReview({ result, remainingCount: nextReviews.length });
     setProcessingReviewId("");
     setMessage("复习结果已写入，并已按规则调整后续复习计划。");
   }
@@ -192,6 +198,42 @@ export default function ReviewPage() {
           : [...selected, label],
       };
     });
+  }
+
+  function handleSkipReview(review: DueReview) {
+    const nextReviews = reviews.filter((item) => item.id !== review.id);
+    setReviews(nextReviews);
+    setMessage(
+      nextReviews.length > 0
+        ? "已跳过本题，不记录本次结果。"
+        : "已跳过本题，不记录本次结果。暂无更多题。",
+    );
+    setLastCompletedReview(null);
+    setRevealedAnswers((current) => {
+      const next = { ...current };
+      delete next[review.id];
+      return next;
+    });
+    setSelectedChoices((current) => {
+      const next = { ...current };
+      delete next[review.id];
+      return next;
+    });
+    setSubmittedChoices((current) => {
+      const next = { ...current };
+      delete next[review.id];
+      return next;
+    });
+    setDraftAnswers((current) => {
+      const next = { ...current };
+      delete next[review.id];
+      return next;
+    });
+  }
+
+  function handleNextReview() {
+    setLastCompletedReview(null);
+    setMessage(reviews.length > 0 ? "" : "今日复习完成，暂无更多题。");
   }
 
   return (
@@ -229,6 +271,32 @@ export default function ReviewPage() {
           <p className="rounded-lg bg-slate-100 p-3 text-sm leading-6 text-slate-700">
             {message}
           </p>
+        </MobileSection>
+      ) : null}
+
+      {lastCompletedReview ? (
+        <MobileSection>
+          <div className="rounded-lg bg-emerald-50 p-4 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
+            <p className="font-semibold">
+              已记录“{resultLabels[lastCompletedReview.result]}”。
+              {lastCompletedReview.remainingCount > 0 ? "可以继续下一题。" : "今日复习完成。"}
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={handleNextReview}
+                className="min-h-12 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white"
+              >
+                下一题
+              </button>
+              <Link
+                href="/questions"
+                className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-100"
+              >
+                返回错题库
+              </Link>
+            </div>
+          </div>
         </MobileSection>
       ) : null}
 
@@ -331,6 +399,17 @@ export default function ReviewPage() {
               <p className="mt-3 break-words text-xs leading-5 text-slate-500">
                 计划 {review.scheduled_date}；章节 {review.questions.chapter ?? "待识别"}；错因 {review.questions.mistake_types?.join("、") || "待分析"}
               </p>
+
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => handleSkipReview(review)}
+                  disabled={Boolean(processingReviewId)}
+                  className="min-h-10 rounded-lg bg-white px-3 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 disabled:text-slate-400"
+                >
+                  跳过本题
+                </button>
+              </div>
 
               {!isChoiceQuestion ? (
                 <div className="mt-4">

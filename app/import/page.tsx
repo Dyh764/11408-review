@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import {
+  chatGptImportPrompt,
   importExampleJson,
   parseImportJsonText,
   type ImportParsedCard,
@@ -106,6 +107,7 @@ export default function ImportPage() {
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
   const [apiResult, setApiResult] = useState<ImportApiResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
 
   const parsed = useMemo(() => parseImportJsonText(jsonText), [jsonText]);
   const previewCards = parsed.cards;
@@ -124,6 +126,23 @@ export default function ImportPage() {
     const result = parseImportJsonText(jsonText);
     setParseErrors(result.errors);
     setApiResult(null);
+  }
+
+  async function copyTextToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus("已复制，可粘贴给 ChatGPT 使用。");
+    } catch {
+      setCopyStatus("复制失败，请手动选择内容后复制。");
+    }
+  }
+
+  function copyChatGptPrompt() {
+    copyTextToClipboard(chatGptImportPrompt);
+  }
+
+  function copyImportExampleJson() {
+    copyTextToClipboard(importExampleJson);
   }
 
   async function handleImport() {
@@ -173,6 +192,32 @@ export default function ImportPage() {
             选择题请尽量把 A/B/C/D 放进 choices，不要全部塞进 question_text。
           </p>
         </Notice>
+      </MobileSection>
+
+      <MobileSection title="给 ChatGPT 的整理模板">
+        <SectionCard subtitle="晚上整理错题时，先复制指令或示例，再让 ChatGPT 按格式输出 JSON。">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={copyChatGptPrompt}
+              className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+            >
+              复制 ChatGPT 整理指令
+            </button>
+            <button
+              type="button"
+              onClick={copyImportExampleJson}
+              className="min-h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+            >
+              复制 JSON 示例
+            </button>
+          </div>
+          {copyStatus ? (
+            <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
+              {copyStatus}
+            </p>
+          ) : null}
+        </SectionCard>
       </MobileSection>
 
       <MobileSection title="粘贴错题卡">

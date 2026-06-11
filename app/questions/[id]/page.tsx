@@ -25,6 +25,11 @@ import {
   buildQuestionUpdatePayload,
   type QuestionEditForm,
 } from "@/lib/questions/edit-question";
+import {
+  buildAiEnhancementSummary,
+  type AiEnhancementSummary,
+  type AiEnhancementSnapshot,
+} from "@/lib/questions/ai-enhancement-summary";
 import { createClient } from "@/lib/supabase/client";
 import type { AnswerStatus, Difficulty, MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
@@ -112,6 +117,7 @@ export default function QuestionDetailPage() {
   const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
   const [aiStatus, setAiStatus] = useState<StatusResponse["ai"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
+  const [aiEnhancementSummary, setAiEnhancementSummary] = useState<AiEnhancementSummary | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/status")
@@ -162,12 +168,13 @@ export default function QuestionDetailPage() {
 
   async function refreshQuestion() {
     if (!supabase) {
-      return;
+      return null;
     }
 
     const item = await fetchCurrentUserQuestion(supabase, params.id, { includeDeleted: true });
     setQuestion(item);
     setForm(formFromQuestion(item));
+    return item;
   }
 
   async function handleAnalyze() {
@@ -232,6 +239,11 @@ export default function QuestionDetailPage() {
   }
 
   async function handleDeepSeekEnhance() {
+    if (!question) {
+      setMessage("请先读取错题详情。");
+      return;
+    }
+
     if (!aiStatus?.configured) {
       setMessage(aiStatus?.label ?? "AI 学习分析未启用（可选）。");
       return;
@@ -247,6 +259,17 @@ export default function QuestionDetailPage() {
 
     setIsDeepSeekEnhancing(true);
     setMessage("");
+    setAiEnhancementSummary(null);
+    const beforeSnapshot: AiEnhancementSnapshot = {
+      chapter: question.chapter,
+      knowledge_point: question.knowledge_point,
+      mistake_types: question.mistake_types,
+      solution_summary: question.solution_summary,
+      one_sentence_tip: question.one_sentence_tip,
+      review_priority: question.review_priority,
+      confidence: question.confidence,
+      needs_manual_check: question.needs_manual_check,
+    };
 
     try {
       const response = await fetch(`/api/questions/${params.id}/deepseek-enhance`, {
@@ -266,13 +289,61 @@ export default function QuestionDetailPage() {
         return;
       }
 
-      await refreshQuestion();
+      const updatedQuestion = await refreshQuestion();
+      if (updatedQuestion) {
+        setAiEnhancementSummary(buildAiEnhancementSummary(beforeSnapshot, updatedQuestion));
+      }
       setMessage("AI 优化完成，题目文字和用户备注已保留。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "AI 优化失败。");
     } finally {
       setIsDeepSeekEnhancing(false);
     }
+  }
+
+  async function handleQuestionStatusUpdate(payload: {
+    question_text_status?: QuestionTextStatus;
+    answer_status?: AnswerStatus;
+  }) {
+    if (!question) {
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${question.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        setMessage(result.error ?? "更新核对状态失败。");
+        return;
+      }
+
+      await refreshQuestion();
+      setMessage("核对状态已更新。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "更新核对状态失败。");
+    }
+  }
+
+  function handleMarkQuestionVerified() {
+    handleQuestionStatusUpdate({ question_text_status: "verified" });
+  }
+
+  function handleMarkAnswerVerified() {
+    handleQuestionStatusUpdate({ answer_status: "verified" });
+  }
+
+  function handleMarkNeedsFix() {
+    handleQuestionStatusUpdate({
+      question_text_status: "needs_fix",
+      answer_status: "needs_fix",
+    });
   }
 
   async function handleSaveEdit() {
@@ -589,6 +660,18 @@ export default function QuestionDetailPage() {
                   </p>
                 )}
               </div>
+              {aiEnhancementSummary ? (
+                <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-900 ring-1 ring-blue-100">
+                  <p className="font-semibold">{aiEnhancementSummary.title}</p>
+                  {aiEnhancementSummary.items.length > 0 ? (
+                    <ul className="mt-2 grid gap-1">
+                      {aiEnhancementSummary.items.map((item) => (
+                        <li key={item}>- {item}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </MobileCard>
           </MobileSection>
 
@@ -618,6 +701,31 @@ export default function QuestionDetailPage() {
                   label={getQuestionTextStatusLabel(question.question_text_status)}
                   tone={getQuestionTextStatusTone(question.question_text_status)}
                 />
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={handleMarkQuestionVerified}
+                  disabled={question.question_text_status === "verified"}
+                  className="min-h-11 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 disabled:text-slate-400"
+                >
+                  标记题目已核对
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkAnswerVerified}
+                  disabled={question.answer_status === "verified"}
+                  className="min-h-11 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 disabled:text-slate-400"
+                >
+                  标记答案已核对
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkNeedsFix}
+                  className="min-h-11 rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-100"
+                >
+                  标记需要修正
+                </button>
               </div>
             </details>
           </MobileSection>

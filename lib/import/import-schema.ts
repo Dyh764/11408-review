@@ -77,32 +77,59 @@ const answerSources: AnswerSource[] = ["chatgpt_import", "manual", "ai_enhanced"
 const reviewPriorities: ReviewPriority[] = ["low", "medium", "high"];
 const confidences: Confidence[] = ["low", "medium", "high"];
 
+export const chatGptImportPrompt = `请把今天的考研数学错题整理成可导入 11408-review 的 JSON 数组。
+只输出 JSON，不要 Markdown。
+数学公式必须使用 LaTeX，并用 $...$ 包裹。
+选择题请把 A/B/C/D 放进 choices 数组，不要全部塞进 question_text。
+standard_answer 必须以“答案：”开头。
+answer_explanation 必须以“过程：”开头。
+
+每题字段包括：
+subject
+chapter
+knowledge_point
+difficulty
+question_text
+choices
+mastery_status
+user_note
+mistake_types
+solution_summary
+standard_answer
+answer_explanation
+key_steps
+one_sentence_tip
+review_priority
+confidence
+needs_manual_check
+answer_status
+answer_source`;
+
 export const importExampleJson = JSON.stringify(
   [
     {
-      image_code: "2026-06-05-math-001",
       subject: "数学",
-      chapter: "二重积分",
-      knowledge_point: "积分区域与换序",
-      difficulty: "中等",
-      question_text: "题目文字",
+      chapter: "幂级数",
+      knowledge_point: "幂级数收敛半径、比值法",
+      difficulty: "基础",
+      question_text: "设幂级数 $\\sum_{n=1}^{\\infty} \\frac{x^n}{n\\cdot 3^n}$ 的收敛半径为 $R$，则 $R=$",
       choices: [
-        { label: "A", text: "选项 A 内容" },
-        { label: "B", text: "选项 B 内容" },
+        { label: "A", text: "$1$" },
+        { label: "B", text: "$2$" },
+        { label: "C", text: "$3$" },
+        { label: "D", text: "$\\frac{1}{3}$" },
       ],
-      question_text_status: "ai_unverified",
-      mastery_status: "思路对但卡住",
-      user_note: "我想先算0-1先积x，但是积分那里卡住了",
-      mistake_types: ["积分限判断不稳", "没优先看对称性"],
-      solution_summary: "先画区域，再判断是否能利用对称性，避免硬拆。",
-      standard_answer: "最终答案",
-      answer_explanation: "完整解析",
-      key_steps: ["画区域", "确定积分顺序", "计算积分"],
-      one_sentence_tip: "二重积分先看区域对称性，再决定积分顺序。",
-      review_priority: "high",
+      mastery_status: "有一点思路",
+      user_note: "把 $3^n$ 放错位置，误以为半径是 $\\frac{1}{3}$。",
+      mistake_types: ["概念混淆", "比值法不熟"],
+      solution_summary: "把通项看成 $a_n x^n$，先求 $|a_{n+1}/a_n|$。",
+      standard_answer: "答案：C",
+      answer_explanation: "过程：$a_n=\\frac{1}{n\\cdot 3^n}$，$\\left|\\frac{a_{n+1}}{a_n}\\right|=\\frac{n}{n+1}\\cdot\\frac{1}{3}\\to\\frac{1}{3}$，所以收敛半径 $R=3$。",
+      key_steps: ["识别 $a_n=\\frac{1}{n\\cdot 3^n}$", "计算 $\\lim |a_{n+1}/a_n|=\\frac{1}{3}$", "得到 $R=3$"],
+      one_sentence_tip: "幂级数先分清 $a_n$ 和 $x^n$，半径是比值极限的倒数。",
+      review_priority: "medium",
       confidence: "medium",
       needs_manual_check: true,
-      source: "chatgpt",
       answer_status: "ai_unverified",
       answer_source: "chatgpt_import",
     },
