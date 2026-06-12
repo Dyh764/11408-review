@@ -592,6 +592,7 @@ export default function QuestionDetailPage() {
                     standard_answer={question.standard_answer}
                     answer_explanation={question.answer_explanation}
                     key_steps={question.key_steps}
+                    one_sentence_tip={question.one_sentence_tip}
                     answer_status={question.answer_status}
                     answer_source={question.answer_source}
                   />

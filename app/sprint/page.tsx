@@ -221,34 +221,33 @@ export default function SprintPage() {
               className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-100"
             >
               <div className="flex gap-3">
-                <Link
-                  href={`/questions/${item.question.id}`}
-                  className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-500"
-                >
-                  {item.question.signedImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.question.signedImageUrl}
-                      alt="原题缩略图"
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    item.question.image_path ? "无预览" : "文字错题卡"
-                  )}
-                </Link>
+                {item.question.signedImageUrl || item.question.image_path ? (
+                  <Link
+                    href={`/questions/${item.question.id}`}
+                    className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-100 text-xs text-slate-500"
+                  >
+                    {item.question.signedImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.question.signedImageUrl}
+                        alt="原题缩略图"
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      "无预览"
+                    )}
+                  </Link>
+                ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap gap-2">
                     <StatusPill label={item.question.subject} tone="blue" />
                     <StatusPill label={item.question.mastery_status} tone="amber" />
                     <StatusPill label={getQuestionSourceLabel(item.question)} tone="blue" />
                   </div>
-                  <h2 className="mt-2 break-words font-semibold text-slate-950">
-                    {item.question.knowledge_point ?? "待识别知识点"}
-                  </h2>
-                  <p className="mt-1 break-words text-sm leading-6 text-slate-600">
-                    {item.question.one_sentence_tip ?? "暂无一句话提醒"}
+                  <p className="mt-2 break-words text-xs font-semibold leading-5 text-slate-500">
+                    {item.question.knowledge_point ?? item.question.chapter ?? "待识别知识点"}
                   </p>
                   {!item.question.image_path ? (
                     <div className="mt-2">

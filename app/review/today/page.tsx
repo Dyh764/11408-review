@@ -179,15 +179,16 @@ export default function TodayReviewListPage() {
                       {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
                     </p>
                     <MathText
-                      text={review.questions.knowledge_point}
-                      fallback="待识别知识点"
-                      className="mt-1 text-base font-black leading-6 text-[#211536]"
-                    />
-                    <MathText
-                      text={questionDisplay.questionText || review.questions.one_sentence_tip}
+                      text={questionDisplay.questionText}
                       fallback="暂无题目摘要。"
                       compact
-                      className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600"
+                      className="mt-2 line-clamp-4 text-base font-black leading-7 text-[#211536]"
+                    />
+                    <MathText
+                      text={review.questions.knowledge_point}
+                      fallback="待识别知识点"
+                      compact
+                      className="mt-2 text-xs font-semibold leading-5 text-slate-500"
                     />
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {priority.reasons.slice(0, 3).map((reason) => (

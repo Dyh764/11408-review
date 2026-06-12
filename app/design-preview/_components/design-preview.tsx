@@ -220,7 +220,7 @@ function HomeMock({ variant }: { variant: Variant }) {
         {[
           ["今日复习", "优先清掉到期题"],
           ["拍题上传", "保留原题和卡点"],
-          ["JSON 导入", "整理文字错题卡"],
+          ["JSON 导入", "整理文字题"],
           ["冲刺模式", "处理高风险错题"],
         ].map(([title, desc], index) => (
           <div key={title} className={cx("rounded-lg border p-4", index === 0 ? variant.primaryButtonClass : variant.cardClass)}>

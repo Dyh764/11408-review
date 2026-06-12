@@ -1,6 +1,5 @@
 import { QuestionMetaBadges } from "@/components/mobile/QuestionMetaBadges";
 import { MathText } from "@/components/mobile/MathText";
-import { StatusPill } from "@/components/status-pill";
 import type {
   Difficulty,
   MasteryStatus,
@@ -44,6 +43,7 @@ export function TextQuestionPreview({
   const containerClass = compact
     ? "text-left"
     : "rounded-lg border border-slate-100 bg-white p-3 text-left shadow-sm";
+  const topicLabel = knowledge_point?.trim() || chapter?.trim() || subject;
 
   if (!hasText) {
     return (
@@ -64,42 +64,36 @@ export function TextQuestionPreview({
 
   return (
     <article className={containerClass}>
-      {!hideMeta ? (
-      <div className="flex flex-wrap gap-2">
-        <StatusPill label="未绑定原图" tone="amber" />
-        {!compact ? <StatusPill label="文字错题卡" tone="blue" /> : null}
-      </div>
-      ) : null}
       {!hideTitle ? (
-      <h2 className={`${hideMeta ? "" : "mt-3"} font-bold text-slate-950 ${compact ? "text-sm" : "text-base"}`}>
-        文字错题卡
-      </h2>
-      ) : null}
-      {!hideMeta ? (
-      <div className="mt-3">
-        <QuestionMetaBadges
-          subject={subject}
-          difficulty={difficulty}
-          mastery_status={mastery_status}
-          question_text_status={question_text_status}
-          hasAnswer={hasAnswer}
-          source={source}
-          showSource={showSource}
-        />
-      </div>
-      ) : null}
-      {chapter || knowledge_point ? (
-        <p className="mt-2 break-words text-xs leading-5 text-slate-500">
-          {[chapter, knowledge_point].filter(Boolean).join(" / ")}
+        <p className="break-words text-xs font-semibold leading-5 text-slate-500">
+          {topicLabel}
         </p>
       ) : null}
       <MathText
         text={question_text}
         compact={compact}
-        className={`${hideMeta && hideTitle ? "" : "mt-3"} text-slate-900 ${
-          compact ? "line-clamp-2" : ""
+        className={`${hideTitle ? "" : "mt-1"} text-slate-950 ${
+          compact ? "line-clamp-3 text-sm leading-6" : "line-clamp-5 text-base leading-7"
         }`}
       />
+      {!hideMeta ? (
+        <div className="mt-3">
+          <QuestionMetaBadges
+            subject={subject}
+            difficulty={difficulty}
+            mastery_status={mastery_status}
+            question_text_status={question_text_status}
+            hasAnswer={hasAnswer}
+            source={source}
+            showSource={showSource}
+          />
+        </div>
+      ) : null}
+      {!hideMeta && (chapter || knowledge_point) ? (
+        <p className="mt-2 break-words text-xs leading-5 text-slate-500">
+          {[chapter, knowledge_point].filter(Boolean).join(" / ")}
+        </p>
+      ) : null}
     </article>
   );
 }

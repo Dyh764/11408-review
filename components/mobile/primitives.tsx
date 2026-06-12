@@ -212,7 +212,7 @@ export function Notice({
   );
 }
 
-export function ImagePlaceholder({ label = "文字错题卡" }: { label?: string }) {
+export function ImagePlaceholder({ label = "无原图预览" }: { label?: string }) {
   return (
     <div className="grid h-full min-h-20 w-full place-items-center rounded-lg bg-blue-50 px-3 text-center text-xs font-semibold leading-5 text-blue-700 ring-1 ring-blue-100">
       {label}

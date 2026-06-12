@@ -42,7 +42,7 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
         {card.image_path ? (
           <StatusPill label="已绑定原图路径" tone="blue" />
         ) : (
-          <StatusPill label="文字错题卡" tone="amber" />
+          <StatusPill label="无原图" tone="amber" />
         )}
         <StatusPill label={card.difficulty ? `难度：${card.difficulty}` : "难度待补充"} tone="slate" />
         {hasChoices ? (
@@ -71,9 +71,9 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
           ))}
         </div>
       ) : null}
-      <h2 className="mt-3 text-base font-semibold text-slate-950">
+      <p className="mt-3 break-words text-xs font-semibold leading-5 text-slate-500">
         {card.knowledge_point ?? "待补充知识点"}
-      </h2>
+      </p>
       {!card.image_path ? (
         <div className="mt-3">
           <TextQuestionPreview

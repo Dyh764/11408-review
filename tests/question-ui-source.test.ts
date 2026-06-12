@@ -42,21 +42,30 @@ test("QuestionListCard only exposes chapter, difficulty, and question-kind badge
 
   assert.match(source, /chapter/);
   assert.match(source, /questionKind/);
+  assert.match(source, /line-clamp-[35]/);
+  assert.match(source, /text=\{summary\}/);
   assert.doesNotMatch(source, /subject:/);
   assert.doesNotMatch(source, /masteryStatus/);
   assert.doesNotMatch(source, /hasAnswer/);
   assert.doesNotMatch(source, /imageUrl/);
   assert.doesNotMatch(source, /hasImagePath/);
   assert.doesNotMatch(source, /文字卡/);
+  assert.doesNotMatch(source, /one_sentence_tip/);
+  assert.doesNotMatch(source, /solution_summary/);
 });
 
-test("TextQuestionPreview exposes compact, hideMeta, and hideTitle controls", () => {
+test("TextQuestionPreview makes question text the primary visual for text-only cards", () => {
   const source = read("components/mobile/TextQuestionPreview.tsx");
 
   assert.match(source, /compact\?: boolean/);
   assert.match(source, /hideMeta\?: boolean/);
   assert.match(source, /hideTitle\?: boolean/);
   assert.match(source, /<MathText/);
+  assert.match(source, /text=\{question_text\}/);
+  assert.match(source, /line-clamp-[35]/);
+  assert.doesNotMatch(source, /文字错题卡/);
+  assert.doesNotMatch(source, /StatusPill label="文字题"/);
+  assert.doesNotMatch(source, /StatusPill label="未绑定原图"/);
 });
 
 test("/questions/[id] renders the question directly and keeps metadata collapsed", () => {
@@ -99,14 +108,32 @@ test("/review presents priority as level and reasons, not raw score", () => {
 test("/review and /questions render math-capable text fields through MathText", () => {
   const review = read("components/study/ReviewFlashcard.tsx");
   const questions = read("app/questions/page.tsx");
+  const answerPanel = read("components/mobile/AnswerPanel.tsx");
 
-  assert.match(review, /<MathText[\s\S]*text=\{review\.questions\.knowledge_point/);
-  assert.match(review, /<MathText[\s\S]*text=\{review\.questions\.one_sentence_tip/);
+  assert.match(review, /text=\{questionDisplay\.questionText\}/);
   assert.match(review, /<TextQuestionPreview/);
   assert.match(review, /<ChoiceList/);
   assert.match(review, /<AnswerPanel/);
   assert.match(questions, /<MathText[\s\S]*text=\{question\.knowledge_point \?\?/);
   assert.match(questions, /<MathText[\s\S]*text=\{questionDisplay\.questionText \|\| question\.user_note\}/);
+  assert.doesNotMatch(review, /text=\{review\.questions\.one_sentence_tip\}/);
+  assert.match(answerPanel, /one_sentence_tip/);
+  assert.match(answerPanel, /一句话提醒/);
+});
+
+test("/review keeps answer hints hidden until answer reveal", () => {
+  const review = read("components/study/ReviewFlashcard.tsx");
+  const answerPanel = read("components/mobile/AnswerPanel.tsx");
+
+  const beforeAnswer = review.slice(review.indexOf("return ("), review.indexOf("{answerRevealed ?"));
+  assert.match(beforeAnswer, /questionDisplay\.questionText/);
+  assert.doesNotMatch(beforeAnswer, /one_sentence_tip/);
+  assert.doesNotMatch(beforeAnswer, /answer_explanation/);
+  assert.doesNotMatch(beforeAnswer, /key_steps/);
+  assert.match(review, /one_sentence_tip=\{review\.questions\.one_sentence_tip\}/);
+  assert.match(answerPanel, /answer_explanation/);
+  assert.match(answerPanel, /key_steps/);
+  assert.match(answerPanel, /one_sentence_tip/);
 });
 
 test("/questions/[id] keeps detail information in the requested learning-flow order", () => {

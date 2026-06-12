@@ -759,12 +759,7 @@ function QuestionDirectory({
                 ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
-                    <MathText
-                      text={question.knowledge_point ?? question.chapter}
-                      fallback="待识别知识点"
-                      className="min-w-0 text-base font-black leading-6 text-[#211536]"
-                    />
-                    <span className="shrink-0 text-[11px] font-bold text-slate-400">
+                    <span className="ml-auto shrink-0 text-[11px] font-bold text-slate-400">
                       {formatDate(question.created_at)}
                     </span>
                   </div>
@@ -772,12 +767,20 @@ function QuestionDirectory({
                     text={questionDisplay.questionText || question.user_note}
                     fallback="暂无题目摘要，进入详情后补充题干或卡点。"
                     compact
-                    className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600"
+                    className="line-clamp-4 text-base font-black leading-7 text-[#211536]"
                   />
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    原始章节/知识点：{question.chapter ?? "未标章节"} / {question.knowledge_point ?? "未标知识点"}
-                    {needsFix ? " · 需要修正" : question.needs_manual_check ? " · 需要核对" : ""}
-                  </p>
+                  <div className="mt-2 text-xs leading-5 text-slate-500">
+                    <MathText
+                      text={question.knowledge_point ?? question.chapter}
+                      fallback="待识别知识点"
+                      compact
+                      className="text-xs leading-5 text-slate-500"
+                    />
+                    <p>
+                      原始章节：{question.chapter ?? "未标章节"}
+                      {needsFix ? " · 需要修正" : question.needs_manual_check ? " · 需要核对" : ""}
+                    </p>
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {badges.map((badge) => (
                       <StudyBadge key={badge.label} tone={badge.tone}>

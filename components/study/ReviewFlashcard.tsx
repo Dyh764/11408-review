@@ -139,21 +139,23 @@ export function ReviewFlashcard({
 
         <div className="rounded-lg bg-[#f8f5ff] p-4">
           <div className="flex gap-3">
-            <Link
-              href={`/questions/${review.question_id}`}
-              className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-[#e4dcff]"
-            >
-              {review.signedImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={review.signedImageUrl}
-                  alt="原题缩略图"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <ImagePlaceholder label={review.questions.image_path ? "原题缩略图" : "文字错题卡"} />
-              )}
-            </Link>
+            {review.signedImageUrl || review.questions.image_path ? (
+              <Link
+                href={`/questions/${review.question_id}`}
+                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-[#e4dcff]"
+              >
+                {review.signedImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={review.signedImageUrl}
+                    alt="原题缩略图"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ImagePlaceholder label="原题缩略图" />
+                )}
+              </Link>
+            ) : null}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-black text-[#5b2bd6]">
                 {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
@@ -161,12 +163,7 @@ export function ReviewFlashcard({
               <MathText
                 text={review.questions.knowledge_point}
                 fallback="待识别知识点"
-                className="mt-2 text-lg font-black leading-7 text-[#211536]"
-              />
-              <MathText
-                text={review.questions.one_sentence_tip}
-                fallback="先独立完成，再展开答案核对。"
-                className="mt-1 text-sm leading-6 text-slate-600"
+                className="mt-1 text-xs font-semibold leading-5 text-slate-500"
               />
             </div>
           </div>
@@ -272,6 +269,7 @@ export function ReviewFlashcard({
               standard_answer={review.questions.standard_answer}
               answer_explanation={review.questions.answer_explanation}
               key_steps={review.questions.key_steps}
+              one_sentence_tip={review.questions.one_sentence_tip}
               answer_status={review.questions.answer_status}
               answer_source={review.questions.answer_source}
             />

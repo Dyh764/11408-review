@@ -11,6 +11,7 @@ type AnswerPanelProps = {
   standard_answer?: string | null;
   answer_explanation?: string | null;
   key_steps?: string[] | null;
+  one_sentence_tip?: string | null;
   answer_status?: AnswerStatus | null;
   answer_source?: AnswerSource | null;
 };
@@ -19,6 +20,7 @@ export function AnswerPanel({
   standard_answer,
   answer_explanation,
   key_steps,
+  one_sentence_tip,
   answer_status,
   answer_source,
 }: AnswerPanelProps) {
@@ -64,6 +66,11 @@ export function AnswerPanel({
             ) : (
               <p className="mt-1 text-slate-500">暂无关键步骤。</p>
             )}
+          </div>
+
+          <div>
+            <p className="font-semibold text-slate-900">一句话提醒：</p>
+            <MathText text={one_sentence_tip} fallback="暂无一句话提醒。" className="mt-1" />
           </div>
         </div>
       )}

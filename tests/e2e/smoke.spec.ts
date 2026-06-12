@@ -74,9 +74,9 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await page.getByRole("button", { name: "解析" }).click();
 
   await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "文字错题卡" })).toBeVisible();
+  await expect(page.getByText("文字错题卡")).toHaveCount(0);
   await expect(page.getByText("文字题卡预览")).toHaveCount(0);
-  const textPreview = page.locator("article").filter({ hasText: "文字错题卡" });
+  const textPreview = page.locator("article").filter({ hasText: "幂级数收敛半径、比值法" });
   await expect(textPreview.getByText("幂级数 / 幂级数收敛半径、比值法")).toBeVisible();
   await expect(page.getByText("选择题 / 4 个选项")).toBeVisible();
 });

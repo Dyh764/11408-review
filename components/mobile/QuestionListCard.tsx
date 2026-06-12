@@ -59,7 +59,7 @@ export function QuestionListCard({
               text={summary}
               fallback="暂无题目摘要，进入详情后补充题干或卡点。"
               compact
-              className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600"
+              className="mt-2 line-clamp-3 text-sm leading-6 text-slate-700"
             />
           </Link>
 
