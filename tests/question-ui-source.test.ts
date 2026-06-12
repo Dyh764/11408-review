@@ -33,8 +33,52 @@ test("/questions uses taxonomy directory browsing before the final question list
   assert.match(source, /activeChapter/);
   assert.match(source, /科目目录/);
   assert.match(source, /返回章节/);
-  assert.match(source, /筛选 \/ 批量管理/);
+  assert.match(source, /搜索 \/ 筛选/);
   assert.doesNotMatch(source, /<select[\s\S]*<SubjectDirectory/);
+});
+
+test("/questions keeps full filtering collapsed and away from the subject directory level", () => {
+  const source = read("app/questions/page.tsx");
+  const subjectDirectory = source.slice(source.indexOf("function SubjectDirectory"), source.indexOf("function ChapterDirectory"));
+
+  assert.match(source, /function FilterPanel/);
+  assert.match(source, /<details className="group rounded-lg border border-\[#d9cffd\] bg-white\/80/);
+  assert.doesNotMatch(source, /<details[^>]*open/);
+  assert.doesNotMatch(subjectDirectory, /FilterPanel|筛选 \/ 批量管理|搜索题目文字/);
+});
+
+test("/questions chapter level has only a small filter entry and no bulk action area", () => {
+  const source = read("app/questions/page.tsx");
+  const chapterDirectory = source.slice(source.indexOf("function ChapterDirectory"), source.indexOf("function QuestionDirectory"));
+
+  assert.match(chapterDirectory, /<FilterPanel/);
+  assert.match(chapterDirectory, /showSearch=\{false\}/);
+  assert.doesNotMatch(chapterDirectory, /批量管理|已选择|标记已掌握|软删除|选择题目/);
+});
+
+test("/questions question level searches the current chapter and shows bulk actions only after selection", () => {
+  const source = read("app/questions/page.tsx");
+  const questionDirectory = source.slice(source.indexOf("function QuestionDirectory"));
+
+  assert.match(questionDirectory, /placeholder="搜索本章题目"/);
+  assert.match(questionDirectory, /selectedIds\.length > 0 \? \(/);
+  assert.match(questionDirectory, /已选择 \{selectedIds\.length\} 题/);
+  assert.match(questionDirectory, /标记已掌握/);
+  assert.match(questionDirectory, /标记需修正/);
+  assert.match(questionDirectory, /加入冲刺/);
+  assert.match(questionDirectory, /软删除/);
+  assert.doesNotMatch(questionDirectory, /showBatchTools && selectedIds\.length > 0/);
+});
+
+test("/questions chapter cards stay clean and hide empty uncategorized chapters", () => {
+  const source = read("app/questions/page.tsx");
+  const chapterDirectory = source.slice(source.indexOf("function ChapterDirectory"), source.indexOf("function QuestionDirectory"));
+
+  assert.match(chapterDirectory, /visibleChapters/);
+  assert.match(chapterDirectory, /chapter\.totalCount > 0/);
+  assert.match(chapterDirectory, /待整理 \/ 未分类/);
+  assert.doesNotMatch(chapterDirectory, /需核对\/修正 \{chapter\.needsAttentionCount\}/);
+  assert.doesNotMatch(chapterDirectory, /StudyBadge tone=\{chapter\.needsAttentionCount > 0/);
 });
 
 test("QuestionListCard only exposes chapter, difficulty, and question-kind badges", () => {

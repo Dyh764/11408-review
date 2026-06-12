@@ -74,11 +74,9 @@ export const higherMathChapterOrder = [
   "多元函数微分学",
   "二重积分",
   "三重积分",
-  "曲线积分",
-  "曲面积分",
+  "曲线曲面积分",
   "无穷级数",
   "向量代数与空间解析几何",
-  "数一专项",
   "待整理 / 未分类",
 ] as const;
 
@@ -86,20 +84,38 @@ type HigherMathChapter = (typeof higherMathChapterOrder)[number];
 
 const higherMathChapterRules: Array<{ chapter: HigherMathChapter; keywords: string[] }> = [
   {
-    chapter: "曲面积分",
-    keywords: ["曲面积分", "第一类曲面积分", "第二类曲面积分", "高斯公式", "斯托克斯公式", "通量", "散度", "旋度", "法向量", "曲面方向", "有向曲面"],
-  },
-  {
-    chapter: "曲线积分",
-    keywords: ["曲线积分", "第一类曲线积分", "第二类曲线积分", "空间曲线积分", "平面曲线积分", "格林公式", "路径无关", "保守场", "环流量", "闭合曲线"],
+    chapter: "曲线曲面积分",
+    keywords: [
+      "曲线积分",
+      "第一类曲线积分",
+      "第二类曲线积分",
+      "空间曲线积分",
+      "平面曲线积分",
+      "格林公式",
+      "路径无关",
+      "保守场",
+      "环流量",
+      "闭合曲线",
+      "曲面积分",
+      "第一类曲面积分",
+      "第二类曲面积分",
+      "高斯公式",
+      "斯托克斯公式",
+      "通量",
+      "散度",
+      "旋度",
+      "法向量",
+      "曲面方向",
+      "有向曲面",
+    ],
   },
   {
     chapter: "三重积分",
-    keywords: ["三重积分", "柱坐标", "球坐标", "空间区域", "体积元", "形心", "质心", "椭球", "雅可比", "变量代换", "绕 x 轴柱坐标", "绕 y 轴柱坐标", "绕 z 轴柱坐标"],
+    keywords: ["三重积分", "\\iiint", "柱坐标", "球坐标", "空间区域", "体积元", "形心", "质心", "椭球", "雅可比", "变量代换", "绕 x 轴柱坐标", "绕 y 轴柱坐标", "绕 z 轴柱坐标"],
   },
   {
     chapter: "二重积分",
-    keywords: ["二重积分", "极坐标", "平面区域", "积分区域", "交换积分次序", "累次积分", "二重积分计算"],
+    keywords: ["二重积分", "\\iint", "极坐标", "平面区域", "积分区域", "交换积分次序", "累次积分", "二重积分计算"],
   },
   {
     chapter: "多元函数微分学",
@@ -132,10 +148,6 @@ const higherMathChapterRules: Array<{ chapter: HigherMathChapter; keywords: stri
   {
     chapter: "向量代数与空间解析几何",
     keywords: ["向量代数", "空间解析几何", "向量", "平面", "直线", "距离", "夹角", "法向量", "方向向量"],
-  },
-  {
-    chapter: "数一专项",
-    keywords: ["方向导数", "梯度", "旋度", "散度", "傅里叶级数", "曲线积分", "曲面积分"],
   },
 ];
 
@@ -185,7 +197,11 @@ function getQuestionText(question: TaxonomyQuestion) {
 }
 
 function classifyByQuestionTextIntegralSymbol(questionText: string) {
-  if (questionText.includes("\\iiint") || questionText.includes("三重积分")) {
+  if (
+    questionText.includes("\\iiint") ||
+    questionText.includes("三重积分") ||
+    questionText.includes("三重积分计算")
+  ) {
     return "三重积分";
   }
 
@@ -197,12 +213,8 @@ function classifyByQuestionTextIntegralSymbol(questionText: string) {
 }
 
 function classifyByPriorityFormula(text: string): HigherMathChapter | null {
-  if (text.includes("斯托克斯公式") || text.includes("高斯公式")) {
-    return "曲面积分";
-  }
-
-  if (text.includes("格林公式")) {
-    return "曲线积分";
+  if (includesAnyKeyword(text, higherMathChapterRules[0].keywords)) {
+    return "曲线曲面积分";
   }
 
   return null;

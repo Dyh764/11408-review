@@ -42,6 +42,19 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
 
 type QuickScope = "all" | "inbox" | "needs_fix" | "uncategorized";
 
+type FilterPanelProps = {
+  quickScope: QuickScope;
+  masteryStatus: MasteryStatus | "全部";
+  textStatus: QuestionTextStatus | "全部";
+  keyword: string;
+  showSearch: boolean;
+  searchPlaceholder?: string;
+  onQuickScopeChange: (scope: QuickScope) => void;
+  onMasteryStatusChange: (status: MasteryStatus | "全部") => void;
+  onTextStatusChange: (status: QuestionTextStatus | "全部") => void;
+  onKeywordChange: (keyword: string) => void;
+};
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -166,6 +179,29 @@ export default function QuestionsPage() {
   const selectedSubject = directory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
     selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
+  const filterPanelProps: FilterPanelProps = {
+    quickScope,
+    masteryStatus,
+    textStatus,
+    keyword,
+    showSearch: false,
+    onQuickScopeChange: (scope) => {
+      setQuickScope(scope);
+      setSelectedIds([]);
+    },
+    onMasteryStatusChange: (status) => {
+      setMasteryStatus(status);
+      setSelectedIds([]);
+    },
+    onTextStatusChange: (status) => {
+      setTextStatus(status);
+      setSelectedIds([]);
+    },
+    onKeywordChange: (value) => {
+      setKeyword(value);
+      setSelectedIds([]);
+    },
+  };
 
   function toggleSelected(id: string) {
     setSelectedIds((current) =>
@@ -404,9 +440,11 @@ export default function QuestionsPage() {
         {selectedSubject && !selectedChapter ? (
           <ChapterDirectory
             subject={selectedSubject}
+            filterPanelProps={filterPanelProps}
             onBack={() => {
               setActiveSubject("");
               setActiveChapter("");
+              setSelectedIds([]);
             }}
             onSelectChapter={setActiveChapter}
           />
@@ -417,6 +455,7 @@ export default function QuestionsPage() {
             chapter={selectedChapter}
             selectedIds={selectedIds}
             showBatchTools={showBatchTools}
+            filterPanelProps={filterPanelProps}
             onBack={() => setActiveChapter("")}
             onSelect={toggleSelected}
             onToggleBatchTools={() => {
@@ -433,85 +472,85 @@ export default function QuestionsPage() {
         ) : null}
         </div>
       </MobileSection>
-
-      <section className="px-5">
-        <details className="rounded-lg border border-[#d9cffd] bg-white p-3">
-          <summary className="cursor-pointer text-sm font-black text-[#4f23b6]">
-            筛选 / 批量管理
-          </summary>
-          <div className="mt-3 space-y-3">
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { key: "all", label: "全部" },
-                { key: "inbox", label: "待整理" },
-                { key: "needs_fix", label: "需修正" },
-                { key: "uncategorized", label: "未分类" },
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => {
-                    setQuickScope(item.key as QuickScope);
-                    setActiveSubject("");
-                    setActiveChapter("");
-                    setSelectedIds([]);
-                  }}
-                  className={`min-h-9 rounded-lg px-2 text-xs font-black ${
-                    quickScope === item.key
-                      ? "bg-[#5b2bd6] text-white"
-                      : "bg-[#f8f5ff] text-[#4f23b6] ring-1 ring-[#d9cffd]"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <select
-                value={masteryStatus}
-                onChange={(event) => {
-                  setMasteryStatus(event.target.value as MasteryStatus | "全部");
-                  setSelectedIds([]);
-                }}
-                className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
-              >
-                {masteryFilters.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={textStatus}
-                onChange={(event) => {
-                  setTextStatus(event.target.value as QuestionTextStatus | "全部");
-                  setSelectedIds([]);
-                }}
-                className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
-              >
-                {textStatusFilters.map((item) => (
-                  <option key={item} value={item}>
-                    {item === "全部" ? item : getQuestionTextStatusLabel(item)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <input
-              value={keyword}
-              onChange={(event) => {
-                setKeyword(event.target.value);
-                setSelectedIds([]);
-              }}
-              className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
-              placeholder="搜索题目文字、知识点、章节或备注"
-            />
-            <p className="text-xs leading-5 text-slate-500">
-              批量操作只在进入章节题目列表并勾选题目后显示；删除仍为软删除。
-            </p>
-          </div>
-        </details>
-      </section>
     </MobilePageShell>
+  );
+}
+
+function FilterPanel({
+  quickScope,
+  masteryStatus,
+  textStatus,
+  keyword,
+  showSearch,
+  searchPlaceholder = "搜索题目文字、知识点、章节或备注",
+  onQuickScopeChange,
+  onMasteryStatusChange,
+  onTextStatusChange,
+  onKeywordChange,
+}: FilterPanelProps) {
+  return (
+    <details className="group rounded-lg border border-[#d9cffd] bg-white/80 p-2">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-black text-[#4f23b6] marker:hidden">
+        <span>{showSearch ? "搜索 / 筛选" : "筛选"}</span>
+        <span className="text-[11px] font-bold text-slate-400 group-open:hidden">展开</span>
+        <span className="hidden text-[11px] font-bold text-slate-400 group-open:inline">收起</span>
+      </summary>
+      <div className="mt-2 space-y-2">
+        {showSearch ? (
+          <input
+            value={keyword}
+            onChange={(event) => onKeywordChange(event.target.value)}
+            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            placeholder={searchPlaceholder}
+          />
+        ) : null}
+        <div className="grid grid-cols-4 rounded-lg bg-[#f8f5ff] p-1">
+          {[
+            { key: "all", label: "全部" },
+            { key: "inbox", label: "待整理" },
+            { key: "needs_fix", label: "需修正" },
+            { key: "uncategorized", label: "未分类" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onQuickScopeChange(item.key as QuickScope)}
+              className={`min-h-8 rounded-md px-1 text-[11px] font-black ${
+                quickScope === item.key
+                  ? "bg-white text-[#4f23b6] shadow-sm"
+                  : "text-slate-500"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <select
+            value={masteryStatus}
+            onChange={(event) => onMasteryStatusChange(event.target.value as MasteryStatus | "全部")}
+            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+          >
+            {masteryFilters.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <select
+            value={textStatus}
+            onChange={(event) => onTextStatusChange(event.target.value as QuestionTextStatus | "全部")}
+            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+          >
+            {textStatusFilters.map((item) => (
+              <option key={item} value={item}>
+                {item === "全部" ? item : getQuestionTextStatusLabel(item)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -566,13 +605,19 @@ function SubjectDirectory({
 
 function ChapterDirectory({
   subject,
+  filterPanelProps,
   onBack,
   onSelectChapter,
 }: {
   subject: QuestionSubjectDirectory<QuestionWithImage>;
+  filterPanelProps: FilterPanelProps;
   onBack: () => void;
   onSelectChapter: (chapter: string) => void;
 }) {
+  const visibleChapters = subject.chapters.filter(
+    (chapter) => chapter.chapter !== "待整理 / 未分类" || chapter.totalCount > 0,
+  );
+
   return (
     <section>
       <SectionHeader
@@ -592,8 +637,11 @@ function ChapterDirectory({
         <SprintStatCard label="错题数量" value={subject.totalCount} />
         <SprintStatCard label="需要处理" value={subject.needsAttentionCount} tone="amber" />
       </div>
+      <div className="mt-3">
+        <FilterPanel {...filterPanelProps} showSearch={false} />
+      </div>
       <div className="mt-4 grid gap-3">
-        {subject.chapters.map((chapter) => (
+        {visibleChapters.map((chapter) => (
           <button
             key={chapter.chapter}
             type="button"
@@ -602,15 +650,17 @@ function ChapterDirectory({
           >
             <StudyCard>
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="font-black text-[#211536]">{chapter.chapter}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {chapter.totalCount} 题 · 困难 {chapter.hardCount} · 已掌握 {chapter.masteredCount}
                   </p>
                 </div>
-                <StudyBadge tone={chapter.needsAttentionCount > 0 ? "amber" : "green"}>
-                  需核对/修正 {chapter.needsAttentionCount}
-                </StudyBadge>
+                {chapter.needsAttentionCount > 0 ? (
+                  <span className="shrink-0 pt-0.5 text-[11px] font-semibold text-slate-400">
+                    待处理 {chapter.needsAttentionCount}
+                  </span>
+                ) : null}
               </div>
             </StudyCard>
           </button>
@@ -625,6 +675,7 @@ function QuestionDirectory({
   chapter,
   selectedIds,
   showBatchTools,
+  filterPanelProps,
   onBack,
   onSelect,
   onToggleBatchTools,
@@ -639,6 +690,7 @@ function QuestionDirectory({
   chapter: QuestionChapterGroup<QuestionWithImage>;
   selectedIds: string[];
   showBatchTools: boolean;
+  filterPanelProps: FilterPanelProps;
   onBack: () => void;
   onSelect: (id: string) => void;
   onToggleBatchTools: () => void;
@@ -673,10 +725,19 @@ function QuestionDirectory({
           </div>
         }
       />
-      <p className="mb-3 rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-600 ring-1 ring-[#e4dcff]">
-        默认按困难优先排序，同难度内优先显示需要处理和高风险题。
-      </p>
-      {showBatchTools && selectedIds.length > 0 ? (
+      <div className="mb-3 space-y-2">
+        <input
+          value={filterPanelProps.keyword}
+          onChange={(event) => filterPanelProps.onKeywordChange(event.target.value)}
+          className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+          placeholder="搜索本章题目"
+        />
+        <FilterPanel {...filterPanelProps} showSearch={false} />
+        <p className="rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-600 ring-1 ring-[#e4dcff]">
+          默认按困难优先排序，同难度内优先显示需要处理和高风险题。
+        </p>
+      </div>
+      {selectedIds.length > 0 ? (
         <StudyCard className="mb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-black text-[#211536]">已选择 {selectedIds.length} 题</p>
@@ -704,7 +765,7 @@ function QuestionDirectory({
               disabled={isBatchProcessing}
               className="min-h-11 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
             >
-              删除所选
+              软删除
             </button>
             <button
               type="button"
@@ -728,7 +789,7 @@ function QuestionDirectory({
               disabled={isBatchProcessing}
               className="min-h-11 rounded-lg bg-[#211536] px-3 text-sm font-black text-white disabled:bg-slate-300"
             >
-              加入今日复习
+              加入冲刺
             </button>
           </div>
         </StudyCard>

@@ -48,11 +48,9 @@ test("higher math chapters are fixed to exam outline buckets", () => {
     "多元函数微分学",
     "二重积分",
     "三重积分",
-    "曲线积分",
-    "曲面积分",
+    "曲线曲面积分",
     "无穷级数",
     "向量代数与空间解析几何",
-    "数一专项",
     "待整理 / 未分类",
   ]);
 
@@ -109,7 +107,7 @@ test("higher math integral taxonomy splits old multi-variable integral data into
       chapter: "多元函数积分学",
       knowledge_point: "空间第二类曲线积分、斯托克斯公式",
     }),
-    "曲面积分",
+    "曲线曲面积分",
   );
   assert.equal(
     getDisplayChapter({
@@ -117,7 +115,7 @@ test("higher math integral taxonomy splits old multi-variable integral data into
       chapter: "高等数学-多元函数积分学",
       knowledge_point: "格林公式",
     }),
-    "曲线积分",
+    "曲线曲面积分",
   );
   assert.equal(
     getDisplayChapter({
@@ -126,6 +124,46 @@ test("higher math integral taxonomy splits old multi-variable integral data into
       knowledge_point: "椭球区域三重积分、雅可比",
     }),
     "三重积分",
+  );
+});
+
+test("line and surface integral formulas are unified under the concise chapter", () => {
+  for (const knowledge_point of ["斯托克斯公式", "高斯公式", "空间第二类曲线积分"]) {
+    assert.equal(
+      getDisplayChapter({
+        ...baseQuestion,
+        chapter: "多元函数积分学",
+        knowledge_point,
+      }),
+      "曲线曲面积分",
+    );
+  }
+});
+
+test("triple and double integral keywords keep their own concise chapters", () => {
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      chapter: "高等数学-多元函数积分学",
+      knowledge_point: "三重积分、柱坐标、空间区域",
+    }),
+    "三重积分",
+  );
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      chapter: "多元函数积分学",
+      knowledge_point: "椭球区域三重积分、雅可比",
+    }),
+    "三重积分",
+  );
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      chapter: "多元函数积分学",
+      knowledge_point: "二重积分、极坐标",
+    }),
+    "二重积分",
   );
 });
 
@@ -182,7 +220,45 @@ test("old multi-variable integral chapter does not force every question into one
     .filter((chapter) => chapter.totalCount > 0)
     .map((chapter) => chapter.chapter);
 
-  assert.deepEqual(nonEmptyChapters, ["二重积分", "三重积分", "曲线积分", "曲面积分"]);
+  assert.deepEqual(nonEmptyChapters, ["二重积分", "三重积分", "曲线曲面积分"]);
+});
+
+test("higher math directory does not generate removed special-purpose chapters", () => {
+  const directory = buildQuestionDirectory([
+    {
+      ...baseQuestion,
+      id: "line",
+      chapter: "多元函数积分学",
+      knowledge_point: "曲线积分、路径无关",
+    },
+    {
+      ...baseQuestion,
+      id: "surface",
+      chapter: "多元函数积分学",
+      knowledge_point: "曲面积分、高斯公式",
+    },
+    {
+      ...baseQuestion,
+      id: "gradient",
+      chapter: "数一专项",
+      knowledge_point: "方向导数、梯度",
+    },
+  ]);
+  const higherMath = directory.find((subject) => subject.subject === "高等数学");
+  const chapters = higherMath?.chapters.map((chapter) => chapter.chapter) ?? [];
+
+  assert.ok(!chapters.includes("数一专项"));
+  assert.ok(!chapters.includes("曲线积分"));
+  assert.ok(!chapters.includes("曲面积分"));
+  assert.ok(chapters.includes("曲线曲面积分"));
+  assert.equal(
+    higherMath?.chapters.find((chapter) => chapter.chapter === "待整理 / 未分类")?.totalCount,
+    0,
+  );
+  assert.deepEqual(
+    higherMath?.chapters.filter((chapter) => chapter.totalCount > 0).map((chapter) => chapter.chapter),
+    ["多元函数微分学", "曲线曲面积分"],
+  );
 });
 
 test("question directory groups by subject then fixed chapter with uncategorized fallback", () => {

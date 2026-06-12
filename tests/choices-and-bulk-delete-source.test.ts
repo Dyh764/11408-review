@@ -53,8 +53,9 @@ test("choices render through shared ChoiceList on import, detail, and review pag
 test("/questions exposes batch delete but keeps it as soft delete", () => {
   const source = read("app/questions/page.tsx");
 
-  assert.match(source, /批量管理/);
-  assert.match(source, /删除所选/);
+  assert.match(source, /选择题目/);
+  assert.match(source, /selectedIds\.length > 0 \? \(/);
+  assert.match(source, /软删除/);
   assert.match(source, /\/api\/questions\/bulk-delete/);
   assert.match(source, /确定删除选中的/);
 });
