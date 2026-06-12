@@ -79,6 +79,42 @@ const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"
 const answerSources: AnswerSource[] = ["chatgpt_import", "manual", "ai_enhanced", "unknown"];
 const reviewPriorities: ReviewPriority[] = ["low", "medium", "high"];
 const confidences: Confidence[] = ["low", "medium", "high"];
+const mathSubjectAliases = ["高等数学", "线性代数", "概率论与数理统计"] as const;
+const difficultyAliases: Record<string, Difficulty> = {
+  简单: "基础",
+  普通: "中等",
+  困难: "较难",
+  难: "较难",
+};
+const masteryStatusAliases: Record<string, MasteryStatus> = {
+  完全不会: "完全没思路",
+  不会: "完全没思路",
+  需要复习: "有一点思路",
+  需复习: "有一点思路",
+  "公式遗忘，需复习": "有一点思路",
+  "公式遗忘,需复习": "有一点思路",
+  已理解但需复习: "做对但不稳",
+  已理解但方向需复习: "做对但不稳",
+  已理解但需巩固: "做对但不稳",
+  已理解: "做对但不稳",
+  已掌握: "完全掌握",
+};
+const reviewPriorityAliases: Record<string, ReviewPriority> = {
+  低: "low",
+  中: "medium",
+  高: "high",
+  低优先级: "low",
+  中优先级: "medium",
+  高优先级: "high",
+};
+const confidenceAliases: Record<string, Confidence> = {
+  低: "low",
+  中: "medium",
+  高: "high",
+  低可信度: "low",
+  中可信度: "medium",
+  高可信度: "high",
+};
 
 const specificParseFailureMessage =
   "JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。";
@@ -290,6 +326,61 @@ function requireEnum<T extends string>(value: unknown, field: string, allowed: r
   return value as T;
 }
 
+function requireMappedEnum<T extends string>(
+  value: unknown,
+  field: string,
+  allowed: readonly T[],
+  aliases: Record<string, T>,
+) {
+  if (typeof value !== "string") {
+    throw new Error(`${field} 不合法：${allowed.join("、")}。`);
+  }
+
+  const normalizedValue = value.trim();
+  const mapped = aliases[normalizedValue];
+  if (mapped) {
+    return mapped;
+  }
+
+  return requireEnum(normalizedValue, field, allowed);
+}
+
+function normalizeSubject(value: unknown): Subject {
+  if (typeof value !== "string") {
+    throw new Error(
+      `subject 不合法：${[...importSubjects, ...mathSubjectAliases].join("、")}。`,
+    );
+  }
+
+  const normalizedValue = value.trim();
+  if (mathSubjectAliases.includes(normalizedValue as (typeof mathSubjectAliases)[number])) {
+    return "数学";
+  }
+
+  return requireEnum(normalizedValue, "subject", importSubjects);
+}
+
+function normalizeChapterForSubject(rawSubject: unknown, rawChapter: string) {
+  if (typeof rawSubject !== "string") {
+    return rawChapter || undefined;
+  }
+
+  const subject = rawSubject.trim();
+  if (!mathSubjectAliases.includes(subject as (typeof mathSubjectAliases)[number])) {
+    return rawChapter || undefined;
+  }
+
+  if (!rawChapter) {
+    return subject;
+  }
+
+  if (rawChapter === subject || rawChapter.startsWith(`${subject}-`)) {
+    return rawChapter;
+  }
+
+  return `${subject}-${rawChapter}`;
+}
+
 function defaultPriorityFromMastery(masteryStatus: MasteryStatus): ReviewPriority {
   if (masteryStatus === "完全没思路" || masteryStatus === "有一点思路") {
     return "high";
@@ -307,11 +398,13 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     throw new Error("每条错题卡必须是 JSON object。");
   }
 
-  const subject = requireEnum(value.subject, "subject", importSubjects);
-  const masteryStatus = requireEnum(
+  const subject = normalizeSubject(value.subject);
+  const rawChapter = optionalString(value.chapter, "chapter");
+  const masteryStatus = requireMappedEnum(
     value.mastery_status,
     "mastery_status",
     importMasteryStatuses,
+    masteryStatusAliases,
   );
   const questionText = optionalString(value.question_text, "question_text");
   const userNote = optionalString(value.user_note, "user_note");
@@ -327,7 +420,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   const difficulty =
     value.difficulty === undefined || value.difficulty === null || value.difficulty === ""
       ? undefined
-      : requireEnum(value.difficulty, "difficulty", difficulties);
+      : requireMappedEnum(value.difficulty, "difficulty", difficulties, difficultyAliases);
   const answerStatus =
     value.answer_status === undefined || value.answer_status === null
       ? "ai_unverified"
@@ -339,11 +432,16 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   const reviewPriority =
     value.review_priority === undefined || value.review_priority === null
       ? defaultPriorityFromMastery(masteryStatus)
-      : requireEnum(value.review_priority, "review_priority", reviewPriorities);
+      : requireMappedEnum(
+          value.review_priority,
+          "review_priority",
+          reviewPriorities,
+          reviewPriorityAliases,
+        );
   const confidence =
     value.confidence === undefined || value.confidence === null
       ? undefined
-      : requireEnum(value.confidence, "confidence", confidences);
+      : requireMappedEnum(value.confidence, "confidence", confidences, confidenceAliases);
   const needsManualCheck =
     value.needs_manual_check === undefined || value.needs_manual_check === null
       ? true
@@ -363,7 +461,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     image_code: optionalString(value.image_code, "image_code") || undefined,
     image_path: optionalString(value.image_path, "image_path") || undefined,
     subject,
-    chapter: optionalString(value.chapter, "chapter") || undefined,
+    chapter: normalizeChapterForSubject(value.subject, rawChapter),
     knowledge_point: optionalString(value.knowledge_point, "knowledge_point") || undefined,
     difficulty,
     question_text: displayQuestionText || undefined,

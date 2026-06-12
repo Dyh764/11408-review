@@ -243,6 +243,42 @@ test("import page shows specific parse guidance when JSON repair still fails", a
   ).toBeVisible();
 });
 
+test("import page normalizes ChatGPT Chinese taxonomy values when reachable", async ({
+  page,
+}) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(String.raw`[
+    {
+      “subject”: “高等数学”,
+      “chapter”: “多元函数积分学”,
+      “knowledge_point”: “椭球区域三重积分”,
+      “difficulty”: “困难”,
+      “question_text”: “设 $\Omega$ 为区域 $\frac{x^2}{a^2}\leq 1$，求 $\iiint_{\Omega}(x+y+z)^2\,dV$。”,
+      “choices”: [],
+      “mastery_status”: “已理解但需复习”,
+      “user_note”: “换元后漏了雅可比 $abc$。”,
+      “mistake_types”: [“换元漏雅可比”],
+      “review_priority”: “高”,
+      “confidence”: “高”,
+      “needs_manual_check”: false
+    }
+  ]`);
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
+  await expect(page.getByText("已自动映射 difficulty = 困难 -> 较难。")).toBeVisible();
+  await expect(page.getByText("已自动映射 mastery_status = 已理解但需复习 -> 做对但不稳。")).toBeVisible();
+  await expect(page.locator(".katex").first()).toBeVisible();
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
 test("import preview shows structured choices when JSON includes choices", async ({ page }) => {
   const response = await page.goto("/import");
 

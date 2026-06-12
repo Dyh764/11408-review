@@ -160,3 +160,37 @@ test("import quality report suggests common ChatGPT taxonomy mappings", () => {
     ),
   );
 });
+
+test("import quality report shows automatic enum mapping notes", () => {
+  const parsed = parseSingle({
+    ...validRow,
+    subject: "高等数学",
+    chapter: "多元函数积分学",
+    difficulty: "困难",
+    mastery_status: "已理解但需复习",
+    review_priority: "高",
+    confidence: "高",
+  });
+  parsed.cards[0].card = {
+    ...parsed.cards[0].card,
+    subject: "数学",
+    chapter: "高等数学-多元函数积分学",
+    difficulty: "较难",
+    mastery_status: "做对但不稳",
+    review_priority: "high",
+    confidence: "high",
+  };
+
+  const report = getImportQualityReport(parsed);
+  const labels = report.rows[0].issues.map((issue) => issue.label);
+
+  assert.ok(
+    labels.includes(
+      "已自动映射 subject = 高等数学：导入为 subject = 数学，chapter = 高等数学-多元函数积分学。",
+    ),
+  );
+  assert.ok(labels.includes("已自动映射 difficulty = 困难 -> 较难。"));
+  assert.ok(labels.includes("已自动映射 mastery_status = 已理解但需复习 -> 做对但不稳。"));
+  assert.ok(labels.includes("已自动映射 review_priority = 高 -> high。"));
+  assert.ok(labels.includes("已自动映射 confidence = 高 -> high。"));
+});

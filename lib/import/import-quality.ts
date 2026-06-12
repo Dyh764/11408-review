@@ -84,11 +84,59 @@ function addIssue(issues: ImportQualityIssue[], severity: ImportQualitySeverity,
   issues.push({ severity, label, detail });
 }
 
+function addAutomaticMappingIssues(
+  issues: ImportQualityIssue[],
+  raw: unknown,
+  card: ImportQuestionCard,
+) {
+  const rawSubject = rawString(raw, "subject");
+  const rawChapter = rawString(raw, "chapter");
+  const rawDifficulty = rawString(raw, "difficulty");
+  const rawMasteryStatus = rawString(raw, "mastery_status");
+  const rawReviewPriority = rawString(raw, "review_priority");
+  const rawConfidence = rawString(raw, "confidence");
+
+  if (rawSubject && rawSubject !== card.subject) {
+    addIssue(
+      issues,
+      "info",
+      `已自动映射 subject = ${rawSubject}：导入为 subject = ${card.subject}，chapter = ${(card.chapter ?? rawChapter) || "待整理"}。`,
+    );
+  }
+
+  if (rawDifficulty && card.difficulty && rawDifficulty !== card.difficulty) {
+    addIssue(issues, "info", `已自动映射 difficulty = ${rawDifficulty} -> ${card.difficulty}。`);
+  }
+
+  if (rawMasteryStatus && rawMasteryStatus !== card.mastery_status) {
+    addIssue(
+      issues,
+      "info",
+      `已自动映射 mastery_status = ${rawMasteryStatus} -> ${card.mastery_status}。`,
+    );
+  }
+
+  if (rawReviewPriority && rawReviewPriority !== card.review_priority) {
+    addIssue(
+      issues,
+      "info",
+      `已自动映射 review_priority = ${rawReviewPriority} -> ${card.review_priority}。`,
+    );
+  }
+
+  if (rawConfidence && card.confidence && rawConfidence !== card.confidence) {
+    addIssue(issues, "info", `已自动映射 confidence = ${rawConfidence} -> ${card.confidence}。`);
+  }
+}
+
 function inspectCard(item: ImportParsedCard): ImportQualityRow {
   const { card, raw } = item;
   const issues: ImportQualityIssue[] = [];
   const text = allText(card);
   const rawQuestionText = rawString(raw, "question_text");
+  const rawSubject = rawString(raw, "subject");
+  const rawChapter = rawString(raw, "chapter");
+  const rawDifficulty = rawString(raw, "difficulty");
 
   if (!card.question_text?.trim()) {
     addIssue(issues, "error", "缺少题干");
@@ -106,11 +154,13 @@ function inspectCard(item: ImportParsedCard): ImportQualityRow {
     addIssue(issues, "warning", "缺少难度");
   }
 
-  if (card.difficulty === "较难") {
+  addAutomaticMappingIssues(issues, raw, card);
+
+  if (rawDifficulty === "较难") {
     addIssue(issues, "info", "检测到 difficulty = 较难：建议自动映射为 困难。");
   }
 
-  if (card.subject === "数学" && card.chapter?.includes("高等数学")) {
+  if (rawSubject === "数学" && rawChapter.includes("高等数学")) {
     addIssue(
       issues,
       "info",
@@ -118,7 +168,7 @@ function inspectCard(item: ImportParsedCard): ImportQualityRow {
     );
   }
 
-  if (card.chapter === "高等数学-多元函数积分学") {
+  if (rawChapter === "高等数学-多元函数积分学") {
     addIssue(
       issues,
       "info",

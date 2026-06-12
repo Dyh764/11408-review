@@ -118,6 +118,60 @@ test("keeps curly quotes inside ordinary Chinese text parseable during LaTeX rep
   assert.equal(result.cards[0].card.question_text, '他说"先看 $\\Omega$"，再求极限。');
 });
 
+test("normalizes ChatGPT Chinese taxonomy values into import enums", () => {
+  const input = String.raw`[
+    {
+      “subject”: “高等数学”,
+      “chapter”: “多元函数积分学”,
+      “knowledge_point”: “椭球区域三重积分、对称性、变量代换、雅可比”,
+      “difficulty”: “困难”,
+      “question_text”: “设 $\Omega$ 为区域 $\frac{x^2}{a^2}\leq 1$，求 $\iiint_{\Omega}(x+y+z)^2\,dV$。”,
+      “choices”: [],
+      “mastery_status”: “已理解但需复习”,
+      “user_note”: “换元后漏了雅可比 $abc$。”,
+      “mistake_types”: [“换元漏雅可比”],
+      “solution_summary”: “先展开并用对称性。”,
+      “standard_answer”: “答案：$\frac{4\pi abc}{15}(a^2+b^2+c^2)$”,
+      “answer_explanation”: “过程：令 $x=au,y=bv,z=cw$。”,
+      “key_steps”: [“注意雅可比 $dV=abc\,dudvdw$”],
+      “one_sentence_tip”: “椭球先伸缩成单位球。”,
+      “review_priority”: “高”,
+      “confidence”: “高”,
+      “needs_manual_check”: false,
+      “answer_status”: “ai_unverified”,
+      “answer_source”: “chatgpt_import”
+    },
+    {
+      “subject”: “高等数学”,
+      “chapter”: “多元函数积分学”,
+      “knowledge_point”: “形心坐标”,
+      “difficulty”: “中等”,
+      “question_text”: “求 $\bar z$。”,
+      “mastery_status”: “公式遗忘，需复习”,
+      “user_note”: “分子分母容易乱。”,
+      “mistake_types”: [],
+      “review_priority”: “中”,
+      “confidence”: “中”,
+      “needs_manual_check”: true
+    }
+  ]`;
+
+  const result = parseImportJsonText(input);
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.cards.length, 2);
+  assert.equal(result.cards[0].card.subject, "数学");
+  assert.equal(result.cards[0].card.chapter, "高等数学-多元函数积分学");
+  assert.equal(result.cards[0].card.difficulty, "较难");
+  assert.equal(result.cards[0].card.mastery_status, "做对但不稳");
+  assert.equal(result.cards[0].card.review_priority, "high");
+  assert.equal(result.cards[0].card.confidence, "high");
+  assert.equal(result.cards[0].card.question_text?.includes("\\iiint_{\\Omega}"), true);
+  assert.equal(result.cards[1].card.mastery_status, "有一点思路");
+  assert.equal(result.cards[1].card.review_priority, "medium");
+  assert.equal(result.cards[1].card.confidence, "medium");
+});
+
 
 test("does not double-escape already valid LaTeX backslashes", () => {
   const input = JSON.stringify([
