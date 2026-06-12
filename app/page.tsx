@@ -7,6 +7,7 @@ import { MotivationBanner } from "@/components/study/MotivationBanner";
 import {
   buildQuestionQualitySummary,
   buildWeaknessTrends,
+  selectHomeFocusTrend,
   type AnalyticsReviewResult,
   type QuestionQualitySummary,
   type WeaknessTrend,
@@ -59,30 +60,6 @@ const emptyStats: DashboardStats = {
   weaknessTrends: [],
   qualitySummary: emptyQualitySummary,
 };
-
-const primaryActions = [
-  {
-    href: "/review",
-    title: "开始今日复习",
-    description: "先清掉今天到期的错题，做完再看答案。",
-    tone: "blue" as const,
-    kicker: "第一步",
-  },
-  {
-    href: "/upload",
-    title: "拍题上传",
-    description: "白天先拍题，保留原图和当时卡点。",
-    tone: "cyan" as const,
-    kicker: "新增错题",
-  },
-  {
-    href: "/import",
-    title: "导入 ChatGPT 错题卡",
-    description: "晚上粘贴 JSON，把错题整理成可复习卡片。",
-    tone: "slate" as const,
-    kicker: "整理题卡",
-  },
-];
 
 const quickLinks = [
   { href: "/questions", title: "错题库", description: "浏览、筛选和进入详情" },
@@ -242,6 +219,11 @@ export default function DashboardPage() {
     };
   }, [supabase]);
 
+  const homeFocusTrend = useMemo(
+    () => selectHomeFocusTrend(stats.weaknessTrends),
+    [stats.weaknessTrends],
+  );
+
   return (
     <MobilePageShell className="bg-[#f4f0ff]">
       <StudyPageHeader
@@ -322,51 +304,88 @@ export default function DashboardPage() {
 
       <MobileSection>
         <SectionHeader
-          title="今日提分焦点"
-          subtitle="根据最近 7 天复习结果和题卡质量，先处理最可能拖分的知识点。"
-          action={<StudyBadge tone="purple">{stats.weaknessTrends.length || 0} 项</StudyBadge>}
+          title="新增错题"
+          subtitle="拍题和导入分开处理，避免把日常入口混进分析卡片。"
         />
         <div className="grid gap-3">
-          {stats.weaknessTrends.length > 0 ? (
-            stats.weaknessTrends.map((trend) => (
-              <StudyCard key={trend.topic}>
-                <Link href={trend.actionHref} className="block">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-black text-[#211536]">{trend.topic}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        {trend.subject} / {trend.chapter}
-                      </p>
-                    </div>
-                    <StudyBadge tone={trend.trend === "up" ? "amber" : trend.trend === "down" ? "green" : "purple"}>
-                      {trend.trend === "up" ? "反复错" : trend.trend === "down" ? "变稳定" : "待观察"}
-                    </StudyBadge>
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-slate-600">{trend.recommendation}</p>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-lg bg-[#f8f5ff] p-2">
-                      <p className="text-[11px] font-bold text-slate-500">近 7 天错</p>
-                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.recentWrongCount}</p>
-                    </div>
-                    <div className="rounded-lg bg-[#f8f5ff] p-2">
-                      <p className="text-[11px] font-bold text-slate-500">题卡问题</p>
-                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.qualityIssueCount}</p>
-                    </div>
-                    <div className="rounded-lg bg-[#f8f5ff] p-2">
-                      <p className="text-[11px] font-bold text-slate-500">题量</p>
-                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.questionCount}</p>
-                    </div>
-                  </div>
-                </Link>
-              </StudyCard>
-            ))
-          ) : (
+          <StudyCard className="bg-[#fbfaff]">
+            <Link href="/upload" className="flex min-h-14 items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-base font-black text-[#211536]">拍题上传</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  白天先拍题，保留原图和当时卡点。
+                </span>
+              </span>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#5b2bd6] text-sm font-black text-white">
+                &gt;
+              </span>
+            </Link>
+          </StudyCard>
+          <StudyCard>
+            <Link href="/import" className="flex min-h-14 items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-base font-black text-[#211536]">
+                  导入 ChatGPT 错题卡
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500">
+                  晚上粘贴 JSON，把错题整理成可复习卡片。
+                </span>
+              </span>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#ede7ff] text-sm font-black text-[#4f23b6]">
+                &gt;
+              </span>
+            </Link>
+          </StudyCard>
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader title="常用入口" subtitle="错题库、专项复盘和考前冲刺放在新增错题之后。" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {quickLinks.map((link) => (
+            <SecondaryStudyLink key={link.href} href={link.href} className="flex-col items-start text-left">
+              <span>{link.title}</span>
+              <span className="mt-1 text-xs font-semibold text-slate-500">{link.description}</span>
+            </SecondaryStudyLink>
+          ))}
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader
+          title="今日提分焦点"
+          subtitle="首页只保留最值得立即处理的一项，完整变化放在报告页。"
+          action={
+            <SecondaryStudyLink href="/reports" className="min-h-9 px-3 text-xs">
+              查看全部分析
+            </SecondaryStudyLink>
+          }
+        />
+        <div className="grid gap-3">
+          {homeFocusTrend ? (
             <StudyCard>
-              <p className="text-sm font-black text-[#211536]">暂无明显薄弱点变化</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                完成几轮复习后，这里会显示最近更该专项处理的知识点。
-              </p>
+              <Link href={homeFocusTrend.actionHref} className="block">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[#211536]">{homeFocusTrend.topic}</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {homeFocusTrend.subject} / {homeFocusTrend.chapter}
+                    </p>
+                  </div>
+                  <StudyBadge tone={homeFocusTrend.trend === "up" ? "amber" : "purple"}>
+                    {homeFocusTrend.recentWrongCount > 0 ? "最近错题" : "题卡待整理"}
+                  </StudyBadge>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-600">{homeFocusTrend.recommendation}</p>
+                <p className="mt-2 text-[11px] font-bold text-slate-400">
+                  近 7 天错 {homeFocusTrend.recentWrongCount} 次 · 题卡问题 {homeFocusTrend.qualityIssueCount} 个
+                </p>
+              </Link>
             </StudyCard>
+          ) : (
+            <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 ring-1 ring-[#e4dcff]">
+              暂无明显拖后腿知识点，先完成今日复习。
+            </p>
           )}
           {stats.qualitySummary.totalIssueCount > 0 ? (
             <SecondaryStudyLink href="/questions?scope=inbox" className="justify-between">
@@ -381,33 +400,6 @@ export default function DashboardPage() {
 
       <MobileSection>
         <MotivationBanner text={getDailyMotivation()} />
-      </MobileSection>
-
-      <MobileSection>
-        <SectionHeader title="快速开始" subtitle="先完成最重要的复习，再处理新增错题。" />
-        <div className="grid gap-3">
-          {primaryActions.slice(1).map((action) => (
-            <StudyCard key={action.href}>
-              <Link href={action.href} className="flex min-h-12 items-center justify-between gap-3">
-                <span className="min-w-0">
-                  <span className="block text-sm font-black text-[#211536]">{action.title}</span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">{action.description}</span>
-                </span>
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#ede7ff] text-sm font-black text-[#4f23b6]">
-                  &gt;
-                </span>
-              </Link>
-            </StudyCard>
-          ))}
-          <div className="grid grid-cols-2 gap-3">
-            {quickLinks.map((link) => (
-              <SecondaryStudyLink key={link.href} href={link.href} className="flex-col items-start text-left">
-                <span>{link.title}</span>
-                <span className="mt-1 text-xs font-semibold text-slate-500">{link.description}</span>
-              </SecondaryStudyLink>
-            ))}
-          </div>
-        </div>
       </MobileSection>
 
       <MobileSection>

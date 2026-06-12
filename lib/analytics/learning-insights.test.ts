@@ -5,6 +5,7 @@ import {
   buildQuestionQualityIssues,
   buildQuestionQualitySummary,
   buildWeaknessTrends,
+  selectHomeFocusTrend,
   type AnalyticsQuestion,
   type AnalyticsReviewResult,
 } from "./learning-insights.ts";
@@ -74,6 +75,34 @@ test("buildWeaknessTrends ranks repeated wrong topics ahead of mastered topics",
   assert.equal(trends[0].repeatedWrongCount, 2);
   assert.match(trends[0].actionHref, /\/practice\?topic=/);
   assert.equal(trends[1].trend, "down");
+});
+
+test("selectHomeFocusTrend keeps the homepage to one meaningful focus", () => {
+  const quietTrend = {
+    topic: "single quiet topic",
+    subject: "math",
+    chapter: "chapter",
+    score: 4,
+    questionCount: 1,
+    recentWrongCount: 0,
+    repeatedWrongCount: 0,
+    masteredCount: 0,
+    qualityIssueCount: 0,
+    trend: "flat" as const,
+    recommendation: "保持正常复习节奏。",
+    actionHref: "/practice?topic=single",
+  };
+  const riskyTrend = {
+    ...quietTrend,
+    topic: "risky topic",
+    questionCount: 2,
+    recentWrongCount: 1,
+    repeatedWrongCount: 1,
+    recommendation: "最近仍在反复错，建议今天先开一轮专项复盘。",
+  };
+
+  assert.equal(selectHomeFocusTrend([quietTrend]), null);
+  assert.equal(selectHomeFocusTrend([quietTrend, riskyTrend])?.topic, "risky topic");
 });
 
 test("buildQuestionQualityIssues hides AI-only verification issues by default", () => {

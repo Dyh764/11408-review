@@ -239,6 +239,26 @@ test("home page is a today learning cockpit, not a technical menu", () => {
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
 
+test("home page prioritizes daily actions and new questions before analysis", () => {
+  const source = read("app/page.tsx");
+  const reviewIndex = source.indexOf("今日待复习");
+  const uploadIndex = source.indexOf("新增错题");
+  const focusIndex = source.indexOf("今日提分焦点");
+
+  assert.notEqual(reviewIndex, -1);
+  assert.notEqual(uploadIndex, -1);
+  assert.notEqual(focusIndex, -1);
+  assert.ok(reviewIndex < uploadIndex);
+  assert.ok(uploadIndex < focusIndex);
+  assert.match(source, /开始今日复习/);
+  assert.match(source, /查看今日题单/);
+  assert.match(source, /拍题上传/);
+  assert.match(source, /导入 ChatGPT 错题卡/);
+  assert.match(source, /selectHomeFocusTrend/);
+  assert.match(source, /暂无明显拖后腿知识点，先完成今日复习。/);
+  assert.doesNotMatch(source, /weaknessTrends\.map/);
+});
+
 test("import page explains JSON import with aggregate preview stats", () => {
   const source = read("app/import/page.tsx");
 

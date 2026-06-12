@@ -265,6 +265,18 @@ export function buildWeaknessTrends(
     .slice(0, options.limit ?? 3);
 }
 
+export function selectHomeFocusTrend(trends: WeaknessTrend[]) {
+  return (
+    trends.find(
+      (trend) =>
+        trend.recentWrongCount > 0 ||
+        trend.repeatedWrongCount > 0 ||
+        trend.qualityIssueCount > 0 ||
+        (trend.questionCount > 1 && trend.trend === "up"),
+    ) ?? null
+  );
+}
+
 function issue(
   question: AnalyticsQuestion,
   type: QuestionQualityIssueType,

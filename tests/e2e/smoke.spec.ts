@@ -42,9 +42,20 @@ test("home mobile first screen exposes primary study actions", async ({ page }) 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /拍题上传/ }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /导入 ChatGPT 错题卡/ })).toBeVisible();
+  const uploadLink = page.getByRole("link", { name: /拍题上传/ }).first();
+  const importLink = page.getByRole("link", { name: /导入 ChatGPT 错题卡/ });
+
+  await expect(uploadLink).toBeVisible();
+  await expect(uploadLink).toHaveAttribute("href", "/upload");
+  await expect(importLink).toBeVisible();
+  await expect(importLink).toHaveAttribute("href", "/import");
+  await expect(page.getByRole("heading", { name: "新增错题" })).toBeVisible();
   await expect(page.getByText("今日提分焦点")).toBeVisible();
+
+  const newQuestionBox = await page.getByRole("heading", { name: "新增错题" }).boundingBox();
+  const focusBox = await page.getByText("今日提分焦点").first().boundingBox();
+  expect(newQuestionBox?.y ?? 0).toBeLessThan(focusBox?.y ?? 0);
+
   const startReviewLink = page.getByRole("link", { name: /开始今日复习/ });
   if ((await startReviewLink.count()) > 0) {
     await expect(startReviewLink.first()).toBeVisible();
@@ -440,7 +451,8 @@ test("home page keeps optional DeepSeek out of the primary cockpit", async ({ pa
 
   expect(response?.status()).toBeLessThan(400);
   await expect(page.getByText("今日学习驾驶舱")).toBeVisible();
-  await expect(page.getByText("快速开始")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "新增错题" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "常用入口" })).toBeVisible();
   await expect(page.getByText("现在应该点这里")).toHaveCount(0);
   await expect(page.getByText("主流程入口保留，低频功能不抢首屏。")).toHaveCount(0);
   await expect(page.getByText("智能建议")).toHaveCount(0);
