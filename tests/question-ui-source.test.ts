@@ -285,6 +285,12 @@ test("learning analytics surfaces stay mobile-first across home, review, questio
   assert.match(review, /本轮暴露问题/);
   assert.match(questions, /buildQuestionQualitySummary/);
   assert.match(questions, /整理收件箱/);
+  assert.match(questions, /showAiUnverified/);
+  assert.match(questions, /includeAiUnverified: showAiUnverified/);
+  assert.match(questions, /显示 AI 未核对/);
+  assert.match(questions, /暂无需要立即整理的题卡/);
+  assert.match(questions, /issue\.labels/);
+  assert.match(questions, /key=\{issue\.questionId\}/);
   assert.match(practice, /URLSearchParams/);
   assert.match(practice, /topic/);
   assert.match(reports, /7 天薄弱点变化/);

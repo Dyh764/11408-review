@@ -68,6 +68,10 @@ const metricLabels: Record<string, string> = {
 const emptyQualitySummary: QuestionQualitySummary = {
   totalIssueCount: 0,
   highIssueCount: 0,
+  severeIssueCount: 0,
+  needsFixCount: 0,
+  uncategorizedCount: 0,
+  aiUnverifiedCount: 0,
   affectedQuestionCount: 0,
   topIssues: [],
 };
@@ -278,7 +282,7 @@ function AnalyticsOverview({
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
               <p className="text-xs text-slate-500">严重问题</p>
-              <p className="mt-1 text-xl font-bold text-slate-950">{qualitySummary.highIssueCount}</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{qualitySummary.severeIssueCount}</p>
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
               <p className="text-xs text-slate-500">总问题</p>
@@ -289,12 +293,12 @@ function AnalyticsOverview({
             <div className="mt-3 space-y-2">
               {qualitySummary.topIssues.slice(0, 3).map((issue) => (
                 <a
-                  key={`${issue.questionId}-${issue.type}`}
+                  key={issue.questionId}
                   href={issue.actionHref}
                   className="block rounded-lg bg-slate-50 p-3 text-sm ring-1 ring-slate-100"
                 >
-                  <span className="font-bold text-slate-800">{issue.label}</span>
-                  <span className="mt-1 block text-xs leading-5 text-slate-500">{issue.detail}</span>
+                  <span className="font-bold text-slate-800">{issue.labels.join(" / ")}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{issue.details[0]}</span>
                 </a>
               ))}
             </div>

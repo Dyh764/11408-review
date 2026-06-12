@@ -374,6 +374,7 @@ test("questions page exposes the organize inbox when reachable", async ({ page }
   }
 
   await expect(page.getByText("整理收件箱").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /显示 AI 未核对|隐藏 AI 未核对/ })).toBeVisible();
 });
 
 test("reports page uses user-facing empty copy and exposes manual rule report generation", async ({

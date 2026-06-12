@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MathText } from "@/components/mobile/MathText";
-import { buildQuestionQualitySummary } from "@/lib/analytics/learning-insights";
+import { buildQuestionQualityIssues, buildQuestionQualitySummary } from "@/lib/analytics/learning-insights";
 import {
   ProgressBar,
   SectionHeader,
@@ -87,6 +87,7 @@ export default function QuestionsPage() {
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
+  const [showAiUnverified, setShowAiUnverified] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
@@ -161,11 +162,7 @@ export default function QuestionsPage() {
             question.question_text_status === "needs_fix" || question.answer_status === "needs_fix";
           const isUncategorized =
             !question.chapter?.trim() || !question.knowledge_point?.trim();
-          const isInbox =
-            question.needs_manual_check ||
-            isNeedsFix ||
-            question.chapter === "待整理" ||
-            isUncategorized;
+          const isInbox = buildQuestionQualityIssues([question]).length > 0;
           const quickScopeMatch =
             quickScope === "all" ||
             (quickScope === "inbox" && isInbox) ||
@@ -183,8 +180,8 @@ export default function QuestionsPage() {
     [dueTodayIds, filteredQuestions],
   );
   const qualitySummary = useMemo(
-    () => buildQuestionQualitySummary(questions, { limit: 3 }),
-    [questions],
+    () => buildQuestionQualitySummary(questions, { includeAiUnverified: showAiUnverified, limit: 4 }),
+    [questions, showAiUnverified],
   );
   const selectedSubject = directory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
@@ -421,26 +418,62 @@ export default function QuestionsPage() {
             <div className="min-w-0">
               <p className="text-sm font-black text-[#211536]">整理收件箱</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                集中处理缺知识点、缺答案、待修正和 AI 未核对的题卡。
+                集中处理缺题干、缺答案、缺章节、缺知识点、待修正和格式异常题卡。
               </p>
             </div>
             <StudyBadge tone={qualitySummary.highIssueCount > 0 ? "amber" : "purple"}>
               {qualitySummary.affectedQuestionCount} 题
             </StudyBadge>
           </div>
+          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+              <p className="text-[11px] font-bold text-slate-500">严重问题</p>
+              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.severeIssueCount}</p>
+            </div>
+            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+              <p className="text-[11px] font-bold text-slate-500">需修正</p>
+              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.needsFixCount}</p>
+            </div>
+            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+              <p className="text-[11px] font-bold text-slate-500">未分类</p>
+              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.uncategorizedCount}</p>
+            </div>
+            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+              <p className="text-[11px] font-bold text-slate-500">AI 未核对</p>
+              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.aiUnverifiedCount}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowAiUnverified((current) => !current)}
+              className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+            >
+              {showAiUnverified ? "隐藏 AI 未核对" : "显示 AI 未核对"}
+            </button>
+          </div>
           {qualitySummary.topIssues.length > 0 ? (
             <div className="mt-3 grid gap-2">
               {qualitySummary.topIssues.map((issue) => (
                 <Link
-                  key={`${issue.questionId}-${issue.type}`}
+                  key={issue.questionId}
                   href={issue.actionHref}
                   className="rounded-lg bg-[#f8f5ff] p-3 text-left ring-1 ring-[#e4dcff]"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-[#4f23b6]">{issue.label}</span>
+                    <span className="text-xs font-black text-[#4f23b6]">
+                      {issue.isAiOnly ? "AI 未核对" : "待整理题卡"}
+                    </span>
                     <span className="text-[11px] font-bold text-slate-400">进入详情</span>
                   </div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">{issue.detail}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {issue.labels.map((label) => (
+                      <StudyBadge key={label} tone={issue.severity === "high" ? "amber" : "purple"}>
+                        {label}
+                      </StudyBadge>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{issue.details[0]}</p>
                 </Link>
               ))}
               <button
@@ -457,7 +490,7 @@ export default function QuestionsPage() {
             </div>
           ) : (
             <p className="mt-3 rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-500">
-              当前题卡质量稳定，暂时没有明显整理项。
+              暂无需要立即整理的题卡。
             </p>
           )}
         </StudyCard>

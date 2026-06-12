@@ -40,6 +40,10 @@ type DashboardStats = {
 const emptyQualitySummary: QuestionQualitySummary = {
   totalIssueCount: 0,
   highIssueCount: 0,
+  severeIssueCount: 0,
+  needsFixCount: 0,
+  uncategorizedCount: 0,
+  aiUnverifiedCount: 0,
   affectedQuestionCount: 0,
   topIssues: [],
 };
