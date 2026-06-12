@@ -1,6 +1,7 @@
 import { defaultGeminiModel, getGeminiConfig } from "@/lib/env";
 import {
   validateLearningInsight,
+  validateMotivationLine,
   validateQuestionEnhancement,
   type DeepSeekLearningInsight,
   type DeepSeekQuestionEnhancement,
@@ -97,4 +98,18 @@ export async function generateLearningInsightWithGemini(
   );
 
   return validateLearningInsight(raw);
+}
+
+export async function generateMotivationLineWithGemini(payload: unknown): Promise<string> {
+  const raw = await callGeminiJson(
+    [
+      "你只为考研复习生成一句原创中文短句。",
+      "风格温柔、积极、有一点诗意，不要太鸡汤。",
+      "不要写真实歌词，不要模仿具体歌手，不要声称来自任何歌手。",
+      "只返回 JSON，字段为 line，长度 8 到 42 个中文字符。",
+    ].join("\n"),
+    payload,
+  );
+
+  return validateMotivationLine(raw);
 }

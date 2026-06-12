@@ -33,6 +33,10 @@ export type DeepSeekLearningInsight = {
   warning: string;
 };
 
+export type DeepSeekMotivationLine = {
+  line: string;
+};
+
 export function getDeepSeekStatus() {
   const config = getDeepSeekConfig();
 
@@ -135,6 +139,14 @@ export function validateLearningInsight(value: unknown): DeepSeekLearningInsight
   };
 }
 
+export function validateMotivationLine(value: unknown): string {
+  if (!isRecord(value) || typeof value.line !== "string") {
+    throw new Error("DeepSeek 每日激励句结构不符合要求。");
+  }
+
+  return value.line.trim();
+}
+
 function extractJsonText(value: unknown) {
   if (!isRecord(value) || !Array.isArray(value.choices)) {
     throw new Error("DeepSeek 响应缺少 choices。");
@@ -210,4 +222,18 @@ export async function generateLearningInsightWithDeepSeek(payload: unknown) {
   );
 
   return validateLearningInsight(raw);
+}
+
+export async function generateMotivationLineWithDeepSeek(payload: unknown) {
+  const raw = await callDeepSeekJson(
+    [
+      "你只为考研复习生成一句原创中文短句。",
+      "风格温柔、积极、有一点诗意，不要太鸡汤。",
+      "不要写真实歌词，不要模仿具体歌手，不要声称来自任何歌手。",
+      "只返回 JSON，字段为 line，长度 8 到 42 个中文字符。",
+    ].join("\n"),
+    payload,
+  );
+
+  return validateMotivationLine(raw);
 }

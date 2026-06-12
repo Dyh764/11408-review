@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const protectedRoutes = ["/upload", "/import", "/questions", "/reports"];
-const utilityRoutes = ["/settings", "/sprint"];
+const utilityRoutes = ["/settings", "/sprint", "/practice"];
 
 async function expectPageHasNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => {
@@ -385,6 +385,7 @@ test("mobile viewport has no obvious horizontal scroll and keeps bottom nav visi
     "/import",
     "/settings",
     "/sprint",
+    "/practice",
     "/questions",
     "/upload",
     "/review",

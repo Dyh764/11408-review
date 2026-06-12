@@ -7,6 +7,10 @@ import { MathText } from "@/components/mobile/MathText";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import {
+  getImportQualityReport,
+  type ImportQualityRow,
+} from "@/lib/import/import-quality";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import {
   chatGptImportPrompt,
@@ -20,14 +24,15 @@ type ImportApiResult = {
   error?: string;
   successCount?: number;
   failureCount?: number;
-  successes?: Array<{ index: number; questionId: string; reviewCount: number; warning?: string }>;
+  successes?: Array<{ index: number; questionId: string; reviewCount: number; warning?: string; inbox?: boolean }>;
   failures?: ImportRowError[];
 };
 
-function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
+function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?: ImportQualityRow }) {
   const { card } = item;
   const hasAnswer = Boolean(card.standard_answer?.trim());
   const hasChoices = card.choices.length > 0;
+  const hasWarnings = Boolean(quality?.recommendedInbox);
 
   return (
     <MobileCard>
@@ -45,7 +50,27 @@ function ImportPreviewCard({ item }: { item: ImportParsedCard }) {
         ) : null}
         <StatusPill label={hasAnswer ? "包含答案" : "未包含答案，可后续补充"} tone={hasAnswer ? "blue" : "amber"} />
         <StatusPill label={getAnswerStatusLabel(card.answer_status)} tone="amber" />
+        {hasWarnings ? <StatusPill label="建议进入待整理" tone="amber" /> : null}
       </div>
+      {quality?.issues.length ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {quality.issues.map((issue) => (
+            <span
+              key={`${issue.severity}-${issue.label}`}
+              className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                issue.severity === "error"
+                  ? "bg-red-50 text-red-700 ring-1 ring-red-100"
+                  : issue.severity === "warning"
+                    ? "bg-amber-50 text-amber-800 ring-1 ring-amber-100"
+                    : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+              }`}
+              title={issue.detail}
+            >
+              {issue.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <h2 className="mt-3 text-base font-semibold text-slate-950">
         {card.knowledge_point ?? "待补充知识点"}
       </h2>
@@ -111,6 +136,11 @@ export default function ImportPage() {
 
   const parsed = useMemo(() => parseImportJsonText(jsonText), [jsonText]);
   const previewCards = parsed.cards;
+  const qualityReport = useMemo(() => getImportQualityReport(parsed), [parsed]);
+  const qualityByIndex = useMemo(
+    () => new Map(qualityReport.rows.map((row) => [row.index, row])),
+    [qualityReport],
+  );
   const previewStats = useMemo(() => {
     const withAnswer = previewCards.filter((item) => item.card.standard_answer?.trim()).length;
     const withoutImage = previewCards.filter((item) => !item.card.image_path).length;
@@ -120,7 +150,7 @@ export default function ImportPage() {
 
     return { withAnswer, withoutImage, needsCheck };
   }, [previewCards]);
-  const canImport = previewCards.length > 0 && !isImporting;
+  const canImport = previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
 
   function handleParse() {
     const result = parseImportJsonText(jsonText);
@@ -145,7 +175,7 @@ export default function ImportPage() {
     copyTextToClipboard(importExampleJson);
   }
 
-  async function handleImport() {
+  async function handleImport(importMode: "normal" | "inbox" = "normal") {
     setIsImporting(true);
     setApiResult(null);
 
@@ -153,7 +183,7 @@ export default function ImportPage() {
       const response = await fetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonText }),
+        body: JSON.stringify({ jsonText, importMode }),
       });
       const result = (await response.json()) as ImportApiResult;
 
@@ -280,9 +310,14 @@ export default function ImportPage() {
         <MobileSection>
           <div className="space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">解析结果</h2>
+            <h2 className="text-base font-semibold text-slate-950">导入前质检</h2>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <StatCard label="共解析" value={previewCards.length} tone="blue" />
+              <StatCard label="可直接导入" value={qualityReport.importableCount - qualityReport.inboxRecommendedCount} tone="green" />
+              <StatCard label="建议待整理" value={qualityReport.inboxRecommendedCount} tone="amber" />
+              <StatCard label="严重错误" value={qualityReport.seriousCount} tone={qualityReport.seriousCount > 0 ? "red" : "slate"} />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
               <StatCard label="包含答案" value={previewStats.withAnswer} tone="green" />
               <StatCard label="未绑定原图" value={previewStats.withoutImage} tone="amber" />
               <StatCard label="需要核对" value={previewStats.needsCheck} />
@@ -292,16 +327,31 @@ export default function ImportPage() {
             预览 {previewCards.length} 张错题卡
           </h2>
           {previewCards.map((item) => (
-            <ImportPreviewCard key={item.index} item={item} />
+            <ImportPreviewCard key={item.index} item={item} quality={qualityByIndex.get(item.index)} />
           ))}
-          <button
-            type="button"
-            onClick={handleImport}
-            disabled={!canImport}
-            className="min-h-14 w-full rounded-lg bg-slate-950 px-4 text-base font-semibold text-white disabled:bg-slate-300"
-          >
-            {isImporting ? "导入中..." : "确认导入"}
-          </button>
+          {qualityReport.seriousCount > 0 ? (
+            <p className="rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-700 ring-1 ring-red-100">
+              存在严重错误，请先修正 JSON 后再导入。
+            </p>
+          ) : null}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => handleImport("normal")}
+              disabled={!canImport}
+              className="min-h-14 rounded-lg bg-slate-950 px-4 text-base font-semibold text-white disabled:bg-slate-300"
+            >
+              {isImporting ? "导入中..." : "确认导入"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleImport("inbox")}
+              disabled={!canImport}
+              className="min-h-14 rounded-lg bg-[#5b2bd6] px-4 text-base font-semibold text-white disabled:bg-slate-300"
+            >
+              导入到待整理
+            </button>
+          </div>
           </div>
         </MobileSection>
       ) : null}
@@ -317,6 +367,7 @@ export default function ImportPage() {
           {typeof apiResult.successCount === "number" ? (
             <div className="rounded-lg bg-emerald-50 p-4 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
               已导入 {apiResult.successCount} 条；失败 {apiResult.failureCount ?? 0} 条。
+              {apiResult.successes?.some((success) => success.inbox) ? " 已自动标记部分题为待整理。" : ""}
             </div>
           ) : null}
           {apiResult.failures?.map((failure) => (

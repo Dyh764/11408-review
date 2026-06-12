@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MobilePageShell, MobileSection } from "@/components/mobile/primitives";
+import { MotivationBanner } from "@/components/study/MotivationBanner";
 import {
-  MotivationBanner,
   ProgressBar,
   SecondaryStudyLink,
   SectionHeader,
@@ -64,6 +64,7 @@ const primaryActions = [
 
 const quickLinks = [
   { href: "/questions", title: "错题库", description: "浏览、筛选和进入详情" },
+  { href: "/practice", title: "专项复盘", description: "按章节或错因开一轮" },
   { href: "/sprint", title: "考前冲刺", description: "优先处理高风险错题" },
 ];
 

@@ -71,17 +71,18 @@ test("/questions/[id] renders the question directly and keeps metadata collapsed
 });
 
 test("/review records non-choice results only after answer reveal", () => {
-  const source = read("app/review/page.tsx");
+  const source = read("components/study/ReviewFlashcard.tsx");
+  const reviewPage = read("app/review/page.tsx");
 
   assert.match(source, /canRecordReview/);
   assert.match(source, /!isChoiceQuestion/);
-  assert.match(source, /draftAnswers/);
-  assert.match(source, /setRevealedAnswers/);
+  assert.match(reviewPage, /draftAnswers/);
+  assert.match(reviewPage, /setRevealedAnswers/);
   assert.match(source, /canRecordReview \?/);
 });
 
 test("/review presents priority as level and reasons, not raw score", () => {
-  const source = read("app/review/page.tsx");
+  const source = read("components/study/ReviewFlashcard.tsx");
   const priority = read("lib/reviews/priority-score.ts");
 
   assert.match(source, /explainReviewPriorityScore/);
@@ -95,7 +96,7 @@ test("/review presents priority as level and reasons, not raw score", () => {
 });
 
 test("/review and /questions render math-capable text fields through MathText", () => {
-  const review = read("app/review/page.tsx");
+  const review = read("components/study/ReviewFlashcard.tsx");
   const questions = read("app/questions/page.tsx");
 
   assert.match(review, /<MathText[\s\S]*text=\{review\.questions\.knowledge_point/);
@@ -177,9 +178,56 @@ test("import page explains JSON import with aggregate preview stats", () => {
     "包含答案",
     "未绑定原图",
     "需要核对",
+    "导入前质检",
+    "可直接导入",
+    "建议待整理",
+    "严重错误",
   ]) {
     assert.match(source, new RegExp(text));
   }
+});
+
+test("/questions exposes focused practice and inbox entries without expanding bottom nav", () => {
+  const questions = read("app/questions/page.tsx");
+  const bottomNav = read("components/bottom-nav.tsx");
+
+  assert.match(questions, /待整理/);
+  assert.match(questions, /需要修正/);
+  assert.match(questions, /未分类/);
+  assert.match(questions, /href="\/practice"/);
+  assert.match(bottomNav, /grid-cols-5/);
+  assert.doesNotMatch(bottomNav, /\/practice/);
+});
+
+test("/practice reuses the review flashcard component for chapter and mistake review", () => {
+  const source = read("app/practice/page.tsx");
+  const sharedCard = read("components/study/ReviewFlashcard.tsx");
+  const todayReview = read("app/review/page.tsx");
+
+  assert.match(source, /专项复盘/);
+  assert.match(source, /章节复盘/);
+  assert.match(source, /错因复盘/);
+  assert.match(source, /buildPracticeCatalog/);
+  assert.match(source, /filterPracticeQuestions/);
+  assert.match(source, /ReviewFlashcard/);
+  assert.match(todayReview, /ReviewFlashcard/);
+  assert.match(sharedCard, /ChoiceList/);
+  assert.match(sharedCard, /AnswerPanel/);
+  assert.match(sharedCard, /canRecordReview/);
+});
+
+test("daily motivation uses a server route and browser cache instead of refreshing AI every render", () => {
+  const banner = read("components/study/MotivationBanner.tsx");
+  const route = read("app/api/motivation/today/route.ts");
+  const home = read("app/page.tsx");
+  const review = read("app/review/page.tsx");
+
+  assert.match(banner, /localStorage/);
+  assert.match(banner, /\/api\/motivation\/today/);
+  assert.match(route, /generateMotivationLineWithAI/);
+  assert.match(route, /fallback/);
+  assert.match(home, /<MotivationBanner/);
+  assert.match(review, /<MotivationBanner/);
 });
 
 test("import page exposes copyable ChatGPT prompt and JSON example templates", () => {

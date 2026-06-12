@@ -39,7 +39,11 @@ test("import schema accepts choices and persists them during import", () => {
 test("choices render through shared ChoiceList on import, detail, and review pages", () => {
   assert.equal(existsSync(join(root, "components/mobile/ChoiceList.tsx")), true);
 
-  for (const path of ["app/import/page.tsx", "app/questions/[id]/page.tsx", "app/review/page.tsx"]) {
+  for (const path of [
+    "app/import/page.tsx",
+    "app/questions/[id]/page.tsx",
+    "components/study/ReviewFlashcard.tsx",
+  ]) {
     const source = read(path);
     assert.match(source, /ChoiceList/);
     assert.match(source, /choices/);

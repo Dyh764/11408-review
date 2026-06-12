@@ -42,6 +42,8 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
   "needs_fix",
 ];
 
+type QuickScope = "all" | "inbox" | "needs_fix" | "uncategorized";
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -68,6 +70,7 @@ export default function QuestionsPage() {
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
   const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
   const [keyword, setKeyword] = useState("");
+  const [quickScope, setQuickScope] = useState<QuickScope>("all");
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
@@ -141,11 +144,25 @@ export default function QuestionsPage() {
             ]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
+          const isNeedsFix =
+            question.question_text_status === "needs_fix" || question.answer_status === "needs_fix";
+          const isUncategorized =
+            !question.chapter?.trim() || !question.knowledge_point?.trim();
+          const isInbox =
+            question.needs_manual_check ||
+            isNeedsFix ||
+            question.chapter === "待整理" ||
+            isUncategorized;
+          const quickScopeMatch =
+            quickScope === "all" ||
+            (quickScope === "inbox" && isInbox) ||
+            (quickScope === "needs_fix" && isNeedsFix) ||
+            (quickScope === "uncategorized" && isUncategorized);
 
-          return masteryMatch && textStatusMatch && keywordMatch;
+          return masteryMatch && textStatusMatch && keywordMatch && quickScopeMatch;
         });
     },
-    [keyword, masteryStatus, questions, textStatus],
+    [keyword, masteryStatus, questions, quickScope, textStatus],
   );
 
   const directory = useMemo(
@@ -343,7 +360,51 @@ export default function QuestionsPage() {
         subtitle="按科目、章节、题目三层浏览。数学题会拆到高数、线代和概率统计，找题更快。"
       />
 
+      <MobileSection>
+        <StudyCard>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-[#211536]">专项复盘</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                按章节或错因主动开一轮闪卡，不影响今日复习入口。
+              </p>
+            </div>
+            <Link
+              href="/practice"
+              className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-[#5b2bd6] px-3 text-xs font-black text-white"
+            >
+              去复盘
+            </Link>
+          </div>
+        </StudyCard>
+      </MobileSection>
+
       <section className="space-y-3 px-5">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { key: "all", label: "全部" },
+            { key: "inbox", label: "待整理" },
+            { key: "needs_fix", label: "需要修正" },
+            { key: "uncategorized", label: "未分类" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                setQuickScope(item.key as QuickScope);
+                setActiveSubject("");
+                setActiveChapter("");
+              }}
+              className={`min-h-10 rounded-lg px-2 text-xs font-black ${
+                quickScope === item.key
+                  ? "bg-[#5b2bd6] text-white"
+                  : "bg-white text-[#4f23b6] ring-1 ring-[#d9cffd]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <select
             value={masteryStatus}

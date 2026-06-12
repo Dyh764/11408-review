@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  applyInboxDefaults,
+  getImportQualityReport,
+  type ImportQualityRow,
+} from "@/lib/import/import-quality";
+import {
   imagePathBelongsToUser,
   parseImportJsonText,
   type ImportQuestionCard,
@@ -18,6 +23,7 @@ type ImportSuccess = {
   questionId: string;
   reviewCount: number;
   warning?: string;
+  inbox?: boolean;
 };
 
 function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
@@ -67,13 +73,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请先登录。" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { jsonText?: unknown };
+  const body = (await request.json().catch(() => ({}))) as {
+    jsonText?: unknown;
+    importMode?: unknown;
+  };
 
   if (typeof body.jsonText !== "string") {
     return NextResponse.json({ error: "请求体缺少 jsonText。" }, { status: 400 });
   }
 
   const parsed = parseImportJsonText(body.jsonText);
+  const qualityReport = getImportQualityReport(parsed);
+  const qualityByIndex = new Map<number, ImportQualityRow>(
+    qualityReport.rows.map((row) => [row.index, row]),
+  );
+  const forceInbox = body.importMode === "inbox";
   const failures: ImportFailure[] = parsed.errors.map((error) => ({
     index: error.index,
     message: error.message,
@@ -81,8 +95,21 @@ export async function POST(request: Request) {
   const successes: ImportSuccess[] = [];
 
   for (const parsedCard of parsed.cards) {
-    const { card } = parsedCard;
+    const rowQuality = qualityByIndex.get(parsedCard.index);
+    const qualityLabels = rowQuality?.issues.map((issue) => issue.label) ?? [];
+    const shouldUseInbox = forceInbox || Boolean(rowQuality?.recommendedInbox);
+    const card = shouldUseInbox
+      ? applyInboxDefaults(parsedCard.card, qualityLabels)
+      : parsedCard.card;
     const originalIndex = parsedCard.index;
+
+    if (rowQuality && !rowQuality.importable) {
+      failures.push({
+        index: originalIndex,
+        message: rowQuality.issues.map((issue) => issue.detail ?? issue.label).join("；"),
+      });
+      continue;
+    }
 
     if (card.image_path && !imagePathBelongsToUser(card.image_path, user.id)) {
       failures.push({
@@ -140,12 +167,14 @@ export async function POST(request: Request) {
       questionId,
       reviewCount: warning ? 0 : reviewPlan.length,
       warning: warning || undefined,
+      inbox: shouldUseInbox,
     });
   }
 
   return NextResponse.json({
     successCount: successes.length,
     failureCount: failures.length,
+    quality: qualityReport,
     successes,
     failures,
   });

@@ -46,6 +46,7 @@ export type ImportRowError = {
 export type ImportParsedCard = {
   index: number;
   card: ImportQuestionCard;
+  raw: unknown;
 };
 
 export type ImportParseResult = {
@@ -296,6 +297,7 @@ export function parseImportJsonText(input: string): ImportParseResult {
         result.cards.push({
           index: rowIndex + 1,
           card: normalizeRow(row),
+          raw: row,
         });
       } catch (error) {
         result.errors.push({

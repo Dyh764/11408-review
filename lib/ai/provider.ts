@@ -1,11 +1,13 @@
 import { getAiProviderName } from "@/lib/env";
 import {
   enhanceQuestionWithDeepSeek,
+  generateMotivationLineWithDeepSeek,
   generateLearningInsightWithDeepSeek,
   getDeepSeekStatus,
 } from "@/lib/ai/deepseek";
 import {
   enhanceQuestionWithGemini,
+  generateMotivationLineWithGemini,
   generateLearningInsightWithGemini,
   getGeminiStatus,
 } from "@/lib/ai/gemini";
@@ -71,4 +73,18 @@ export async function generateLearningInsights(input: unknown) {
 
 export async function generateReportWithAI(input: unknown) {
   return generateLearningInsights(input);
+}
+
+export async function generateMotivationLineWithAI(input: unknown) {
+  const status = getAiProviderStatus();
+
+  if (status.provider === "gemini") {
+    return generateMotivationLineWithGemini(input);
+  }
+
+  if (status.provider === "deepseek") {
+    return generateMotivationLineWithDeepSeek(input);
+  }
+
+  throw new Error("AI 每日激励句未启用（可选）。");
 }
