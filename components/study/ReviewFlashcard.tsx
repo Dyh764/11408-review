@@ -8,6 +8,7 @@ import { ImagePlaceholder, MobileSection } from "@/components/mobile/primitives"
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
+import { buildQuestionBadges } from "@/lib/questions/question-badges";
 import { explainReviewPriorityScore } from "@/lib/reviews/priority-score";
 import type { DueReview } from "@/lib/reviews";
 import type { ReviewResult } from "@/lib/types";
@@ -23,8 +24,6 @@ import type {
   Subject,
 } from "@/lib/types";
 import {
-  AttentionBadge,
-  DifficultyBadge,
   SectionHeader,
   StudyBadge,
   StudyCard,
@@ -117,6 +116,10 @@ export function ReviewFlashcard({
       : !isChoiceQuestion && answerRevealed
     : true;
   const priority = explainReviewPriorityScore(review, today);
+  const badges = buildQuestionBadges(review.questions, {
+    reviewStatus: isOverdue(review.scheduled_date, today) ? "overdue" : "due_today",
+    questionKind: isChoiceQuestion ? "选择题" : "文字题",
+  });
 
   return (
     <MobileSection>
@@ -127,22 +130,11 @@ export function ReviewFlashcard({
       />
       <StudyCard className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <StudyBadge tone={isOverdue(review.scheduled_date, today) ? "red" : "amber"}>
-            {isOverdue(review.scheduled_date, today) ? "已逾期" : "今日到期"}
-          </StudyBadge>
-          {priority.reasons.slice(0, 4).map((reason) => (
-            <StudyBadge key={reason} tone="purple">
-              {reason}
+          {badges.map((badge) => (
+            <StudyBadge key={badge.label} tone={badge.tone}>
+              {badge.label}
             </StudyBadge>
           ))}
-          <DifficultyBadge difficulty={review.questions.difficulty} />
-          <AttentionBadge
-            needsFix={
-              review.questions.question_text_status === "needs_fix" ||
-              review.questions.answer_status === "needs_fix"
-            }
-            needsManualCheck={review.questions.needs_manual_check}
-          />
         </div>
 
         <div className="rounded-lg bg-[#f8f5ff] p-4">

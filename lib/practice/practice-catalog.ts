@@ -5,6 +5,7 @@ import type {
   QuestionTextStatus,
   ReviewPriority,
 } from "../types";
+import { sortQuestionsForChapterList } from "../questions/question-sort.ts";
 
 export type PracticeQuestion = {
   id: string;
@@ -120,21 +121,13 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
   questions: T[],
   filter: PracticeFilter,
 ) {
-  return questions
-    .filter((question) => {
+  return sortQuestionsForChapterList(
+    questions.filter((question) => {
       if (filter.type === "chapter") {
         return question.subject === filter.subject && chapterLabel(question) === filter.chapter;
       }
 
       return mistakeLabels(question).includes(filter.mistakeType);
-    })
-    .sort((a, b) => {
-      const priorityDelta = priorityValue(b) - priorityValue(a);
-
-      if (priorityDelta !== 0) {
-        return priorityDelta;
-      }
-
-      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
-    });
+    }),
+  );
 }

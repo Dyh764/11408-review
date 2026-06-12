@@ -13,9 +13,8 @@ test("/questions uses compact text previews without duplicate title or meta", ()
   const source = read("app/questions/page.tsx");
 
   assert.match(source, /<MathText/);
-  assert.match(source, /<DifficultyBadge/);
-  assert.match(source, /<MasteryBadge/);
-  assert.match(source, /<AttentionBadge/);
+  assert.match(source, /buildQuestionBadges/);
+  assert.match(source, /默认按困难优先排序/);
   assert.match(source, /进入详情/);
   assert.doesNotMatch(source, /<MobileCard key=\{question\.id\}[\s\S]*<TextQuestionPreview/);
   assert.doesNotMatch(source, /getQuestionSourceLabel\(question\.source\)/);
@@ -34,6 +33,8 @@ test("/questions uses taxonomy directory browsing before the final question list
   assert.match(source, /activeChapter/);
   assert.match(source, /科目目录/);
   assert.match(source, /返回章节/);
+  assert.match(source, /筛选 \/ 批量管理/);
+  assert.doesNotMatch(source, /<select[\s\S]*<SubjectDirectory/);
 });
 
 test("QuestionListCard only exposes chapter, difficulty, and question-kind badges", () => {
@@ -87,7 +88,7 @@ test("/review presents priority as level and reasons, not raw score", () => {
 
   assert.match(source, /explainReviewPriorityScore/);
   assert.match(source, /priority\.level/);
-  assert.match(source, /priority\.reasons/);
+  assert.match(source, /buildQuestionBadges/);
   assert.doesNotMatch(source, /优先级 \{Math\.round\(priority\.total\)\}/);
   assert.match(priority, /今日重点/);
   assert.match(priority, /高优先级/);
@@ -253,6 +254,20 @@ test("/review supports skipping and explicit next-step actions after recording",
   assert.match(source, /下一题/);
   assert.match(source, /返回错题库/);
   assert.match(source, /不记录本次结果/);
+});
+
+test("home and today review list expose selectable due-review entry points", () => {
+  const home = read("app/page.tsx");
+  const today = read("app/review/today/page.tsx");
+  const review = read("app/review/page.tsx");
+
+  assert.match(home, /查看今日题单/);
+  assert.match(today, /今日复习题单/);
+  assert.match(today, /difficultyGroup/);
+  assert.match(today, /buildQuestionBadges/);
+  assert.match(today, /startQuestionId=\$\{review\.question_id\}/);
+  assert.match(review, /moveStartQuestionToFront/);
+  assert.match(review, /startQuestionId/);
 });
 
 test("/questions/[id] shows AI enhancement change summaries and manual verification actions", () => {

@@ -230,12 +230,20 @@ export default function DashboardPage() {
             />
           </div>
           {stats.dueToday > 0 ? (
-            <Link
-              href="/review"
-              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
-            >
-              开始今日复习
-            </Link>
+            <div className="mt-5 grid gap-2">
+              <Link
+                href="/review"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+              >
+                开始今日复习
+              </Link>
+              <Link
+                href="/review/today"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white/35 px-4 text-sm font-black text-white"
+              >
+                查看今日题单
+              </Link>
+            </div>
           ) : (
             <div className="mt-5 rounded-lg bg-white/14 p-3">
               <p className="text-sm font-black text-white">今日暂无到期复习</p>

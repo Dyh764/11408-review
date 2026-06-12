@@ -16,6 +16,7 @@ import {
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { getDailyMotivation } from "@/lib/motivation";
 import { sortDueReviewsByPriority } from "@/lib/reviews/priority-score";
+import { moveStartQuestionToFront } from "@/lib/reviews/review-queue";
 import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
@@ -81,7 +82,14 @@ export default function ReviewPage() {
     fetchDueReviews(supabase)
       .then((items) => {
         if (isActive) {
-          const sorted = sortDueReviewsByPriority(items, todayIsoDate());
+          const startQuestionId =
+            typeof window === "undefined"
+              ? ""
+              : new URLSearchParams(window.location.search).get("startQuestionId");
+          const sorted = moveStartQuestionToFront(
+            sortDueReviewsByPriority(items, todayIsoDate()),
+            startQuestionId,
+          );
           setReviews(sorted);
           setInitialReviewCount(sorted.length);
           setFocusTopics(getFocusTopics(sorted));

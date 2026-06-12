@@ -5,9 +5,6 @@ import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MathText } from "@/components/mobile/MathText";
 import {
-  AttentionBadge,
-  DifficultyBadge,
-  MasteryBadge,
   ProgressBar,
   SectionHeader,
   SprintStatCard,
@@ -19,6 +16,7 @@ import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
+import { buildQuestionBadges } from "@/lib/questions/question-badges";
 import { buildQuestionDirectory, type QuestionChapterGroup, type QuestionSubjectDirectory } from "@/lib/taxonomy/question-taxonomy";
 import {
   getQuestionTextStatusLabel,
@@ -53,13 +51,9 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function getQuestionKind(question: QuestionWithImage, choiceCount: number) {
+function getQuestionKind(choiceCount: number) {
   if (choiceCount > 0) {
     return "选择题";
-  }
-
-  if (question.image_path || question.signedImageUrl) {
-    return "图片题";
   }
 
   return "文字题";
@@ -177,10 +171,6 @@ export default function QuestionsPage() {
     setSelectedIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     );
-  }
-
-  function selectAllFiltered() {
-    setSelectedIds(filteredQuestions.map((question) => question.id));
   }
 
   async function handleBatchAction(action: "mastered" | "needs_fix" | "sprint") {
@@ -379,151 +369,6 @@ export default function QuestionsPage() {
         </StudyCard>
       </MobileSection>
 
-      <section className="space-y-3 px-5">
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { key: "all", label: "全部" },
-            { key: "inbox", label: "待整理" },
-            { key: "needs_fix", label: "需要修正" },
-            { key: "uncategorized", label: "未分类" },
-          ].map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => {
-                setQuickScope(item.key as QuickScope);
-                setActiveSubject("");
-                setActiveChapter("");
-              }}
-              className={`min-h-10 rounded-lg px-2 text-xs font-black ${
-                quickScope === item.key
-                  ? "bg-[#5b2bd6] text-white"
-                  : "bg-white text-[#4f23b6] ring-1 ring-[#d9cffd]"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <select
-            value={masteryStatus}
-            onChange={(event) => setMasteryStatus(event.target.value as MasteryStatus | "全部")}
-            className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
-          >
-            {masteryFilters.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-          <select
-            value={textStatus}
-            onChange={(event) =>
-              setTextStatus(event.target.value as QuestionTextStatus | "全部")
-            }
-            className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
-          >
-            {textStatusFilters.map((item) => (
-              <option key={item} value={item}>
-                {item === "全部" ? item : getQuestionTextStatusLabel(item)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <input
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          className="min-h-12 w-full rounded-lg border border-[#d9cffd] bg-white px-4 text-base outline-none focus:border-[#5b2bd6]"
-          placeholder="搜索题目文字、知识点、章节或备注"
-        />
-      </section>
-
-      <section className="px-5">
-        <StudyCard>
-          {!showBatchTools ? (
-            <button
-              type="button"
-              onClick={() => setShowBatchTools(true)}
-              className="min-h-11 w-full rounded-lg bg-[#ede7ff] px-4 text-sm font-black text-[#4f23b6]"
-            >
-              批量管理
-            </button>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-800">
-                  已选择 {selectedIds.length} 题
-                </p>
-                <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={selectAllFiltered}
-                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
-              >
-                全选当前页
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedIds([])}
-                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
-              >
-                取消选择
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedIds([]);
-                  setShowBatchTools(false);
-                }}
-                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
-              >
-                退出批量
-              </button>
-                </div>
-            </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={handleBatchDelete}
-              disabled={isBatchProcessing || selectedIds.length === 0}
-              className="min-h-11 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
-            >
-              删除所选
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBatchAction("mastered")}
-              disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-[#5b2bd6] px-3 text-sm font-black text-white disabled:bg-slate-300"
-            >
-              标记已掌握
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBatchAction("needs_fix")}
-              disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-amber-100 px-3 text-sm font-semibold text-amber-800 disabled:text-slate-400"
-            >
-              标记需修正
-            </button>
-            <button
-              type="button"
-              onClick={() => handleBatchAction("sprint")}
-              disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-[#211536] px-3 text-sm font-black text-white disabled:bg-slate-300"
-            >
-              加入冲刺复习
-            </button>
-          </div>
-            </>
-          )}
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            批量删除只会软删除错题，不会删除 Storage 图片或复习记录。
-          </p>
-        </StudyCard>
-      </section>
-
       {isLoading ? (
         <MobileSection>
           <LoadingState label="正在读取错题库..." />
@@ -574,10 +419,98 @@ export default function QuestionsPage() {
             showBatchTools={showBatchTools}
             onBack={() => setActiveChapter("")}
             onSelect={toggleSelected}
+            onToggleBatchTools={() => {
+              setShowBatchTools((current) => !current);
+              setSelectedIds([]);
+            }}
+            onSelectAll={() => setSelectedIds(selectedChapter.questions.map((question) => question.id))}
+            onClearSelected={() => setSelectedIds([])}
+            onBatchDelete={handleBatchDelete}
+            onBatchAction={handleBatchAction}
+            isBatchProcessing={isBatchProcessing}
+            dueTodayIds={dueTodayIds}
           />
         ) : null}
         </div>
       </MobileSection>
+
+      <section className="px-5">
+        <details className="rounded-lg border border-[#d9cffd] bg-white p-3">
+          <summary className="cursor-pointer text-sm font-black text-[#4f23b6]">
+            筛选 / 批量管理
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { key: "all", label: "全部" },
+                { key: "inbox", label: "待整理" },
+                { key: "needs_fix", label: "需修正" },
+                { key: "uncategorized", label: "未分类" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => {
+                    setQuickScope(item.key as QuickScope);
+                    setActiveSubject("");
+                    setActiveChapter("");
+                    setSelectedIds([]);
+                  }}
+                  className={`min-h-9 rounded-lg px-2 text-xs font-black ${
+                    quickScope === item.key
+                      ? "bg-[#5b2bd6] text-white"
+                      : "bg-[#f8f5ff] text-[#4f23b6] ring-1 ring-[#d9cffd]"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select
+                value={masteryStatus}
+                onChange={(event) => {
+                  setMasteryStatus(event.target.value as MasteryStatus | "全部");
+                  setSelectedIds([]);
+                }}
+                className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+              >
+                {masteryFilters.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={textStatus}
+                onChange={(event) => {
+                  setTextStatus(event.target.value as QuestionTextStatus | "全部");
+                  setSelectedIds([]);
+                }}
+                className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+              >
+                {textStatusFilters.map((item) => (
+                  <option key={item} value={item}>
+                    {item === "全部" ? item : getQuestionTextStatusLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <input
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value);
+                setSelectedIds([]);
+              }}
+              className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+              placeholder="搜索题目文字、知识点、章节或备注"
+            />
+            <p className="text-xs leading-5 text-slate-500">
+              批量操作只在进入章节题目列表并勾选题目后显示；删除仍为软删除。
+            </p>
+          </div>
+        </details>
+      </section>
     </MobilePageShell>
   );
 }
@@ -694,6 +627,13 @@ function QuestionDirectory({
   showBatchTools,
   onBack,
   onSelect,
+  onToggleBatchTools,
+  onSelectAll,
+  onClearSelected,
+  onBatchDelete,
+  onBatchAction,
+  isBatchProcessing,
+  dueTodayIds,
 }: {
   subject: QuestionSubjectDirectory<QuestionWithImage>;
   chapter: QuestionChapterGroup<QuestionWithImage>;
@@ -701,6 +641,13 @@ function QuestionDirectory({
   showBatchTools: boolean;
   onBack: () => void;
   onSelect: (id: string) => void;
+  onToggleBatchTools: () => void;
+  onSelectAll: () => void;
+  onClearSelected: () => void;
+  onBatchDelete: () => void;
+  onBatchAction: (action: "mastered" | "needs_fix" | "sprint") => void;
+  isBatchProcessing: boolean;
+  dueTodayIds: Set<string>;
 }) {
   return (
     <section>
@@ -708,20 +655,93 @@ function QuestionDirectory({
         title={chapter.chapter}
         subtitle={`${subject.subject} · ${chapter.totalCount} 题`}
         action={
-          <button
-            type="button"
-            onClick={onBack}
-            className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
-          >
-            返回章节
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onToggleBatchTools}
+              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+            >
+              {showBatchTools ? "退出选择" : "选择题目"}
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+            >
+              返回章节
+            </button>
+          </div>
         }
       />
+      <p className="mb-3 rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-600 ring-1 ring-[#e4dcff]">
+        默认按困难优先排序，同难度内优先显示需要处理和高风险题。
+      </p>
+      {showBatchTools && selectedIds.length > 0 ? (
+        <StudyCard className="mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-black text-[#211536]">已选择 {selectedIds.length} 题</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onSelectAll}
+                className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+              >
+                全选本章
+              </button>
+              <button
+                type="button"
+                onClick={onClearSelected}
+                className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+              >
+                取消选择
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            <button
+              type="button"
+              onClick={onBatchDelete}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              删除所选
+            </button>
+            <button
+              type="button"
+              onClick={() => onBatchAction("mastered")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-[#5b2bd6] px-3 text-sm font-black text-white disabled:bg-slate-300"
+            >
+              标记已掌握
+            </button>
+            <button
+              type="button"
+              onClick={() => onBatchAction("needs_fix")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-amber-100 px-3 text-sm font-semibold text-amber-800 disabled:text-slate-400"
+            >
+              标记需修正
+            </button>
+            <button
+              type="button"
+              onClick={() => onBatchAction("sprint")}
+              disabled={isBatchProcessing}
+              className="min-h-11 rounded-lg bg-[#211536] px-3 text-sm font-black text-white disabled:bg-slate-300"
+            >
+              加入今日复习
+            </button>
+          </div>
+        </StudyCard>
+      ) : null}
       <div className="grid gap-3">
         {chapter.questions.map((question) => {
           const questionDisplay = getQuestionStemAndChoices(question.question_text, question.choices);
           const needsFix =
             question.question_text_status === "needs_fix" || question.answer_status === "needs_fix";
+          const badges = buildQuestionBadges(question, {
+            reviewStatus: dueTodayIds.has(question.id) ? "due_today" : "ready",
+            questionKind: getQuestionKind(questionDisplay.choices.length),
+          });
 
           return (
             <StudyCard key={question.id}>
@@ -754,13 +774,16 @@ function QuestionDirectory({
                     compact
                     className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600"
                   />
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    原始章节/知识点：{question.chapter ?? "未标章节"} / {question.knowledge_point ?? "未标知识点"}
+                    {needsFix ? " · 需要修正" : question.needs_manual_check ? " · 需要核对" : ""}
+                  </p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    <DifficultyBadge difficulty={question.difficulty} />
-                    <MasteryBadge mastery={question.mastery_status} />
-                    <StudyBadge tone="purple">
-                      {getQuestionKind(question, questionDisplay.choices.length)}
-                    </StudyBadge>
-                    <AttentionBadge needsFix={needsFix} needsManualCheck={question.needs_manual_check} />
+                    {badges.map((badge) => (
+                      <StudyBadge key={badge.label} tone={badge.tone}>
+                        {badge.label}
+                      </StudyBadge>
+                    ))}
                   </div>
                   <div className="mt-3 flex justify-end">
                     <Link
