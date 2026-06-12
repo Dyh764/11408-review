@@ -10,7 +10,7 @@ import type {
   ReviewPriority,
   Subject,
 } from "@/lib/types";
-import { extractChoicesFromQuestionText, splitQuestionTextAndChoices } from "@/lib/questions/extract-choices";
+import { extractChoicesFromQuestionText, splitQuestionTextAndChoices } from "../questions/extract-choices.ts";
 
 export type ImportQuestionCard = {
   image_code?: string;
@@ -52,6 +52,8 @@ export type ImportParsedCard = {
 export type ImportParseResult = {
   cards: ImportParsedCard[];
   errors: ImportRowError[];
+  sanitizedText?: string;
+  repairNotices?: string[];
 };
 
 export const importSubjects: Subject[] = [
@@ -77,6 +79,20 @@ const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"
 const answerSources: AnswerSource[] = ["chatgpt_import", "manual", "ai_enhanced", "unknown"];
 const reviewPriorities: ReviewPriority[] = ["low", "medium", "high"];
 const confidences: Confidence[] = ["low", "medium", "high"];
+
+const specificParseFailureMessage =
+  "JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。";
+
+const latexCommandPattern = /^[A-Za-z]+/;
+const validEscapeCharacters = new Set(['"', "\\", "/", "b", "f", "n", "r", "t"]);
+
+type ImportJsonSanitizeReport = {
+  text: string;
+  changedCurlyQuotes: boolean;
+  fixedLatexBackslashes: boolean;
+};
+
+type JsonStringDelimiter = "ascii" | "curly";
 
 export const chatGptImportPrompt = `请把今天的考研数学错题整理成可导入 11408-review 的 JSON 数组。
 只输出 JSON，不要 Markdown。
@@ -138,6 +154,105 @@ export const importExampleJson = JSON.stringify(
   null,
   2,
 );
+
+function isHexDigit(value: string | undefined) {
+  return Boolean(value && /[0-9a-fA-F]/.test(value));
+}
+
+function hasValidUnicodeEscape(input: string, index: number) {
+  return (
+    input[index + 1] === "u" &&
+    isHexDigit(input[index + 2]) &&
+    isHexDigit(input[index + 3]) &&
+    isHexDigit(input[index + 4]) &&
+    isHexDigit(input[index + 5])
+  );
+}
+
+function sanitizeImportJsonTextWithReport(input: string): ImportJsonSanitizeReport {
+  let inString = false;
+  let delimiter: JsonStringDelimiter = "ascii";
+  let changedCurlyQuotes = false;
+  let fixedLatexBackslashes = false;
+  let text = "";
+
+  for (let index = 0; index < input.length; index += 1) {
+    const current = input[index];
+
+    if (current === "‘" || current === "’") {
+      text += "'";
+      changedCurlyQuotes = true;
+      continue;
+    }
+
+    if (!inString) {
+      if (current === '"' || current === "“" || current === "”") {
+        text += '"';
+        inString = true;
+        delimiter = current === '"' ? "ascii" : "curly";
+        changedCurlyQuotes = changedCurlyQuotes || current !== '"';
+      } else {
+        text += current;
+      }
+      continue;
+    }
+
+    if (
+      (delimiter === "ascii" && current === '"') ||
+      (delimiter === "curly" && (current === "“" || current === "”"))
+    ) {
+      inString = false;
+      text += '"';
+      changedCurlyQuotes = changedCurlyQuotes || current !== '"';
+      continue;
+    }
+
+    if (delimiter === "ascii" && (current === "“" || current === "”")) {
+      text += '\\"';
+      changedCurlyQuotes = true;
+      continue;
+    }
+
+    if (current !== "\\") {
+      text += current;
+      continue;
+    }
+
+    const next = input[index + 1];
+    const command = input.slice(index + 1).match(latexCommandPattern)?.[0] ?? "";
+
+    if (command.length > 1) {
+      text += "\\\\";
+      fixedLatexBackslashes = true;
+      continue;
+    }
+
+    if (next === "u" && hasValidUnicodeEscape(input, index)) {
+      text += input.slice(index, index + 6);
+      index += 5;
+      continue;
+    }
+
+    if (next && validEscapeCharacters.has(next)) {
+      text += `\\${next}`;
+      index += 1;
+      continue;
+    }
+
+    text += "\\\\";
+    fixedLatexBackslashes = true;
+  }
+
+  return {
+    text,
+    changedCurlyQuotes,
+    fixedLatexBackslashes,
+  };
+}
+
+export function sanitizeImportJsonText(input: string) {
+  return sanitizeImportJsonTextWithReport(input).text;
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -272,18 +387,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   };
 }
 
-export function parseImportJsonText(input: string): ImportParseResult {
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(input);
-  } catch {
-    return {
-      cards: [],
-      errors: [{ index: 0, message: "JSON 解析失败，请确认粘贴的是 JSON 数组。" }],
-    };
-  }
-
+function parseImportArray(parsed: unknown): ImportParseResult {
   if (!Array.isArray(parsed)) {
     return {
       cards: [],
@@ -310,6 +414,42 @@ export function parseImportJsonText(input: string): ImportParseResult {
     },
     { cards: [], errors: [] },
   );
+}
+
+export function parseImportJsonText(input: string): ImportParseResult {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(input);
+    return parseImportArray(parsed);
+  } catch {
+    const sanitized = sanitizeImportJsonTextWithReport(input);
+
+    try {
+      parsed = JSON.parse(sanitized.text);
+    } catch {
+      return {
+        cards: [],
+        errors: [{ index: 0, message: specificParseFailureMessage }],
+      };
+    }
+
+    const result = parseImportArray(parsed);
+    if (result.errors.length > 0) {
+      return result;
+    }
+
+    const repairNotices = [
+      sanitized.changedCurlyQuotes ? "检测到中文弯引号：已尝试转换。" : "",
+      sanitized.fixedLatexBackslashes ? "检测到 LaTeX 单反斜杠：已尝试转义。" : "",
+    ].filter(Boolean);
+
+    return {
+      ...result,
+      sanitizedText: sanitized.text !== input ? sanitized.text : undefined,
+      repairNotices,
+    };
+  }
 }
 
 export function imagePathBelongsToUser(imagePath: string, userId: string) {

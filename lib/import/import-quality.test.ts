@@ -140,3 +140,23 @@ test("applyInboxDefaults reuses existing fields instead of requiring a schema ch
     "待整理：标准答案格式异常",
   ]);
 });
+
+test("import quality report suggests common ChatGPT taxonomy mappings", () => {
+  const parsed = parseSingle({
+    ...validRow,
+    subject: "数学",
+    chapter: "高等数学-多元函数积分学",
+    difficulty: "较难",
+  });
+
+  const report = getImportQualityReport(parsed);
+  const labels = report.rows[0].issues.map((issue) => issue.label);
+
+  assert.ok(labels.includes("检测到 difficulty = 较难：建议自动映射为 困难。"));
+  assert.ok(labels.includes("检测到 subject = 数学 且 chapter 包含高等数学：建议映射为 subject = 高等数学。"));
+  assert.ok(
+    labels.includes(
+      "检测到 chapter = 高等数学-多元函数积分学：建议拆成 subject = 高等数学，chapter = 多元函数积分学。",
+    ),
+  );
+});

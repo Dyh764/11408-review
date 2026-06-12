@@ -106,6 +106,26 @@ function inspectCard(item: ImportParsedCard): ImportQualityRow {
     addIssue(issues, "warning", "缺少难度");
   }
 
+  if (card.difficulty === "较难") {
+    addIssue(issues, "info", "检测到 difficulty = 较难：建议自动映射为 困难。");
+  }
+
+  if (card.subject === "数学" && card.chapter?.includes("高等数学")) {
+    addIssue(
+      issues,
+      "info",
+      "检测到 subject = 数学 且 chapter 包含高等数学：建议映射为 subject = 高等数学。",
+    );
+  }
+
+  if (card.chapter === "高等数学-多元函数积分学") {
+    addIssue(
+      issues,
+      "info",
+      "检测到 chapter = 高等数学-多元函数积分学：建议拆成 subject = 高等数学，chapter = 多元函数积分学。",
+    );
+  }
+
   if (hasInvalidChoices(raw)) {
     addIssue(issues, "warning", "choices 格式异常");
   }

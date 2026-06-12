@@ -130,6 +130,8 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
 export default function ImportPage() {
   const [jsonText, setJsonText] = useState("");
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
+  const [parseNotice, setParseNotice] = useState("");
+  const [parseRepairNotices, setParseRepairNotices] = useState<string[]>([]);
   const [apiResult, setApiResult] = useState<ImportApiResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [copyStatus, setCopyStatus] = useState("");
@@ -151,10 +153,21 @@ export default function ImportPage() {
     return { withAnswer, withoutImage, needsCheck };
   }, [previewCards]);
   const canImport = previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
+  const visibleRepairNotices =
+    parseRepairNotices.length > 0 ? parseRepairNotices : (parsed.repairNotices ?? []);
 
   function handleParse() {
     const result = parseImportJsonText(jsonText);
     setParseErrors(result.errors);
+    setParseRepairNotices(result.repairNotices ?? []);
+    setParseNotice(
+      result.sanitizedText && result.errors.length === 0
+        ? "已自动修复中文引号或 LaTeX 反斜杠格式，请继续检查预览。"
+        : "",
+    );
+    if (result.sanitizedText && result.errors.length === 0) {
+      setJsonText(result.sanitizedText);
+    }
     setApiResult(null);
   }
 
@@ -259,6 +272,8 @@ export default function ImportPage() {
               onChange={(event) => {
                 setJsonText(event.target.value);
                 setParseErrors([]);
+                setParseNotice("");
+                setParseRepairNotices([]);
                 setApiResult(null);
               }}
               rows={12}
@@ -273,6 +288,8 @@ export default function ImportPage() {
               onClick={() => {
                 setJsonText(importExampleJson);
                 setParseErrors([]);
+                setParseNotice("");
+                setParseRepairNotices([]);
                 setApiResult(null);
               }}
               className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
@@ -289,6 +306,14 @@ export default function ImportPage() {
           </div>
         </SectionCard>
       </MobileSection>
+
+      {parseNotice ? (
+        <MobileSection>
+          <p className="rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
+            {parseNotice}
+          </p>
+        </MobileSection>
+      ) : null}
 
       {parseErrors.length > 0 ? (
         <MobileSection>
@@ -311,6 +336,18 @@ export default function ImportPage() {
           <div className="space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-950">导入前质检</h2>
+            {visibleRepairNotices.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {visibleRepairNotices.map((notice) => (
+                  <span
+                    key={notice}
+                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
+                  >
+                    {notice}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <StatCard label="共解析" value={previewCards.length} tone="blue" />
               <StatCard label="可直接导入" value={qualityReport.importableCount - qualityReport.inboxRecommendedCount} tone="green" />

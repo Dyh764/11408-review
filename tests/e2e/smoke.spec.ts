@@ -179,6 +179,70 @@ test("import preview renders LaTeX formulas with KaTeX when reachable", async ({
   await expectPageHasNoHorizontalOverflow(page);
 });
 
+test("import page repairs single-backslash LaTeX and keeps KaTeX preview working", async ({
+  page,
+}) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(String.raw`[
+    {
+      "subject": "数学",
+      "chapter": "高等数学-多元函数积分学",
+      "knowledge_point": "三重积分",
+      "difficulty": "较难",
+      "question_text": "计算区域 $\Omega$ 上的 $\iiint_\Omega \frac{x^2}{a^2} dV$，并判断 $\leq 1$。",
+      "question_text_status": "ai_unverified",
+      "mastery_status": "思路对但卡住",
+      "user_note": "ChatGPT 复制出来是单反斜杠。",
+      "mistake_types": ["LaTeX"],
+      "solution_summary": "先识别 $\Omega$。",
+      "standard_answer": "答案：$\frac{x^2}{a^2}\leq 1$",
+      "answer_explanation": "过程：使用 $\left\{x\mid x\in\Omega\right\}$。",
+      "key_steps": ["写出 $\Omega$", "计算 $\iiint_\Omega$"],
+      "one_sentence_tip": "注意 $\frac{}{}$ 的反斜杠。",
+      "review_priority": "high",
+      "confidence": "medium",
+      "needs_manual_check": true,
+      "answer_status": "ai_unverified",
+      "answer_source": "chatgpt_import"
+    }
+  ]`);
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(page.getByText("已自动修复中文引号或 LaTeX 反斜杠格式，请继续检查预览。")).toBeVisible();
+  await expect(page.getByText("检测到 LaTeX 单反斜杠：已尝试转义。")).toBeVisible();
+  await expect(page.getByText("检测到 difficulty = 较难：建议自动映射为 困难。")).toBeVisible();
+  await expect(page.locator(".katex").first()).toBeVisible();
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
+test("import page shows specific parse guidance when JSON repair still fails", async ({
+  page,
+}) => {
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await page.getByRole("textbox", { name: "ChatGPT 输出内容" }).fill(String.raw`[{"subject": "数学", "question_text": "$\Omega$"`);
+  await page.getByRole("button", { name: "解析" }).click();
+
+  await expect(
+    page.getByText(
+      "JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。",
+    ),
+  ).toBeVisible();
+});
+
 test("import preview shows structured choices when JSON includes choices", async ({ page }) => {
   const response = await page.goto("/import");
 
