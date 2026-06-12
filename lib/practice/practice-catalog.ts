@@ -38,7 +38,8 @@ export type PracticeMistakeOption = {
 
 export type PracticeFilter =
   | { type: "chapter"; subject: string; chapter: string }
-  | { type: "mistake"; mistakeType: string };
+  | { type: "mistake"; mistakeType: string }
+  | { type: "topic"; topic: string };
 
 const untaggedMistakeType = "未标注错因";
 
@@ -125,6 +126,11 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
     questions.filter((question) => {
       if (filter.type === "chapter") {
         return question.subject === filter.subject && chapterLabel(question) === filter.chapter;
+      }
+
+      if (filter.type === "topic") {
+        const topic = filter.topic.trim();
+        return question.knowledge_point?.trim() === topic || chapterLabel(question) === topic;
       }
 
       return mistakeLabels(question).includes(filter.mistakeType);

@@ -82,6 +82,11 @@ export default function PracticePage() {
   const [submittedChoices, setSubmittedChoices] = useState<Record<string, boolean>>({});
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
+  const [topicParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("topic")?.trim() ?? ""
+      : "",
+  );
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看专项复盘。",
   );
@@ -98,7 +103,19 @@ export default function PracticePage() {
       .then((items) => {
         if (isActive) {
           setQuestions(items);
-          setMessage(items.length === 0 ? "还没有可复盘的错题。" : "");
+          if (topicParam) {
+            const topicFilter: PracticeFilter = { type: "topic", topic: topicParam };
+            const selected = filterPracticeQuestions(items, topicFilter).map(makePracticeReview);
+
+            setActiveFilter(topicFilter);
+            setQueue(selected);
+            setInitialCount(selected.length);
+            setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
+            setSkippedCount(0);
+            setMessage(selected.length === 0 ? "这个范围暂时没有错题。" : "");
+          } else {
+            setMessage(items.length === 0 ? "还没有可复盘的错题。" : "");
+          }
         }
       })
       .catch((error) => {
@@ -115,7 +132,7 @@ export default function PracticePage() {
     return () => {
       isActive = false;
     };
-  }, [supabase]);
+  }, [supabase, topicParam]);
 
   const catalog = useMemo(() => buildPracticeCatalog(questions), [questions]);
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);

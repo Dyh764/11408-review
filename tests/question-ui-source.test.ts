@@ -271,6 +271,26 @@ test("/questions exposes focused practice and inbox entries without expanding bo
   assert.doesNotMatch(bottomNav, /\/practice/);
 });
 
+test("learning analytics surfaces stay mobile-first across home, review, questions, practice, and reports", () => {
+  const home = read("app/page.tsx");
+  const review = read("app/review/page.tsx");
+  const questions = read("app/questions/page.tsx");
+  const practice = read("app/practice/page.tsx");
+  const reports = read("app/reports/page.tsx");
+
+  assert.match(home, /buildWeaknessTrends/);
+  assert.match(home, /今日提分焦点/);
+  assert.match(home, /专项复盘/);
+  assert.match(review, /buildRoundExposureSummary/);
+  assert.match(review, /本轮暴露问题/);
+  assert.match(questions, /buildQuestionQualitySummary/);
+  assert.match(questions, /整理收件箱/);
+  assert.match(practice, /URLSearchParams/);
+  assert.match(practice, /topic/);
+  assert.match(reports, /7 天薄弱点变化/);
+  assert.match(reports, /题卡质量概览/);
+});
+
 test("/practice reuses the review flashcard component for chapter and mistake review", () => {
   const source = read("app/practice/page.tsx");
   const sharedCard = read("components/study/ReviewFlashcard.tsx");

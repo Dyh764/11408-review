@@ -5,6 +5,14 @@ import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard }
 import { MathText } from "@/components/mobile/MathText";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import {
+  buildQuestionQualitySummary,
+  buildWeaknessTrends,
+  type AnalyticsReviewResult,
+  type QuestionQualitySummary,
+  type WeaknessTrend,
+} from "@/lib/analytics/learning-insights";
+import { fetchCurrentUserQuestions } from "@/lib/questions";
 import { fetchCurrentUserReports, type ReportRecord, type ReportType } from "@/lib/reports";
 import { createClient } from "@/lib/supabase/client";
 
@@ -55,6 +63,13 @@ const metricLabels: Record<string, string> = {
   answer_unverified_count: "答案待核对",
   wrong_again_count: "复习后又错",
   review_completion_rate: "复习完成率",
+};
+
+const emptyQualitySummary: QuestionQualitySummary = {
+  totalIssueCount: 0,
+  highIssueCount: 0,
+  affectedQuestionCount: 0,
+  topIssues: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -207,9 +222,94 @@ function ReportList({
   );
 }
 
+function addDays(dateKey: string, amount: number) {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+function AnalyticsOverview({
+  weaknessTrends,
+  qualitySummary,
+}: {
+  weaknessTrends: WeaknessTrend[];
+  qualitySummary: QuestionQualitySummary;
+}) {
+  return (
+    <MobileSection>
+      <div className="space-y-4">
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">7 天薄弱点变化</h2>
+          {weaknessTrends.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {weaknessTrends.map((trend) => (
+                <a
+                  key={trend.topic}
+                  href={trend.actionHref}
+                  className="block rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <MathText text={trend.topic} compact className="font-bold text-slate-950" />
+                      <p className="mt-1 text-xs text-slate-500">
+                        近 7 天错 {trend.recentWrongCount} 次 / 已掌握 {trend.masteredCount} 次
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-500">
+                      {trend.trend === "up" ? "上升" : trend.trend === "down" ? "下降" : "平稳"}
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+              最近 7 天还没有足够的复习记录形成趋势。
+            </p>
+          )}
+        </MobileCard>
+
+        <MobileCard>
+          <h2 className="text-sm font-bold text-slate-800">题卡质量概览</h2>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">待整理题</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{qualitySummary.affectedQuestionCount}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">严重问题</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{qualitySummary.highIssueCount}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="text-xs text-slate-500">总问题</p>
+              <p className="mt-1 text-xl font-bold text-slate-950">{qualitySummary.totalIssueCount}</p>
+            </div>
+          </div>
+          {qualitySummary.topIssues.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {qualitySummary.topIssues.slice(0, 3).map((issue) => (
+                <a
+                  key={`${issue.questionId}-${issue.type}`}
+                  href={issue.actionHref}
+                  className="block rounded-lg bg-slate-50 p-3 text-sm ring-1 ring-slate-100"
+                >
+                  <span className="font-bold text-slate-800">{issue.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{issue.detail}</span>
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </MobileCard>
+      </div>
+    </MobileSection>
+  );
+}
+
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportType>("daily");
   const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [weaknessTrends, setWeaknessTrends] = useState<WeaknessTrend[]>([]);
+  const [qualitySummary, setQualitySummary] = useState<QuestionQualitySummary>(emptyQualitySummary);
   const [selectedReportId, setSelectedReportId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
@@ -234,10 +334,31 @@ export default function ReportsPage() {
     }
 
     let isActive = true;
-    fetchCurrentUserReports(supabase)
-      .then((items) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekStart = `${addDays(today, -6)}T00:00:00.000Z`;
+
+    Promise.all([
+      fetchCurrentUserReports(supabase),
+      fetchCurrentUserQuestions(supabase),
+      supabase
+        .from("reviews")
+        .select("question_id,review_result,completed_at")
+        .gte("completed_at", weekStart),
+    ])
+      .then(([items, questions, recentReviewsResult]) => {
+        if (recentReviewsResult.error) {
+          throw recentReviewsResult.error;
+        }
+
         if (isActive) {
           setReports(items);
+          setWeaknessTrends(
+            buildWeaknessTrends(questions, (recentReviewsResult.data ?? []) as AnalyticsReviewResult[], {
+              today,
+              limit: 3,
+            }),
+          );
+          setQualitySummary(buildQuestionQualitySummary(questions, { limit: 3 }));
         }
       })
       .catch((error) => {
@@ -329,6 +450,10 @@ export default function ReportsPage() {
             {message}
           </p>
         </MobileSection>
+      ) : null}
+
+      {!isLoading ? (
+        <AnalyticsOverview weaknessTrends={weaknessTrends} qualitySummary={qualitySummary} />
       ) : null}
 
       {!isLoading && !selectedReport ? (

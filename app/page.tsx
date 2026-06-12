@@ -5,6 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
 import {
+  buildQuestionQualitySummary,
+  buildWeaknessTrends,
+  type AnalyticsReviewResult,
+  type QuestionQualitySummary,
+  type WeaknessTrend,
+} from "@/lib/analytics/learning-insights";
+import {
   ProgressBar,
   SecondaryStudyLink,
   SectionHeader,
@@ -26,6 +33,15 @@ type DashboardStats = {
   completionRate: number;
   focusChapters: string[];
   subjectStats: Array<{ subject: string; total: number; highRisk: number }>;
+  weaknessTrends: WeaknessTrend[];
+  qualitySummary: QuestionQualitySummary;
+};
+
+const emptyQualitySummary: QuestionQualitySummary = {
+  totalIssueCount: 0,
+  highIssueCount: 0,
+  affectedQuestionCount: 0,
+  topIssues: [],
 };
 
 const emptyStats: DashboardStats = {
@@ -36,6 +52,8 @@ const emptyStats: DashboardStats = {
   completionRate: 0,
   focusChapters: [],
   subjectStats: [],
+  weaknessTrends: [],
+  qualitySummary: emptyQualitySummary,
 };
 
 const primaryActions = [
@@ -103,7 +121,9 @@ export default function DashboardPage() {
       }
 
       const today = todayIsoDate();
-      const [dueResult, completedResult, addedResult, questionsResult] = await Promise.all([
+      const weekStart = `${addDays(today, -6)}T00:00:00.000Z`;
+      const [dueResult, completedResult, addedResult, questionsResult, recentReviewsResult] =
+        await Promise.all([
         client
           .from("reviews")
           .select("id,questions!inner(deleted_at)", { count: "exact", head: true })
@@ -126,13 +146,22 @@ export default function DashboardPage() {
           .lt("created_at", startOfNextDay(today)),
         client
           .from("questions")
-          .select("subject,chapter,knowledge_point,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status")
+          .select("id,subject,chapter,knowledge_point,question_text,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,created_at")
           .eq("user_id", user.id)
           .is("deleted_at", null),
+        client
+          .from("reviews")
+          .select("question_id,review_result,completed_at")
+          .eq("user_id", user.id)
+          .gte("completed_at", weekStart),
       ]);
 
       const error =
-        dueResult.error ?? completedResult.error ?? addedResult.error ?? questionsResult.error;
+        dueResult.error ??
+        completedResult.error ??
+        addedResult.error ??
+        questionsResult.error ??
+        recentReviewsResult.error;
 
       if (error) {
         setMessage(`学习统计更新失败：${error.message}`);
@@ -144,6 +173,12 @@ export default function DashboardPage() {
       const todayTotal = completedToday + dueToday;
       const completionRate = todayTotal > 0 ? Math.round((completedToday / todayTotal) * 100) : 0;
       const questionRows = questionsResult.data ?? [];
+      const recentReviews = (recentReviewsResult.data ?? []) as AnalyticsReviewResult[];
+      const weaknessTrends = buildWeaknessTrends(questionRows, recentReviews, {
+        today,
+        limit: 3,
+      });
+      const qualitySummary = buildQuestionQualitySummary(questionRows, { limit: 3 });
       const subjectMap = new Map<string, { subject: string; total: number; highRisk: number }>();
       const focusMap = new Map<string, number>();
 
@@ -182,6 +217,8 @@ export default function DashboardPage() {
           totalQuestions: questionRows.length,
           completionRate,
           focusChapters,
+          weaknessTrends,
+          qualitySummary,
           subjectStats: Array.from(subjectMap.values())
             .sort((a, b) => b.highRisk - a.highRisk || b.total - a.total)
             .slice(0, 5),
@@ -276,6 +313,65 @@ export default function DashboardPage() {
           <SprintStatCard label="今日完成" value={stats.completedToday} helper="已写入复习记录" />
           <SprintStatCard label="今日新增" value={stats.addedToday} helper="新整理错题" />
           <SprintStatCard label="错题总量" value={stats.totalQuestions} helper="当前题库" />
+        </div>
+      </MobileSection>
+
+      <MobileSection>
+        <SectionHeader
+          title="今日提分焦点"
+          subtitle="根据最近 7 天复习结果和题卡质量，先处理最可能拖分的知识点。"
+          action={<StudyBadge tone="purple">{stats.weaknessTrends.length || 0} 项</StudyBadge>}
+        />
+        <div className="grid gap-3">
+          {stats.weaknessTrends.length > 0 ? (
+            stats.weaknessTrends.map((trend) => (
+              <StudyCard key={trend.topic}>
+                <Link href={trend.actionHref} className="block">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-[#211536]">{trend.topic}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        {trend.subject} / {trend.chapter}
+                      </p>
+                    </div>
+                    <StudyBadge tone={trend.trend === "up" ? "amber" : trend.trend === "down" ? "green" : "purple"}>
+                      {trend.trend === "up" ? "反复错" : trend.trend === "down" ? "变稳定" : "待观察"}
+                    </StudyBadge>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-600">{trend.recommendation}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-[#f8f5ff] p-2">
+                      <p className="text-[11px] font-bold text-slate-500">近 7 天错</p>
+                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.recentWrongCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-[#f8f5ff] p-2">
+                      <p className="text-[11px] font-bold text-slate-500">题卡问题</p>
+                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.qualityIssueCount}</p>
+                    </div>
+                    <div className="rounded-lg bg-[#f8f5ff] p-2">
+                      <p className="text-[11px] font-bold text-slate-500">题量</p>
+                      <p className="mt-1 text-lg font-black text-[#4f23b6]">{trend.questionCount}</p>
+                    </div>
+                  </div>
+                </Link>
+              </StudyCard>
+            ))
+          ) : (
+            <StudyCard>
+              <p className="text-sm font-black text-[#211536]">暂无明显薄弱点变化</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                完成几轮复习后，这里会显示最近更该专项处理的知识点。
+              </p>
+            </StudyCard>
+          )}
+          {stats.qualitySummary.totalIssueCount > 0 ? (
+            <SecondaryStudyLink href="/questions?scope=inbox" className="justify-between">
+              <span>整理收件箱</span>
+              <span className="text-xs font-semibold text-slate-500">
+                {stats.qualitySummary.affectedQuestionCount} 题待整理
+              </span>
+            </SecondaryStudyLink>
+          ) : null}
         </div>
       </MobileSection>
 

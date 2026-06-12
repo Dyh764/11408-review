@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MathText } from "@/components/mobile/MathText";
+import { buildQuestionQualitySummary } from "@/lib/analytics/learning-insights";
 import {
   ProgressBar,
   SectionHeader,
@@ -77,7 +78,12 @@ export default function QuestionsPage() {
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
   const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
   const [keyword, setKeyword] = useState("");
-  const [quickScope, setQuickScope] = useState<QuickScope>("all");
+  const [quickScope, setQuickScope] = useState<QuickScope>(() =>
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("scope") === "inbox"
+      ? "inbox"
+      : "all",
+  );
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
@@ -175,6 +181,10 @@ export default function QuestionsPage() {
   const directory = useMemo(
     () => buildQuestionDirectory(filteredQuestions, dueTodayIds),
     [dueTodayIds, filteredQuestions],
+  );
+  const qualitySummary = useMemo(
+    () => buildQuestionQualitySummary(questions, { limit: 3 }),
+    [questions],
   );
   const selectedSubject = directory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
@@ -402,6 +412,54 @@ export default function QuestionsPage() {
               去复盘
             </Link>
           </div>
+        </StudyCard>
+      </MobileSection>
+
+      <MobileSection>
+        <StudyCard>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-[#211536]">整理收件箱</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                集中处理缺知识点、缺答案、待修正和 AI 未核对的题卡。
+              </p>
+            </div>
+            <StudyBadge tone={qualitySummary.highIssueCount > 0 ? "amber" : "purple"}>
+              {qualitySummary.affectedQuestionCount} 题
+            </StudyBadge>
+          </div>
+          {qualitySummary.topIssues.length > 0 ? (
+            <div className="mt-3 grid gap-2">
+              {qualitySummary.topIssues.map((issue) => (
+                <Link
+                  key={`${issue.questionId}-${issue.type}`}
+                  href={issue.actionHref}
+                  className="rounded-lg bg-[#f8f5ff] p-3 text-left ring-1 ring-[#e4dcff]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-[#4f23b6]">{issue.label}</span>
+                    <span className="text-[11px] font-bold text-slate-400">进入详情</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{issue.detail}</p>
+                </Link>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickScope("inbox");
+                  setActiveSubject("");
+                  setActiveChapter("");
+                }}
+                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+              >
+                查看全部待整理题卡
+              </button>
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-500">
+              当前题卡质量稳定，暂时没有明显整理项。
+            </p>
+          )}
         </StudyCard>
       </MobileSection>
 

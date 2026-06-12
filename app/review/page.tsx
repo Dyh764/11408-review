@@ -6,6 +6,10 @@ import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/comp
 import { MotivationBanner } from "@/components/study/MotivationBanner";
 import { ReviewFlashcard } from "@/components/study/ReviewFlashcard";
 import {
+  buildRoundExposureSummary,
+  type RoundExposureSummary,
+} from "@/lib/analytics/learning-insights";
+import {
   ProgressBar,
   SecondaryStudyLink,
   SprintStatCard,
@@ -57,6 +61,9 @@ export default function ReviewPage() {
     mastered: 0,
     wrong_again: 0,
   });
+  const [completedReviewItems, setCompletedReviewItems] = useState<
+    Array<{ question: DueReview["questions"]; result: ReviewResult }>
+  >([]);
   const [skippedCount, setSkippedCount] = useState(0);
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
   const [selectedChoices, setSelectedChoices] = useState<Record<string, string[]>>({});
@@ -212,6 +219,7 @@ export default function ReviewPage() {
 
     const nextReviews = reviews.filter((item) => item.id !== review.id);
     setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
+    setCompletedReviewItems((current) => [...current, { question: review.questions, result }]);
     setReviews(nextReviews);
     setLastCompletedReview({ result, remainingCount: nextReviews.length });
     setProcessingReviewId("");
@@ -222,6 +230,10 @@ export default function ReviewPage() {
   const overdueCount = reviews.filter((review) => isOverdue(review.scheduled_date)).length;
   const todayCount = reviews.length - overdueCount;
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
+  const roundExposureSummary: RoundExposureSummary = useMemo(
+    () => buildRoundExposureSummary(completedReviewItems),
+    [completedReviewItems],
+  );
   const progress = initialReviewCount > 0
     ? Math.round(((completedTotal + skippedCount) / initialReviewCount) * 100)
     : 0;
@@ -315,12 +327,35 @@ export default function ReviewPage() {
               </span>
             ))}
           </div>
+          <div className="mt-5 rounded-lg bg-white/12 p-3">
+            <p className="text-sm font-black text-white">本轮暴露问题</p>
+            {roundExposureSummary.exposedTopics.length > 0 ? (
+              <div className="mt-3 grid gap-2">
+                {roundExposureSummary.exposedTopics.map((topic) => (
+                  <Link
+                    key={topic.topic}
+                    href={topic.actionHref}
+                    className="rounded-lg bg-white px-3 py-2 text-left text-[#211536]"
+                  >
+                    <span className="block text-sm font-black">{topic.topic}</span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      本轮错 {topic.wrongCount} 次，建议开专项复盘。
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-white/80">
+                本轮没有集中暴露的知识点，保持当前节奏即可。
+              </p>
+            )}
+          </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <Link
-              href="/"
+              href={roundExposureSummary.nextActionHref}
               className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
             >
-              返回首页
+              {roundExposureSummary.nextActionLabel}
             </Link>
             <Link
               href="/questions"

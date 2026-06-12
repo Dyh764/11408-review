@@ -45,6 +45,22 @@ test("buildPracticeCatalog groups chapter and mistake review entries with counts
   );
 });
 
+test("filterPracticeQuestions can start a round from a weakness topic", () => {
+  const questions = [
+    { ...baseQuestion, id: "topic-high", knowledge_point: "矩阵秩", priority_score: 100 },
+    { ...baseQuestion, id: "topic-low", knowledge_point: "矩阵秩", priority_score: 10 },
+    { ...baseQuestion, id: "chapter-match", chapter: "矩阵秩", knowledge_point: "", priority_score: 80 },
+    { ...baseQuestion, id: "other", knowledge_point: "特征值", priority_score: 90 },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, { type: "topic", topic: "矩阵秩" }).map(
+      (question) => question.id,
+    ),
+    ["topic-high", "chapter-match", "topic-low"],
+  );
+});
+
 test("filterPracticeQuestions narrows by chapter or mistake type and sorts by priority", () => {
   const questions = [
     { ...baseQuestion, id: "low", chapter: "极限", mistake_types: ["概念混淆"], priority_score: 10 },
