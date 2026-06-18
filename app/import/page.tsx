@@ -72,6 +72,7 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
       <div className="flex flex-wrap gap-2">
         <StatusPill label={`第 ${item.index} 条`} tone="slate" />
         <StatusPill label={card.subject} tone="blue" />
+        <StatusPill label={card.source_info.name} tone="blue" />
         {card.image_path ? (
           <StatusPill label="已绑定原图路径" tone="blue" />
         ) : (
@@ -132,6 +133,18 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
         </div>
       ) : null}
       <dl className="mt-3 space-y-2 text-sm">
+        <div className="rounded-lg bg-[#f8f5ff] p-3 ring-1 ring-[#e4dcff]">
+          <dt className="font-semibold text-slate-800">题源信息</dt>
+          <dd className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+            <span>题源类型：{card.source_info.type || "未标来源"}</span>
+            <span>题源名称：{card.source_info.name || "未标来源"}</span>
+            <span>模块：{card.source_info.section || "无"}</span>
+            <span>卷/套：{card.source_info.paper || card.source_info.volume || "无"}</span>
+            <span>页码：{card.source_info.page || "无"}</span>
+            <span>题号：{card.source_info.problem_number || "无"}</span>
+            <span>原始来源：{card.source_info.raw || "未标来源"}</span>
+          </dd>
+        </div>
         {hasAnswer ? (
           <div className="rounded-lg bg-slate-50 p-3">
             <dt className="font-semibold text-slate-800">标准答案预览</dt>

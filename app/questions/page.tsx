@@ -18,6 +18,11 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import { buildQuestionBadges } from "@/lib/questions/question-badges";
+import {
+  buildQuestionSourceStats,
+  getQuestionSourceInfo,
+  type QuestionSourceStats,
+} from "@/lib/questions/source-info";
 import { buildQuestionDirectory, type QuestionChapterGroup, type QuestionSubjectDirectory } from "@/lib/taxonomy/question-taxonomy";
 import {
   getQuestionTextStatusLabel,
@@ -42,6 +47,7 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
 ];
 
 type QuickScope = "all" | "recent" | "weak" | "inbox" | "needs_fix" | "uncategorized";
+type DirectoryMode = "chapter" | "source";
 
 type FilterPanelProps = {
   quickScope: QuickScope;
@@ -67,6 +73,16 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function formatSourceDate(value: string | null) {
+  if (!value) return "无";
+  return value.slice(0, 10) === todayIsoDate() ? "今天" : formatDate(value);
+}
+
+function getQuestionSourceKey(question: QuestionWithImage) {
+  const sourceInfo = getQuestionSourceInfo(question);
+  return `${sourceInfo.type}::${sourceInfo.name}`;
 }
 
 function getQuestionKind(choiceCount: number) {
@@ -117,6 +133,8 @@ export default function QuestionsPage() {
           : "all") as QuickScope)
       : "all",
   );
+  const [directoryMode, setDirectoryMode] = useState<DirectoryMode>("chapter");
+  const [activeSourceKey, setActiveSourceKey] = useState("");
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
@@ -228,11 +246,28 @@ export default function QuestionsPage() {
     () => buildQuestionDirectory(filteredQuestions, dueTodayIds),
     [dueTodayIds, filteredQuestions],
   );
+  const sourceStats = useMemo(
+    () => buildQuestionSourceStats(filteredQuestions),
+    [filteredQuestions],
+  );
+  const sourceQuestions = useMemo(
+    () =>
+      activeSourceKey
+        ? filteredQuestions.filter((question) => getQuestionSourceKey(question) === activeSourceKey)
+        : filteredQuestions,
+    [activeSourceKey, filteredQuestions],
+  );
+  const sourceDirectory = useMemo(
+    () => buildQuestionDirectory(sourceQuestions, dueTodayIds),
+    [dueTodayIds, sourceQuestions],
+  );
+  const activeDirectory =
+    directoryMode === "source" && activeSourceKey ? sourceDirectory : directory;
   const qualitySummary = useMemo(
     () => buildQuestionQualitySummary(questions, { includeAiUnverified: showAiUnverified, limit: 4 }),
     [questions, showAiUnverified],
   );
-  const selectedSubject = directory.find((group) => group.subject === activeSubject) ?? null;
+  const selectedSubject = activeDirectory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
     selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
   const filterPanelProps: FilterPanelProps = {
@@ -570,6 +605,36 @@ export default function QuestionsPage() {
       ) : null}
 
       <MobileSection>
+        <StudyCard>
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f8f5ff] p-1">
+            {[
+              { key: "chapter", label: "按章节看" },
+              { key: "source", label: "按题源看" },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  setDirectoryMode(item.key as DirectoryMode);
+                  setActiveSourceKey("");
+                  setActiveSubject("");
+                  setActiveChapter("");
+                  setSelectedIds([]);
+                }}
+                className={`min-h-10 rounded-md text-sm font-black ${
+                  directoryMode === item.key
+                    ? "bg-white text-[#4f23b6] shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </StudyCard>
+      </MobileSection>
+
+      <MobileSection>
         <div className="space-y-4">
         {!isLoading && filteredQuestions.length === 0 ? (
           <EmptyState
@@ -578,9 +643,35 @@ export default function QuestionsPage() {
             action={{ href: "/upload", label: "去拍题" }}
           />
         ) : null}
-        {!selectedSubject ? (
+        {directoryMode === "source" && !activeSourceKey ? (
+          <SourceDirectory
+            stats={sourceStats}
+            onSelectSource={(key) => {
+              setActiveSourceKey(key);
+              setActiveSubject("");
+              setActiveChapter("");
+              setSelectedIds([]);
+            }}
+          />
+        ) : null}
+        {!(directoryMode === "source" && !activeSourceKey) && !selectedSubject ? (
           <SubjectDirectory
-            directory={directory}
+            directory={activeDirectory}
+            sourceName={
+              directoryMode === "source"
+                ? sourceStats.find((source) => source.key === activeSourceKey)?.name
+                : undefined
+            }
+            onBackSource={
+              directoryMode === "source"
+                ? () => {
+                    setActiveSourceKey("");
+                    setActiveSubject("");
+                    setActiveChapter("");
+                    setSelectedIds([]);
+                  }
+                : undefined
+            }
             onSelectSubject={(subject) => {
               setActiveSubject(subject);
               setActiveChapter("");
@@ -724,17 +815,33 @@ function FilterPanel({
 
 function SubjectDirectory({
   directory,
+  sourceName,
+  onBackSource,
   onSelectSubject,
 }: {
   directory: QuestionSubjectDirectory<QuestionWithImage>[];
+  sourceName?: string;
+  onBackSource?: () => void;
   onSelectSubject: (subject: string) => void;
 }) {
   return (
     <section>
       <SectionHeader
-        title="科目目录"
+        title={sourceName ? `${sourceName} / 科目目录` : "科目目录"}
         subtitle="默认先从科目入口进入，再看章节和题目。"
-        action={<StudyBadge tone="purple">{directory.length} 科目</StudyBadge>}
+        action={
+          onBackSource ? (
+            <button
+              type="button"
+              onClick={onBackSource}
+              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+            >
+              返回题源
+            </button>
+          ) : (
+            <StudyBadge tone="purple">{directory.length} 科目</StudyBadge>
+          )
+        }
       />
       <div className="grid gap-3">
         {directory.map((subject) => (
@@ -762,6 +869,58 @@ function SubjectDirectory({
                   label="掌握进度"
                   helper={`${subject.masteryRate}%`}
                 />
+              </div>
+            </StudyCard>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SourceDirectory({
+  stats,
+  onSelectSource,
+}: {
+  stats: QuestionSourceStats[];
+  onSelectSource: (key: string) => void;
+}) {
+  return (
+    <section>
+      <SectionHeader
+        title="题源信息"
+        subtitle="按题源进入后，再看科目、章节和具体错题。这里只显示错题数量和薄弱点。"
+        action={<StudyBadge tone="purple">{stats.length} 个题源</StudyBadge>}
+      />
+      <div className="grid gap-3">
+        {stats.map((source) => (
+          <button
+            key={source.key}
+            type="button"
+            onClick={() => onSelectSource(source.key)}
+            className="text-left"
+          >
+            <StudyCard>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-lg font-black text-[#211536]">{source.name}</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {source.type} · {source.section || "未标模块"} · 最近更新 {formatSourceDate(source.latest_added_at)}
+                  </p>
+                </div>
+                <StudyBadge tone={source.name === "未标来源" ? "amber" : "purple"}>
+                  {source.wrong_questions} 题
+                </StudyBadge>
+              </div>
+              <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600">
+                <p>总题数：{source.total_questions}</p>
+                <p>主要章节：{source.weak_chapters.length ? source.weak_chapters.join("、") : "待整理"}</p>
+                <p>
+                  高频错因：
+                  {source.frequent_mistake_types.length
+                    ? source.frequent_mistake_types.join("、")
+                    : "待整理"}
+                </p>
               </div>
             </StudyCard>
           </button>
@@ -1011,6 +1170,7 @@ function QuestionDirectory({
                     </p>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
+                    <StudyBadge tone="cyan">{getQuestionSourceInfo(question).name}</StudyBadge>
                     {badges.map((badge) => (
                       <StudyBadge key={badge.label} tone={badge.tone}>
                         {badge.label}

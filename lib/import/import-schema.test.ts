@@ -200,6 +200,100 @@ test("returns a specific parse failure message when repair still cannot parse JS
     /JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。/,
   );
 });
+
+test("old import JSON without source gets an unmarked source_info fallback", () => {
+  const result = parseImportJsonText(JSON.stringify([validRow({ source: undefined })]));
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.cards.length, 1);
+  assert.deepEqual(result.cards[0].card.source_info, {
+    type: "未标来源",
+    name: "未标来源",
+    section: "",
+    volume: "",
+    paper: "",
+    page: "",
+    problem_number: "",
+    raw: "未标来源",
+  });
+});
+
+test("Import Protocol v2 parses structured source and keeps the old database subject compatible", () => {
+  const result = parseImportJsonText(
+    JSON.stringify([
+      validRow({
+        import_protocol_version: "2.0",
+        subject: "高等数学",
+        source: {
+          type: "练习册",
+          name: "武忠祥严选题",
+          section: "高等数学",
+          volume: "",
+          paper: "",
+          page: "42",
+          problem_number: "8",
+          raw: "武忠祥严选题-高数-42页-8题",
+        },
+        chapter: "三重积分",
+        difficulty: "较难",
+      }),
+    ]),
+  );
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.cards[0].card.subject, "数学");
+  assert.equal(result.cards[0].card.chapter, "高等数学-三重积分");
+  assert.equal(result.cards[0].card.difficulty, "较难");
+  assert.deepEqual(result.cards[0].card.source_info, {
+    type: "练习册",
+    name: "武忠祥严选题",
+    section: "高等数学",
+    volume: "",
+    paper: "",
+    page: "42",
+    problem_number: "8",
+    raw: "武忠祥严选题-高数-42页-8题",
+  });
+});
+
+test("source string imports are converted to source_info objects", () => {
+  const result = parseImportJsonText(
+    JSON.stringify([
+      validRow({
+        import_protocol_version: "2.0",
+        subject: "数学",
+        chapter: "三重积分",
+        source: "武忠祥严选题-高数",
+      }),
+    ]),
+  );
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.cards[0].card.source_info.name, "武忠祥严选题");
+  assert.equal(result.cards[0].card.source_info.type, "练习册");
+  assert.equal(result.cards[0].card.source_info.section, "高等数学");
+  assert.equal(result.cards[0].card.source_info.raw, "武忠祥严选题-高数");
+});
+
+test("parseImportWithDiagnostics classifies source and choices field problems", () => {
+  const result = parseImportWithDiagnostics(
+    JSON.stringify([
+      validRow({ source: { type: "练习册", name: 123 }, choices: "" }),
+    ]),
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.diagnostics.length, 2);
+  assert.deepEqual(
+    result.diagnostics.map((diagnostic) => diagnostic.type),
+    ["source格式错误", "choices格式错误"],
+  );
+  assert.deepEqual(
+    result.diagnostics.map((diagnostic) => diagnostic.field),
+    ["source", "choices"],
+  );
+});
+
 test("parseImportWithDiagnostics reports JSON format location snippet and repair example", () => {
   const result = parseImportWithDiagnostics(`[
     {"subject": "鏁板", "question_text": "$\\Omega$"

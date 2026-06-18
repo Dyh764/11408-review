@@ -52,6 +52,7 @@ function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
     confidence: card.confidence ?? null,
     needs_manual_check: card.needs_manual_check,
     source: "chatgpt_import",
+    source_info: card.source_info,
     answer_status: card.answer_status,
     answer_source: card.answer_source,
     analyzed_at: new Date().toISOString(),

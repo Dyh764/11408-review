@@ -6,11 +6,13 @@ import type {
   Difficulty,
   MasteryStatus,
   QuestionSource,
+  QuestionSourceInfo,
   QuestionTextStatus,
   ReviewPriority,
   Subject,
 } from "@/lib/types";
 import { extractChoicesFromQuestionText, splitQuestionTextAndChoices } from "../questions/extract-choices.ts";
+import { normalizeQuestionSourceInfo } from "../questions/source-info.ts";
 
 export type ImportQuestionCard = {
   image_code?: string;
@@ -34,6 +36,7 @@ export type ImportQuestionCard = {
   confidence?: Confidence;
   needs_manual_check: boolean;
   source: QuestionSource;
+  source_info: QuestionSourceInfo;
   answer_status: AnswerStatus;
   answer_source: AnswerSource;
 };
@@ -58,8 +61,14 @@ export type ImportParseResult = {
 
 export type ImportDiagnosticType =
   | "JSON格式错误"
+  | "中文弯引号错误"
+  | "LaTeX反斜杠转义错误"
   | "字段缺失"
   | "字段类型错误"
+  | "source格式错误"
+  | "choices格式错误"
+  | "chapter不合法"
+  | "difficulty不合法"
   | "LaTeX错误"
   | "转义错误";
 
@@ -103,9 +112,13 @@ const confidences: Confidence[] = ["low", "medium", "high"];
 const mathSubjectAliases = ["高等数学", "线性代数", "概率论与数理统计"] as const;
 const difficultyAliases: Record<string, Difficulty> = {
   简单: "基础",
+  容易: "基础",
   普通: "中等",
   困难: "较难",
+  较难: "较难",
   难: "较难",
+  高难: "压轴",
+  压轴题: "压轴",
 };
 const masteryStatusAliases: Record<string, MasteryStatus> = {
   完全不会: "完全没思路",
@@ -152,14 +165,20 @@ type ImportJsonSanitizeReport = {
 type JsonStringDelimiter = "ascii" | "curly";
 
 export const chatGptImportPrompt = `请把今天的考研数学错题整理成可导入 11408-review 的 JSON 数组。
-只输出 JSON，不要 Markdown。
+只输出 JSON 数组，不要 Markdown。
+不要解释。
+使用 import_protocol_version = "2.0"。
+必须包含 source；没有来源时 source.raw 写“未标来源”。
+LaTeX 反斜杠必须双写。
 数学公式必须使用 LaTeX，并用 $...$ 包裹。
 选择题请把 A/B/C/D 放进 choices 数组，不要全部塞进 question_text。
 standard_answer 必须以“答案：”开头。
 answer_explanation 必须以“过程：”开头。
 
 每题字段包括：
+import_protocol_version
 subject
+source
 chapter
 knowledge_point
 difficulty
@@ -182,7 +201,18 @@ answer_source`;
 export const importExampleJson = JSON.stringify(
   [
     {
+      import_protocol_version: "2.0",
       subject: "数学",
+      source: {
+        type: "练习册",
+        name: "未标来源",
+        section: "高等数学",
+        volume: "",
+        paper: "",
+        page: "",
+        problem_number: "",
+        raw: "未标来源",
+      },
       chapter: "幂级数",
       knowledge_point: "幂级数收敛半径、比值法",
       difficulty: "基础",
@@ -402,6 +432,48 @@ function normalizeChapterForSubject(rawSubject: unknown, rawChapter: string) {
   return `${subject}-${rawChapter}`;
 }
 
+function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
+  if (value === undefined || value === null || value === "") {
+    return normalizeQuestionSourceInfo(null);
+  }
+
+  if (typeof value === "string") {
+    return normalizeQuestionSourceInfo(value);
+  }
+
+  if (!isObject(value)) {
+    throw new Error("source 必须是对象或字符串。");
+  }
+
+  const allowedFields: Array<keyof QuestionSourceInfo> = [
+    "type",
+    "name",
+    "section",
+    "volume",
+    "paper",
+    "page",
+    "problem_number",
+    "raw",
+  ];
+  const sourceInfo: Partial<QuestionSourceInfo> = {};
+
+  for (const field of allowedFields) {
+    const fieldValue = value[field];
+    if (fieldValue === undefined || fieldValue === null) {
+      sourceInfo[field] = "";
+      continue;
+    }
+
+    if (typeof fieldValue !== "string") {
+      throw new Error("source 格式错误：type、name、section、volume、paper、page、problem_number、raw 必须是字符串。");
+    }
+
+    sourceInfo[field] = fieldValue.trim();
+  }
+
+  return normalizeQuestionSourceInfo(sourceInfo);
+}
+
 function defaultPriorityFromMastery(masteryStatus: MasteryStatus): ReviewPriority {
   if (masteryStatus === "完全没思路" || masteryStatus === "有一点思路") {
     return "high";
@@ -429,6 +501,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   );
   const questionText = optionalString(value.question_text, "question_text");
   const userNote = optionalString(value.user_note, "user_note");
+  const sourceInfo = normalizeImportSourceInfo(value.source);
 
   if (!questionText && !userNote) {
     throw new Error("question_text 和 user_note 至少需要填写一个。");
@@ -473,6 +546,9 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   }
 
   const choices = extractChoicesFromQuestionText(questionText, value.choices);
+  if (value.choices !== undefined && value.choices !== null && !Array.isArray(value.choices)) {
+    throw new Error("choices 必须是数组。");
+  }
   const displayQuestionText =
     choices.length > 0 && value.choices === undefined
       ? splitQuestionTextAndChoices(questionText).questionText
@@ -501,6 +577,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     confidence,
     needs_manual_check: needsManualCheck,
     source: "chatgpt_import",
+    source_info: sourceInfo,
     answer_status: answerStatus,
     answer_source: answerSource,
   };
@@ -580,7 +657,18 @@ function findFieldOffset(input: string, field: string | undefined, fallback = 0)
 
 function fixedExampleForField(field?: string) {
   const row: Record<string, unknown> = {
+    import_protocol_version: "2.0",
     subject: "数学",
+    source: {
+      type: "未标来源",
+      name: "未标来源",
+      section: "",
+      volume: "",
+      paper: "",
+      page: "",
+      problem_number: "",
+      raw: "未标来源",
+    },
     chapter: "函数、极限与连续",
     knowledge_point: "等价无穷小",
     difficulty: "中等",
@@ -611,6 +699,7 @@ function fieldFromErrorMessage(message: string) {
     "chapter",
     "knowledge_point",
     "difficulty",
+    "source",
     "question_text",
     "choices",
     "question_text_status",
@@ -633,6 +722,22 @@ function fieldFromErrorMessage(message: string) {
 }
 
 function diagnosticTypeFromRowError(message: string): ImportDiagnosticType {
+  if (message.includes("source")) {
+    return "source格式错误";
+  }
+
+  if (message.includes("choices")) {
+    return "choices格式错误";
+  }
+
+  if (message.includes("chapter")) {
+    return "chapter不合法";
+  }
+
+  if (message.includes("difficulty")) {
+    return "difficulty不合法";
+  }
+
   if (message.includes("question_text") && message.includes("user_note")) {
     return "字段缺失";
   }
@@ -655,6 +760,22 @@ function diagnosticSuggestion(type: ImportDiagnosticType, field?: string) {
 
   if (type === "LaTeX错误") {
     return "检查公式分隔符是否成对出现，并确认 LaTeX 命令没有缺少反斜杠或右括号。";
+  }
+
+  if (type === "source格式错误") {
+    return "source 可以是标准对象或来源字符串；对象内 type、name、section、volume、paper、page、problem_number、raw 都应是字符串。";
+  }
+
+  if (type === "choices格式错误") {
+    return "choices 必须是数组；没有选项时请写 []，选择题请写成 [{\"label\":\"A\",\"text\":\"...\"}]。";
+  }
+
+  if (type === "chapter不合法") {
+    return "请把 chapter 归入当前目录，例如三重积分、曲线曲面积分、无穷级数或待整理 / 未分类。";
+  }
+
+  if (type === "difficulty不合法") {
+    return "difficulty 请使用简单、中等、困难，或兼容旧值基础、较难、压轴。";
   }
 
   if (type === "字段类型错误") {
@@ -758,6 +879,72 @@ function buildRowDiagnostic(input: string, error: ImportRowError): ImportDiagnos
   };
 }
 
+function buildManualFieldDiagnostic(
+  input: string,
+  field: string,
+  type: ImportDiagnosticType,
+): ImportDiagnostic {
+  const offset = findFieldOffset(input, field);
+
+  return {
+    type,
+    ...getLineAndCharacter(input, offset),
+    field,
+    snippet: snippetAround(input, offset),
+    suggestion: diagnosticSuggestion(type, field),
+    fixedExample: fixedExampleForField(field),
+  };
+}
+
+function buildCommonFieldDiagnostics(parsed: unknown, input: string) {
+  const diagnostics: ImportDiagnostic[] = [];
+
+  if (!Array.isArray(parsed)) {
+    return diagnostics;
+  }
+
+  for (const row of parsed) {
+    if (!isObject(row)) {
+      continue;
+    }
+
+    if (
+      row.source !== undefined &&
+      row.source !== null &&
+      typeof row.source !== "string"
+    ) {
+      if (!isObject(row.source)) {
+        diagnostics.push(buildManualFieldDiagnostic(input, "source", "source格式错误"));
+      } else {
+        const source = row.source as Record<string, unknown>;
+        const hasBadSourceField = [
+          "type",
+          "name",
+          "section",
+          "volume",
+          "paper",
+          "page",
+          "problem_number",
+          "raw",
+        ].some((field) => {
+          const value = source[field];
+          return value !== undefined && value !== null && typeof value !== "string";
+        });
+
+        if (hasBadSourceField) {
+          diagnostics.push(buildManualFieldDiagnostic(input, "source", "source格式错误"));
+        }
+      }
+    }
+
+    if (row.choices !== undefined && row.choices !== null && !Array.isArray(row.choices)) {
+      diagnostics.push(buildManualFieldDiagnostic(input, "choices", "choices格式错误"));
+    }
+  }
+
+  return diagnostics;
+}
+
 export function parseImportWithDiagnostics(input: string): ImportDiagnosticResult {
   let parsed: unknown;
   let sanitizedText: string | undefined;
@@ -787,6 +974,20 @@ export function parseImportWithDiagnostics(input: string): ImportDiagnosticResul
         diagnostics: [buildJsonFormatDiagnostic(input, secondError)],
       };
     }
+  }
+
+  const commonDiagnostics = buildCommonFieldDiagnostics(parsed, sanitizedText ?? input);
+  if (commonDiagnostics.length > 0) {
+    return {
+      cards: [],
+      errors: commonDiagnostics.map((diagnostic, index) => ({
+        index: index + 1,
+        message: diagnostic.suggestion,
+      })),
+      sanitizedText,
+      repairNotices,
+      diagnostics: commonDiagnostics,
+    };
   }
 
   const result = parseImportArray(parsed);

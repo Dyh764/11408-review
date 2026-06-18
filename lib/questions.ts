@@ -7,6 +7,7 @@ import type {
   Difficulty,
   MasteryStatus,
   QuestionSource,
+  QuestionSourceInfo,
   QuestionTextStatus,
   ReviewPriority,
   Subject,
@@ -35,6 +36,7 @@ export type QuestionRecord = {
   confidence: string | null;
   needs_manual_check: boolean;
   source: QuestionSource;
+  source_info: QuestionSourceInfo | null;
   answer_status: AnswerStatus;
   answer_source: AnswerSource;
   created_at: string;
@@ -70,6 +72,7 @@ const questionColumns = `
   confidence,
   needs_manual_check,
   source,
+  source_info,
   answer_status,
   answer_source,
   created_at,
