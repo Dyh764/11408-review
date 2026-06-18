@@ -14,8 +14,9 @@ async function expectPageHasNoHorizontalOverflow(page: Page) {
 
 async function expectBottomNav(page: Page) {
   await expect(page.locator("nav").getByRole("link", { name: /首页|棣栭〉/ })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link", { name: /错题|閿欓/ })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link", { name: /导入|瀵煎叆/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /拍题|鎷嶉/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /复习|澶嶄範/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
 }
 
@@ -35,33 +36,31 @@ test("home page is accessible and includes bottom navigation", async ({ page }) 
 
   expect(response?.status()).toBeLessThan(400);
   await expectBottomNav(page);
-  await expect(page.getByRole("link", { name: /导入 ChatGPT 错题卡/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "打开错题本" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "进入导入诊断" })).toBeVisible();
 });
 
-test("home mobile first screen exposes primary study actions", async ({ page }) => {
+test("home mobile first screen exposes primary asset actions", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  const uploadLink = page.getByRole("link", { name: /拍题上传/ }).first();
-  const importLink = page.getByRole("link", { name: /导入 ChatGPT 错题卡/ });
+  const questionsLink = page.getByRole("link", { name: /打开错题本/ }).first();
+  const importLink = page.getByRole("link", { name: /进入导入诊断/ }).first();
 
-  await expect(uploadLink).toBeVisible();
-  await expect(uploadLink).toHaveAttribute("href", "/upload");
+  await expect(questionsLink).toBeVisible();
+  await expect(questionsLink).toHaveAttribute("href", "/questions");
   await expect(importLink).toBeVisible();
   await expect(importLink).toHaveAttribute("href", "/import");
-  await expect(page.getByRole("heading", { name: "新增错题" })).toBeVisible();
-  await expect(page.getByText("今日提分焦点")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "数学错题资产管理" })).toBeVisible();
+  await expect(page.getByText("核心模块")).toBeVisible();
+  await expect(page.getByRole("link", { name: /错题本 按章节/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今日提分焦点" })).toBeVisible();
 
-  const newQuestionBox = await page.getByRole("heading", { name: "新增错题" }).boundingBox();
-  const focusBox = await page.getByText("今日提分焦点").first().boundingBox();
-  expect(newQuestionBox?.y ?? 0).toBeLessThan(focusBox?.y ?? 0);
-
-  const startReviewLink = page.getByRole("link", { name: /开始今日复习/ });
-  if ((await startReviewLink.count()) > 0) {
-    await expect(startReviewLink.first()).toBeVisible();
-  } else {
-    await expect(page.getByText("今日暂无到期复习")).toBeVisible();
-  }
+  const modulesBox = await page.getByText("核心模块").first().boundingBox();
+  const focusBox = await page.getByRole("heading", { name: "今日提分焦点" }).boundingBox();
+  expect(modulesBox?.y ?? 0).toBeLessThan(focusBox?.y ?? 0);
+  await expect(page.getByRole("link", { name: /开始今日复习/ })).toHaveCount(0);
+  await expectPageHasNoHorizontalOverflow(page);
 });
 
 test("login page is accessible", async ({ page }) => {
@@ -253,6 +252,12 @@ test("import page shows specific parse guidance when JSON repair still fails", a
       "JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。",
     ),
   ).toBeVisible();
+  await expect(page.getByText("导入诊断")).toBeVisible();
+  await expect(page.getByText("JSON格式错误")).toBeVisible();
+  await expect(page.getByText(/第 \d+ 行 \/ 第 \d+ 个字符/)).toBeVisible();
+  await expect(page.getByText("错误片段")).toBeVisible();
+  await expect(page.getByText("修复建议")).toBeVisible();
+  await expect(page.getByText("查看修复后的 JSON 示例")).toBeVisible();
 });
 
 test("import page normalizes ChatGPT Chinese taxonomy values when reachable", async ({
@@ -446,13 +451,13 @@ test("review flow asks users to reveal answers before result buttons when reacha
   await expect(page.getByRole("button", { name: "仍不会" }).first()).toBeVisible();
 });
 
-test("home page keeps optional DeepSeek out of the primary cockpit", async ({ page }) => {
+test("home page keeps optional DeepSeek out of the primary asset cockpit", async ({ page }) => {
   const response = await page.goto("/");
 
   expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByText("今日学习驾驶舱")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "新增错题" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "常用入口" })).toBeVisible();
+  await expect(page.getByText("数学错题资产管理")).toBeVisible();
+  await expect(page.getByText("核心模块")).toBeVisible();
+  await expect(page.getByRole("link", { name: /错题分享 进入单题详情/ })).toBeVisible();
   await expect(page.getByText("现在应该点这里")).toHaveCount(0);
   await expect(page.getByText("主流程入口保留，低频功能不抢首屏。")).toHaveCount(0);
   await expect(page.getByText("智能建议")).toHaveCount(0);

@@ -16,6 +16,8 @@ import {
   chatGptImportPrompt,
   importExampleJson,
   parseImportJsonText,
+  parseImportWithDiagnostics,
+  type ImportDiagnostic,
   type ImportParsedCard,
   type ImportRowError,
 } from "@/lib/import/import-schema";
@@ -26,7 +28,38 @@ type ImportApiResult = {
   failureCount?: number;
   successes?: Array<{ index: number; questionId: string; reviewCount: number; warning?: string; inbox?: boolean }>;
   failures?: ImportRowError[];
+  diagnostics?: ImportDiagnostic[];
 };
+
+function ImportDiagnosticCard({ diagnostic }: { diagnostic: ImportDiagnostic }) {
+  return (
+    <MobileCard tone="red">
+      <div className="flex flex-wrap gap-2">
+        <StatusPill label={diagnostic.type} tone="red" />
+        <StatusPill label={`第 ${diagnostic.line} 行 / 第 ${diagnostic.character} 个字符`} tone="amber" />
+        {diagnostic.field ? <StatusPill label={`字段：${diagnostic.field}`} tone="slate" /> : null}
+      </div>
+      <div className="mt-3 rounded-lg bg-white/80 p-3">
+        <p className="text-xs font-black text-red-700">错误片段</p>
+        <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-800">
+          {diagnostic.snippet}
+        </pre>
+      </div>
+      <div className="mt-3 rounded-lg bg-white/80 p-3">
+        <p className="text-xs font-black text-red-700">修复建议</p>
+        <p className="mt-2 text-sm leading-6 text-slate-800">{diagnostic.suggestion}</p>
+      </div>
+      <details className="mt-3 rounded-lg bg-white/80 p-3">
+        <summary className="cursor-pointer list-none text-xs font-black text-[#4f23b6]">
+          查看修复后的 JSON 示例
+        </summary>
+        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-800">
+          {diagnostic.fixedExample}
+        </pre>
+      </details>
+    </MobileCard>
+  );
+}
 
 function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?: ImportQualityRow }) {
   const { card } = item;
@@ -130,6 +163,7 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
 export default function ImportPage() {
   const [jsonText, setJsonText] = useState("");
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
+  const [importDiagnostics, setImportDiagnostics] = useState<ImportDiagnostic[]>([]);
   const [parseNotice, setParseNotice] = useState("");
   const [parseRepairNotices, setParseRepairNotices] = useState<string[]>([]);
   const [apiResult, setApiResult] = useState<ImportApiResult | null>(null);
@@ -158,7 +192,9 @@ export default function ImportPage() {
 
   function handleParse() {
     const result = parseImportJsonText(jsonText);
+    const diagnosticResult = parseImportWithDiagnostics(jsonText);
     setParseErrors(result.errors);
+    setImportDiagnostics(diagnosticResult.diagnostics);
     setParseRepairNotices(result.repairNotices ?? []);
     setParseNotice(
       result.sanitizedText && result.errors.length === 0
@@ -201,6 +237,7 @@ export default function ImportPage() {
       const result = (await response.json()) as ImportApiResult;
 
       setApiResult(result);
+      setImportDiagnostics(result.diagnostics ?? []);
       if (!response.ok && result.error) {
         setParseErrors([{ index: 0, message: result.error }]);
       }
@@ -272,6 +309,7 @@ export default function ImportPage() {
               onChange={(event) => {
                 setJsonText(event.target.value);
                 setParseErrors([]);
+                setImportDiagnostics([]);
                 setParseNotice("");
                 setParseRepairNotices([]);
                 setApiResult(null);
@@ -288,6 +326,7 @@ export default function ImportPage() {
               onClick={() => {
                 setJsonText(importExampleJson);
                 setParseErrors([]);
+                setImportDiagnostics([]);
                 setParseNotice("");
                 setParseRepairNotices([]);
                 setApiResult(null);
@@ -312,6 +351,19 @@ export default function ImportPage() {
           <p className="rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
             {parseNotice}
           </p>
+        </MobileSection>
+      ) : null}
+
+      {importDiagnostics.length > 0 ? (
+        <MobileSection title="导入诊断">
+          <div className="space-y-3">
+            {importDiagnostics.map((diagnostic, index) => (
+              <ImportDiagnosticCard
+                key={`${diagnostic.type}-${diagnostic.field ?? "json"}-${diagnostic.line}-${diagnostic.character}-${index}`}
+                diagnostic={diagnostic}
+              />
+            ))}
+          </div>
         </MobileSection>
       ) : null}
 

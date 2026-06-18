@@ -7,6 +7,7 @@ import {
 import {
   imagePathBelongsToUser,
   parseImportJsonText,
+  parseImportWithDiagnostics,
   type ImportQuestionCard,
 } from "@/lib/import/import-schema";
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
   }
 
   const parsed = parseImportJsonText(body.jsonText);
+  const diagnosticResult = parseImportWithDiagnostics(body.jsonText);
   const qualityReport = getImportQualityReport(parsed);
   const qualityByIndex = new Map<number, ImportQualityRow>(
     qualityReport.rows.map((row) => [row.index, row]),
@@ -175,6 +177,7 @@ export async function POST(request: Request) {
     successCount: successes.length,
     failureCount: failures.length,
     quality: qualityReport,
+    diagnostics: failures.length > 0 ? diagnosticResult.diagnostics : [],
     successes,
     failures,
   });

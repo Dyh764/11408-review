@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   parseImportJsonText,
+  parseImportWithDiagnostics,
   sanitizeImportJsonText,
 } from "./import-schema.ts";
 
@@ -198,4 +199,56 @@ test("returns a specific parse failure message when repair still cannot parse JS
     result.errors[0].message,
     /JSON 解析失败，可能原因：引号不是英文双引号、LaTeX 反斜杠未转义、数组逗号缺失、括号未闭合。/,
   );
+});
+test("parseImportWithDiagnostics reports JSON format location snippet and repair example", () => {
+  const result = parseImportWithDiagnostics(`[
+    {"subject": "鏁板", "question_text": "$\\Omega$"
+  ]`);
+
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].type, "JSON格式错误");
+  assert.equal(result.diagnostics[0].line, 3);
+  assert.ok(result.diagnostics[0].character > 0);
+  assert.match(result.diagnostics[0].snippet, /question_text/);
+  assert.match(result.diagnostics[0].suggestion, /检查 JSON/);
+  assert.match(result.diagnostics[0].fixedExample, /"subject"/);
+});
+
+test("parseImportWithDiagnostics reports field validation diagnostics with field names", () => {
+  const result = parseImportWithDiagnostics(
+    JSON.stringify([
+      validRow({ needs_manual_check: "true" }),
+      validRow({ question_text: "", user_note: "" }),
+    ]),
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.equal(result.diagnostics.length, 2);
+  assert.equal(result.diagnostics[0].type, "字段类型错误");
+  assert.equal(result.diagnostics[0].field, "needs_manual_check");
+  assert.match(result.diagnostics[0].snippet, /needs_manual_check/);
+  assert.equal(result.diagnostics[1].type, "字段缺失");
+  assert.equal(result.diagnostics[1].field, "question_text");
+  assert.match(result.diagnostics[1].fixedExample, /"question_text"/);
+});
+
+test("parseImportWithDiagnostics classifies LaTeX and escape problems", () => {
+  const latexResult = parseImportWithDiagnostics(
+    JSON.stringify([validRow({ question_text: "未闭合公式 $x+1" })]),
+  );
+  const escapeResult = parseImportWithDiagnostics(String.raw`[
+    {
+      "subject": "鏁板",
+      "question_text": "路径 \q 错误",
+      "mastery_status": "鏈変竴鐐规€濊矾",
+      "user_note": "bad escape",
+      "needs_manual_check": true
+    }
+  ]`);
+
+  assert.equal(latexResult.diagnostics[0].type, "LaTeX错误");
+  assert.equal(latexResult.diagnostics[0].field, "question_text");
+  assert.equal(escapeResult.diagnostics[0].type, "转义错误");
+  assert.match(escapeResult.diagnostics[0].suggestion, /反斜杠/);
 });

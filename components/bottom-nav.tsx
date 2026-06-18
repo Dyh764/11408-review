@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/", label: "首页", icon: "⌂" },
-  { href: "/upload", label: "拍题", icon: "+" },
-  { href: "/review", label: "复习", icon: "✓" },
-  { href: "/questions", label: "错题", icon: "□" },
+  { href: "/questions", label: "错题", icon: "▣" },
+  { href: "/import", label: "导入", icon: "+" },
+  { href: "/upload", label: "拍题", icon: "↑" },
   { href: "/settings", label: "我的", icon: "•" },
 ];
 

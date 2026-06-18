@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
@@ -31,6 +31,8 @@ import {
   type AiEnhancementSnapshot,
 } from "@/lib/questions/ai-enhancement-summary";
 import { createClient } from "@/lib/supabase/client";
+import { buildShareCardImageModel } from "@/lib/share/question-card";
+import { generateShareCardImage } from "@/lib/share/share-card-image";
 import type { AnswerStatus, Difficulty, MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
 
 const subjects: Subject[] = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
@@ -100,6 +102,7 @@ function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
 export default function QuestionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState<QuestionWithImage | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
@@ -110,6 +113,7 @@ export default function QuestionDetailPage() {
   const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -430,6 +434,55 @@ export default function QuestionDetailPage() {
     }
   }
 
+  async function handleCopyShareJson() {
+    if (!question) {
+      return;
+    }
+
+    setIsSharing(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${question.id}/share-card`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(typeof result.error === "string" ? result.error : "生成分享 JSON 失败。");
+        return;
+      }
+
+      await navigator.clipboard.writeText(JSON.stringify(result.card, null, 2));
+      setMessage("错题分享 JSON 已复制。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成分享 JSON 失败。");
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  async function handleDownloadShareImage() {
+    if (!question || !shareCardRef.current) {
+      setMessage("分享卡片还没有准备好。");
+      return;
+    }
+
+    setIsSharing(true);
+    setMessage("");
+
+    try {
+      const dataUrl = await generateShareCardImage(shareCardRef.current);
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `question-card-${question.id}.png`;
+      link.click();
+      setMessage("错题分享图片已生成。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成分享图片失败。");
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
   async function handleDeleteQuestion() {
     if (!question) {
       return;
@@ -478,6 +531,19 @@ export default function QuestionDetailPage() {
   const questionDisplay = question
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
+  const shareCardModel = question
+    ? buildShareCardImageModel({
+        subject: question.subject,
+        chapter: question.chapter,
+        knowledge_point: question.knowledge_point,
+        difficulty: question.difficulty,
+        question_text: questionDisplay.questionText || question.question_text,
+        mistake_types: question.mistake_types,
+        one_sentence_tip: question.one_sentence_tip,
+        standard_answer: question.standard_answer,
+        answer_explanation: question.answer_explanation,
+      })
+    : null;
 
   return (
     <MobilePageShell>
@@ -729,6 +795,88 @@ export default function QuestionDetailPage() {
                 </button>
               </div>
             </details>
+          </MobileSection>
+
+          <MobileSection title="错题分享">
+            <MobileCard>
+              <p className="text-sm leading-6 text-slate-600">
+                导出单题 JSON，或生成 1080x1350 的紫色错题卡片图，适合保存后分享到微信或小红书。
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleCopyShareJson}
+                  disabled={isSharing}
+                  className="min-h-12 rounded-lg bg-[#ede7ff] px-4 text-sm font-black text-[#4f23b6] disabled:text-slate-400"
+                >
+                  复制分享 JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadShareImage}
+                  disabled={isSharing}
+                  className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white disabled:bg-slate-300"
+                >
+                  下载错题卡 PNG
+                </button>
+              </div>
+              {shareCardModel ? (
+                <div className="pointer-events-none fixed -left-[2000px] top-0" aria-hidden="true">
+                  <div
+                    ref={shareCardRef}
+                    style={{ width: 1080, height: 1350 }}
+                    className="overflow-hidden bg-[#f4f0ff] p-[72px] text-[#211536]"
+                  >
+                    <div className="flex h-full flex-col rounded-[32px] border border-[#d8ccff] bg-white p-[56px] shadow-[0_32px_90px_rgba(79,35,182,0.18)]">
+                      <div className="flex items-start justify-between gap-8">
+                        <div className="min-w-0">
+                          <p className="text-[34px] font-black leading-tight text-[#4f23b6]">
+                            {shareCardModel.subject}
+                          </p>
+                          <p className="mt-4 break-words text-[46px] font-black leading-tight">
+                            {shareCardModel.knowledgePoint}
+                          </p>
+                        </div>
+                        <div className="shrink-0 rounded-full bg-[#ede7ff] px-8 py-4 text-[28px] font-black text-[#4f23b6]">
+                          {shareCardModel.difficulty}
+                        </div>
+                      </div>
+
+                      <div className="my-12 h-px bg-[#e4dcff]" />
+
+                      <div className="min-h-0 flex-1 overflow-hidden">
+                        <MathText
+                          text={shareCardModel.questionText}
+                          className="text-[38px] leading-[1.55] text-[#211536]"
+                        />
+                      </div>
+
+                      <div className="mt-10 rounded-[28px] bg-[#f8f5ff] p-8">
+                        <div className="flex flex-wrap gap-3">
+                          {shareCardModel.mistakeTypes.length > 0 ? (
+                            shareCardModel.mistakeTypes.map((item) => (
+                              <span
+                                key={item}
+                                className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-[#4f23b6] ring-1 ring-[#e4dcff]"
+                              >
+                                {item}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-[#4f23b6] ring-1 ring-[#e4dcff]">
+                              待整理错因
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-6 break-words text-[30px] font-bold leading-[1.45] text-[#211536]">
+                          {shareCardModel.oneSentenceTip}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </MobileCard>
           </MobileSection>
 
           <MobileSection title="更多操作">

@@ -105,6 +105,13 @@ export type RoundExposureSummary = {
   nextActionHref: string;
 };
 
+export type TodayLiftFocus = {
+  questions: AnalyticsQuestion[];
+  weakTopic: WeaknessTrend | null;
+  inboxIssue: QuestionQualityCard | null;
+  emptyMessage: string;
+};
+
 const fallbackTopic = "待整理错题";
 const fallbackChapter = "未分类";
 
@@ -275,6 +282,92 @@ export function selectHomeFocusTrend(trends: WeaknessTrend[]) {
         (trend.questionCount > 1 && trend.trend === "up"),
     ) ?? null
   );
+}
+
+function recentWrongQuestionIds(reviews: AnalyticsReviewResult[], today: string) {
+  const ids = new Map<string, number>();
+
+  for (const review of reviews) {
+    if (!isRecentReview(review, today, 7)) {
+      continue;
+    }
+
+    if (review.review_result === "wrong_again" || review.review_result === "still_wrong") {
+      ids.set(review.question_id, (ids.get(review.question_id) ?? 0) + 1);
+    }
+  }
+
+  return ids;
+}
+
+function focusQuestionScore(
+  question: AnalyticsQuestion,
+  recentWrongCounts: Map<string, number>,
+  issueCounts: Map<string, number>,
+) {
+  let score = questionBaseScore(question);
+  const mastery = question.mastery_status?.trim() ?? "";
+  score += (recentWrongCounts.get(question.id) ?? 0) * 18;
+  score += (issueCounts.get(question.id) ?? 0) * 3;
+
+  if (
+    mastery === "完全没思路" ||
+    mastery === "有一点思路" ||
+    mastery.includes("娌℃€濊矾") ||
+    mastery.includes("鏈変竴鐐规€濊矾")
+  ) {
+    score += 12;
+  }
+
+  if (question.review_priority === "high") {
+    score += 25;
+  }
+
+  if (mastery === "完全掌握" || mastery.includes("鎺屾彙")) {
+    score -= 20;
+  }
+
+  return score;
+}
+
+export function selectTodayLiftFocus(
+  questions: AnalyticsQuestion[],
+  reviews: AnalyticsReviewResult[] = [],
+  options: { today?: string } = {},
+): TodayLiftFocus {
+  const today = options.today ?? new Date().toISOString().slice(0, 10);
+  const weakTopic = selectHomeFocusTrend(buildWeaknessTrends(questions, reviews, { today, limit: 3 }));
+  const qualitySummary = buildQuestionQualitySummary(questions, { limit: 1 });
+  const allIssues = buildQuestionQualityIssues(questions);
+  const issueCounts = new Map<string, number>();
+  const recentWrongCounts = recentWrongQuestionIds(reviews, today);
+
+  for (const issueItem of allIssues) {
+    issueCounts.set(issueItem.questionId, (issueCounts.get(issueItem.questionId) ?? 0) + 1);
+  }
+
+  const topQuestions = [...questions]
+    .map((question, index) => ({
+      question,
+      index,
+      score: focusQuestionScore(question, recentWrongCounts, issueCounts),
+    }))
+    .filter((item) => item.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        String(b.question.created_at ?? "").localeCompare(String(a.question.created_at ?? "")) ||
+        a.index - b.index,
+    )
+    .slice(0, 3)
+    .map((item) => item.question);
+
+  return {
+    questions: topQuestions,
+    weakTopic,
+    inboxIssue: qualitySummary.topIssues[0] ?? null,
+    emptyMessage: "暂无明显薄弱点，先完成错题复习",
+  };
 }
 
 function issue(

@@ -56,6 +56,27 @@ export type ImportParseResult = {
   repairNotices?: string[];
 };
 
+export type ImportDiagnosticType =
+  | "JSON格式错误"
+  | "字段缺失"
+  | "字段类型错误"
+  | "LaTeX错误"
+  | "转义错误";
+
+export type ImportDiagnostic = {
+  type: ImportDiagnosticType;
+  line: number;
+  character: number;
+  field?: string;
+  snippet: string;
+  suggestion: string;
+  fixedExample: string;
+};
+
+export type ImportDiagnosticResult = ImportParseResult & {
+  diagnostics: ImportDiagnostic[];
+};
+
 export const importSubjects: Subject[] = [
   "数学",
   "数据结构",
@@ -512,6 +533,277 @@ function parseImportArray(parsed: unknown): ImportParseResult {
     },
     { cards: [], errors: [] },
   );
+}
+
+function getLineAndCharacter(input: string, offset: number) {
+  const safeOffset = Math.max(0, Math.min(offset, input.length));
+  const before = input.slice(0, safeOffset);
+  const lines = before.split(/\r?\n/);
+
+  return {
+    line: lines.length,
+    character: lines[lines.length - 1].length + 1,
+  };
+}
+
+function findJsonErrorOffset(message: string, input: string) {
+  const positionMatch = message.match(/position (\d+)/i);
+  if (positionMatch) {
+    return Number(positionMatch[1]);
+  }
+
+  const lineColumnMatch = message.match(/line (\d+) column (\d+)/i);
+  if (lineColumnMatch) {
+    const line = Number(lineColumnMatch[1]);
+    const column = Number(lineColumnMatch[2]);
+    const lines = input.split(/\r?\n/);
+    return lines.slice(0, line - 1).join("\n").length + (line > 1 ? 1 : 0) + column - 1;
+  }
+
+  return Math.max(0, input.length - 1);
+}
+
+function snippetAround(input: string, offset: number, length = 96) {
+  const safeOffset = Math.max(0, Math.min(offset, input.length));
+  const start = Math.max(0, safeOffset - Math.floor(length / 2));
+  const end = Math.min(input.length, start + length);
+  return input.slice(start, end).trim() || input.trim().slice(0, length);
+}
+
+function findFieldOffset(input: string, field: string | undefined, fallback = 0) {
+  if (!field) return fallback;
+  const quotedIndex = input.indexOf(`"${field}"`);
+  if (quotedIndex >= 0) return quotedIndex;
+  const plainIndex = input.indexOf(field);
+  return plainIndex >= 0 ? plainIndex : fallback;
+}
+
+function fixedExampleForField(field?: string) {
+  const row: Record<string, unknown> = {
+    subject: "数学",
+    chapter: "函数、极限与连续",
+    knowledge_point: "等价无穷小",
+    difficulty: "中等",
+    question_text: "求 $\\lim_{x\\to0}\\frac{\\sin x}{x}$。",
+    mastery_status: "有一点思路",
+    user_note: "混淆了等价无穷小。",
+    mistake_types: ["概念不清"],
+    standard_answer: "答案：1",
+    answer_explanation: "过程：$\\sin x \\sim x$。",
+    one_sentence_tip: "先找可替换的等价无穷小。",
+    review_priority: "medium",
+    confidence: "medium",
+    needs_manual_check: true,
+    answer_status: "ai_unverified",
+    answer_source: "chatgpt_import",
+  };
+
+  if (field && !(field in row)) {
+    row[field] = "请按字段要求填写";
+  }
+
+  return JSON.stringify([row], null, 2);
+}
+
+function fieldFromErrorMessage(message: string) {
+  const knownFields = [
+    "subject",
+    "chapter",
+    "knowledge_point",
+    "difficulty",
+    "question_text",
+    "choices",
+    "question_text_status",
+    "mastery_status",
+    "user_note",
+    "mistake_types",
+    "solution_summary",
+    "standard_answer",
+    "answer_explanation",
+    "key_steps",
+    "one_sentence_tip",
+    "review_priority",
+    "confidence",
+    "needs_manual_check",
+    "answer_status",
+    "answer_source",
+  ];
+
+  return knownFields.find((field) => message.includes(field));
+}
+
+function diagnosticTypeFromRowError(message: string): ImportDiagnosticType {
+  if (message.includes("question_text") && message.includes("user_note")) {
+    return "字段缺失";
+  }
+
+  if (message.includes("必须") || message.includes("boolean") || message.includes("数组") || message.includes("不合法")) {
+    return "字段类型错误";
+  }
+
+  return "字段缺失";
+}
+
+function diagnosticSuggestion(type: ImportDiagnosticType, field?: string) {
+  if (type === "JSON格式错误") {
+    return "检查 JSON 的逗号、括号、双引号和数组闭合；确保整体是 JSON 数组。";
+  }
+
+  if (type === "转义错误") {
+    return "检查反斜杠转义；LaTeX 命令在 JSON 字符串中建议写成双反斜杠，例如 \\\\frac。";
+  }
+
+  if (type === "LaTeX错误") {
+    return "检查公式分隔符是否成对出现，并确认 LaTeX 命令没有缺少反斜杠或右括号。";
+  }
+
+  if (type === "字段类型错误") {
+    return `${field ?? "字段"} 的类型不符合导入要求，请按示例改成字符串、布尔值或字符串数组。`;
+  }
+
+  return `${field ?? "必填字段"} 缺失或为空，请补齐后再导入。`;
+}
+
+function hasInvalidJsonEscape(input: string) {
+  for (let index = 0; index < input.length; index += 1) {
+    if (input[index] !== "\\") continue;
+    const next = input[index + 1];
+    if (!next) return index;
+
+    if (next === "u") {
+      if (!hasValidUnicodeEscape(input, index)) return index;
+      index += 5;
+      continue;
+    }
+
+    if (!validEscapeCharacters.has(next)) return index;
+    index += 1;
+  }
+
+  return -1;
+}
+
+function mathDiagnosticForCard(card: ImportQuestionCard, rawText: string): ImportDiagnostic | null {
+  const fields: Array<{ field: keyof ImportQuestionCard; value?: string }> = [
+    { field: "question_text", value: card.question_text },
+    { field: "standard_answer", value: card.standard_answer },
+    { field: "answer_explanation", value: card.answer_explanation },
+    { field: "one_sentence_tip", value: card.one_sentence_tip },
+  ];
+
+  for (const item of fields) {
+    const value = item.value ?? "";
+    const hasUnbalancedMath =
+      (value.match(/\$/g)?.length ?? 0) % 2 !== 0 ||
+      (value.match(/\\\(/g)?.length ?? 0) !== (value.match(/\\\)/g)?.length ?? 0) ||
+      (value.match(/\\\[/g)?.length ?? 0) !== (value.match(/\\\]/g)?.length ?? 0);
+
+    if (hasUnbalancedMath) {
+      const field = String(item.field);
+      const offset = findFieldOffset(rawText, field);
+      return {
+        type: "LaTeX错误",
+        ...getLineAndCharacter(rawText, offset),
+        field,
+        snippet: snippetAround(rawText, offset),
+        suggestion: diagnosticSuggestion("LaTeX错误", field),
+        fixedExample: fixedExampleForField(field),
+      };
+    }
+  }
+
+  return null;
+}
+
+function buildJsonDiagnostic(input: string, error: unknown): ImportDiagnostic {
+  const message = error instanceof Error ? error.message : "";
+  const invalidEscapeOffset = hasInvalidJsonEscape(input);
+  const type: ImportDiagnosticType = invalidEscapeOffset >= 0 ? "转义错误" : "JSON格式错误";
+  const offset = invalidEscapeOffset >= 0 ? invalidEscapeOffset : findJsonErrorOffset(message, input);
+
+  return {
+    type,
+    ...getLineAndCharacter(input, offset),
+    snippet: snippetAround(input, offset),
+    suggestion: diagnosticSuggestion(type),
+    fixedExample: fixedExampleForField(),
+  };
+}
+
+function buildJsonFormatDiagnostic(input: string, error: unknown): ImportDiagnostic {
+  const message = error instanceof Error ? error.message : "";
+  const offset = findJsonErrorOffset(message, input);
+
+  return {
+    type: "JSON格式错误",
+    ...getLineAndCharacter(input, offset),
+    snippet: snippetAround(input, offset),
+    suggestion: diagnosticSuggestion("JSON格式错误"),
+    fixedExample: fixedExampleForField(),
+  };
+}
+
+function buildRowDiagnostic(input: string, error: ImportRowError): ImportDiagnostic {
+  const field = fieldFromErrorMessage(error.message);
+  const type = diagnosticTypeFromRowError(error.message);
+  const offset = findFieldOffset(input, field);
+
+  return {
+    type,
+    ...getLineAndCharacter(input, offset),
+    field,
+    snippet: snippetAround(input, offset),
+    suggestion: diagnosticSuggestion(type, field),
+    fixedExample: fixedExampleForField(field),
+  };
+}
+
+export function parseImportWithDiagnostics(input: string): ImportDiagnosticResult {
+  let parsed: unknown;
+  let sanitizedText: string | undefined;
+  let repairNotices: string[] | undefined;
+  const diagnostics: ImportDiagnostic[] = [];
+
+  try {
+    parsed = JSON.parse(input);
+  } catch (firstError) {
+    const sanitized = sanitizeImportJsonTextWithReport(input);
+
+    try {
+      parsed = JSON.parse(sanitized.text);
+      sanitizedText = sanitized.text !== input ? sanitized.text : undefined;
+      repairNotices = [
+        sanitized.changedCurlyQuotes ? "检测到中文弯引号：已尝试转换。" : "",
+        sanitized.fixedLatexBackslashes ? "检测到 LaTeX 单反斜杠：已尝试转义。" : "",
+      ].filter(Boolean);
+
+      if (sanitized.fixedLatexBackslashes) {
+        diagnostics.push(buildJsonDiagnostic(input, firstError));
+      }
+    } catch (secondError) {
+      return {
+        cards: [],
+        errors: [{ index: 0, message: specificParseFailureMessage }],
+        diagnostics: [buildJsonFormatDiagnostic(input, secondError)],
+      };
+    }
+  }
+
+  const result = parseImportArray(parsed);
+  diagnostics.push(...result.errors.map((error) => buildRowDiagnostic(sanitizedText ?? input, error)));
+
+  for (const parsedCard of result.cards) {
+    const mathDiagnostic = mathDiagnosticForCard(parsedCard.card, sanitizedText ?? input);
+    if (mathDiagnostic) diagnostics.push(mathDiagnostic);
+  }
+
+  return {
+    ...result,
+    cards: diagnostics.length > 0 ? [] : result.cards,
+    sanitizedText,
+    repairNotices,
+    diagnostics,
+  };
 }
 
 export function parseImportJsonText(input: string): ImportParseResult {

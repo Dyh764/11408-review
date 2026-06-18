@@ -225,37 +225,38 @@ test("mobile UI exposes the mature learning-app components", () => {
   }
 });
 
-test("home page is a today learning cockpit, not a technical menu", () => {
+test("home page is a wrong-question asset cockpit, not a technical menu", () => {
   const source = read("app/page.tsx");
 
-  assert.match(source, /今日学习驾驶舱/);
-  assert.match(source, /开始今日复习/);
-  assert.match(source, /拍题上传/);
-  assert.match(source, /导入 ChatGPT 错题卡/);
-  assert.match(source, /更多入口/);
-  assert.match(source, /loadDashboardStats/);
+  assert.match(source, /数学错题资产管理/);
+  assert.match(source, /核心模块/);
+  assert.match(source, /错题本/);
+  assert.match(source, /今日提分焦点/);
+  assert.match(source, /导入诊断/);
+  assert.match(source, /错题分享/);
+  assert.match(source, /loadHomeStats/);
+  assert.match(source, /selectTodayLiftFocus/);
   assert.doesNotMatch(source, /dashboardStats/);
-  assert.doesNotMatch(source, /刷新智能分析/);
+  assert.doesNotMatch(source, /开始今日复习|今日学习驾驶舱|打卡/);
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
 
-test("home page prioritizes daily actions and new questions before analysis", () => {
+test("home page prioritizes core modules before lightweight focus", () => {
   const source = read("app/page.tsx");
-  const reviewIndex = source.indexOf("今日待复习");
-  const uploadIndex = source.indexOf("新增错题");
-  const focusIndex = source.indexOf("今日提分焦点");
+  const modulesIndex = source.indexOf('title="核心模块"');
+  const focusIndex = source.indexOf('title="今日提分焦点"');
+  const questionsIndex = source.indexOf("/questions");
+  const importIndex = source.indexOf("/import");
 
-  assert.notEqual(reviewIndex, -1);
-  assert.notEqual(uploadIndex, -1);
+  assert.notEqual(modulesIndex, -1);
   assert.notEqual(focusIndex, -1);
-  assert.ok(reviewIndex < uploadIndex);
-  assert.ok(uploadIndex < focusIndex);
-  assert.match(source, /开始今日复习/);
-  assert.match(source, /查看今日题单/);
-  assert.match(source, /拍题上传/);
-  assert.match(source, /导入 ChatGPT 错题卡/);
-  assert.match(source, /selectHomeFocusTrend/);
-  assert.match(source, /暂无明显拖后腿知识点，先完成今日复习。/);
+  assert.notEqual(questionsIndex, -1);
+  assert.notEqual(importIndex, -1);
+  assert.ok(modulesIndex < focusIndex);
+  assert.match(source, /打开错题本/);
+  assert.match(source, /进入导入诊断/);
+  assert.match(source, /暂无明显薄弱点，先完成错题复习/);
+  assert.doesNotMatch(source, /selectHomeFocusTrend/);
   assert.doesNotMatch(source, /weaknessTrends\.map/);
 });
 
@@ -298,9 +299,9 @@ test("learning analytics surfaces stay mobile-first across home, review, questio
   const practice = read("app/practice/page.tsx");
   const reports = read("app/reports/page.tsx");
 
-  assert.match(home, /buildWeaknessTrends/);
+  assert.match(home, /selectTodayLiftFocus/);
   assert.match(home, /今日提分焦点/);
-  assert.match(home, /专项复盘/);
+  assert.match(home, /3道最该做错题/);
   assert.match(review, /buildRoundExposureSummary/);
   assert.match(review, /本轮暴露问题/);
   assert.match(questions, /buildQuestionQualitySummary/);
@@ -334,7 +335,7 @@ test("/practice reuses the review flashcard component for chapter and mistake re
   assert.match(sharedCard, /canRecordReview/);
 });
 
-test("daily motivation uses a server route and browser cache instead of refreshing AI every render", () => {
+test("daily motivation remains secondary and keeps cached server routing", () => {
   const banner = read("components/study/MotivationBanner.tsx");
   const route = read("app/api/motivation/today/route.ts");
   const home = read("app/page.tsx");
@@ -344,7 +345,7 @@ test("daily motivation uses a server route and browser cache instead of refreshi
   assert.match(banner, /\/api\/motivation\/today/);
   assert.match(route, /generateMotivationLineWithAI/);
   assert.match(route, /fallback/);
-  assert.match(home, /<MotivationBanner/);
+  assert.doesNotMatch(home, /<MotivationBanner/);
   assert.match(review, /<MotivationBanner/);
 });
 
@@ -373,12 +374,14 @@ test("/review supports skipping and explicit next-step actions after recording",
   assert.match(source, /不记录本次结果/);
 });
 
-test("home and today review list expose selectable due-review entry points", () => {
+test("review remains reachable as a secondary route with selectable entry points", () => {
   const home = read("app/page.tsx");
+  const bottomNav = read("components/bottom-nav.tsx");
   const today = read("app/review/today/page.tsx");
   const review = read("app/review/page.tsx");
 
-  assert.match(home, /查看今日题单/);
+  assert.match(home, /href="\/questions"/);
+  assert.doesNotMatch(bottomNav, /href: "\/review"/);
   assert.match(today, /今日复习题单/);
   assert.match(today, /difficultyGroup/);
   assert.match(today, /buildQuestionBadges/);
@@ -443,4 +446,38 @@ test("DeepSeek enhancement only updates the allowed question fields", () => {
     "confidence",
     "needs_manual_check",
   ]);
+});
+
+test("v3 home page is an asset and decision system, not a daily review loop", () => {
+  const source = read("app/page.tsx");
+
+  assert.match(source, /selectTodayLiftFocus/);
+  assert.match(source, /数学错题资产管理/);
+  assert.match(source, /3道最该做错题/);
+  assert.match(source, /今日提分焦点/);
+  assert.match(source, /导入诊断/);
+  assert.match(source, /错题分享/);
+  assert.doesNotMatch(source, /dueToday|completedToday|completionRate/);
+  assert.doesNotMatch(source, /开始今日复习|今日待复习|今日学习进度|打卡/);
+});
+
+test("v3 bottom navigation removes review as a primary module", () => {
+  const source = read("components/bottom-nav.tsx");
+
+  assert.doesNotMatch(source, /href: "\/review"/);
+  assert.match(source, /href: "\/questions"/);
+  assert.match(source, /href: "\/import"/);
+});
+
+test("v3 questions page exposes asset filters and share entry without changing review routes", () => {
+  const source = read("app/questions/page.tsx");
+  const detail = read("app/questions/[id]/page.tsx");
+
+  assert.match(source, /mistakeType/);
+  assert.match(source, /knowledgeKeyword/);
+  assert.match(source, /quickScope === "recent"/);
+  assert.match(source, /quickScope === "weak"/);
+  assert.match(source, /quickScope === "inbox"/);
+  assert.match(detail, /share-card/);
+  assert.match(detail, /generateShareCardImage/);
 });

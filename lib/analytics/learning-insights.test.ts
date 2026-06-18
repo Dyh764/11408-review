@@ -5,6 +5,7 @@ import {
   buildQuestionQualityIssues,
   buildQuestionQualitySummary,
   buildWeaknessTrends,
+  selectTodayLiftFocus,
   selectHomeFocusTrend,
   type AnalyticsQuestion,
   type AnalyticsReviewResult,
@@ -103,6 +104,52 @@ test("selectHomeFocusTrend keeps the homepage to one meaningful focus", () => {
 
   assert.equal(selectHomeFocusTrend([quietTrend]), null);
   assert.equal(selectHomeFocusTrend([quietTrend, riskyTrend])?.topic, "risky topic");
+});
+
+test("selectTodayLiftFocus returns three questions one weak topic and one inbox issue", () => {
+  const questions: AnalyticsQuestion[] = [
+    {
+      ...baseQuestion,
+      id: "weak-unmastered",
+      knowledge_point: "矩阵秩",
+      review_priority: "high",
+      mastery_status: "瀹屽叏娌℃€濊矾",
+    },
+    {
+      ...baseQuestion,
+      id: "recent-wrong",
+      knowledge_point: "矩阵秩",
+      review_priority: "medium",
+    },
+    {
+      ...baseQuestion,
+      id: "inbox",
+      knowledge_point: "",
+      question_text_status: "needs_fix",
+      standard_answer: "",
+    },
+    {
+      ...baseQuestion,
+      id: "stable",
+      knowledge_point: "稳定知识点",
+      review_priority: "low",
+      mastery_status: "瀹屽叏鎺屾彙",
+    },
+  ];
+  const reviews: AnalyticsReviewResult[] = [
+    { question_id: "recent-wrong", review_result: "wrong_again", completed_at: "2026-06-12T10:00:00.000Z" },
+    { question_id: "weak-unmastered", review_result: "still_wrong", completed_at: "2026-06-11T10:00:00.000Z" },
+  ];
+
+  const focus = selectTodayLiftFocus(questions, reviews, { today: "2026-06-12" });
+
+  assert.deepEqual(
+    focus.questions.map((question) => question.id),
+    ["weak-unmastered", "inbox", "recent-wrong"],
+  );
+  assert.equal(focus.weakTopic?.topic, "矩阵秩");
+  assert.equal(focus.inboxIssue?.questionId, "inbox");
+  assert.equal(focus.emptyMessage, "暂无明显薄弱点，先完成错题复习");
 });
 
 test("buildQuestionQualityIssues hides AI-only verification issues by default", () => {

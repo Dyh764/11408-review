@@ -41,19 +41,23 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
   "needs_fix",
 ];
 
-type QuickScope = "all" | "inbox" | "needs_fix" | "uncategorized";
+type QuickScope = "all" | "recent" | "weak" | "inbox" | "needs_fix" | "uncategorized";
 
 type FilterPanelProps = {
   quickScope: QuickScope;
   masteryStatus: MasteryStatus | "全部";
   textStatus: QuestionTextStatus | "全部";
   keyword: string;
+  knowledgeKeyword: string;
+  mistakeType: string;
   showSearch: boolean;
   searchPlaceholder?: string;
   onQuickScopeChange: (scope: QuickScope) => void;
   onMasteryStatusChange: (status: MasteryStatus | "全部") => void;
   onTextStatusChange: (status: QuestionTextStatus | "全部") => void;
   onKeywordChange: (keyword: string) => void;
+  onKnowledgeKeywordChange: (keyword: string) => void;
+  onMistakeTypeChange: (mistakeType: string) => void;
 };
 
 function formatDate(value: string) {
@@ -73,15 +77,44 @@ function getQuestionKind(choiceCount: number) {
   return "文字题";
 }
 
+function isRecentQuestion(createdAt: string | null | undefined) {
+  if (!createdAt) {
+    return false;
+  }
+
+  const createdTime = new Date(createdAt).getTime();
+  const recentStart = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  return Number.isFinite(createdTime) && createdTime >= recentStart;
+}
+
+function isWeakQuestion(question: QuestionWithImage) {
+  const mastery = question.mastery_status?.trim() ?? "";
+  return (
+    question.review_priority === "high" ||
+    question.needs_manual_check ||
+    question.question_text_status === "needs_fix" ||
+    question.answer_status === "needs_fix" ||
+    mastery.includes("没思路") ||
+    mastery.includes("有一点思路") ||
+    mastery.includes("不稳") ||
+    mastery.includes("卡住")
+  );
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
   const [textStatus, setTextStatus] = useState<QuestionTextStatus | "全部">("全部");
   const [keyword, setKeyword] = useState("");
+  const [knowledgeKeyword, setKnowledgeKeyword] = useState("");
+  const [mistakeType, setMistakeType] = useState("");
   const [quickScope, setQuickScope] = useState<QuickScope>(() =>
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("scope") === "inbox"
-      ? "inbox"
+    typeof window !== "undefined"
+      ? ((["recent", "weak", "inbox", "needs_fix", "uncategorized"].includes(
+          new URLSearchParams(window.location.search).get("scope") ?? "",
+        )
+          ? new URLSearchParams(window.location.search).get("scope")
+          : "all") as QuickScope)
       : "all",
   );
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
@@ -141,6 +174,8 @@ export default function QuestionsPage() {
   const filteredQuestions = useMemo(
     () => {
       const normalizedKeyword = keyword.trim().toLowerCase();
+      const normalizedKnowledgeKeyword = knowledgeKeyword.trim().toLowerCase();
+      const normalizedMistakeType = mistakeType.trim().toLowerCase();
 
       return questions
           .filter((question) => {
@@ -158,21 +193,35 @@ export default function QuestionsPage() {
             ]
               .filter(Boolean)
               .some((value) => String(value).toLowerCase().includes(normalizedKeyword));
+          const knowledgeMatch =
+            normalizedKnowledgeKeyword.length === 0 ||
+            [question.knowledge_point, question.chapter]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(normalizedKnowledgeKeyword));
+          const mistakeTypeMatch =
+            normalizedMistakeType.length === 0 ||
+            (question.mistake_types ?? [])
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(normalizedMistakeType));
           const isNeedsFix =
             question.question_text_status === "needs_fix" || question.answer_status === "needs_fix";
           const isUncategorized =
             !question.chapter?.trim() || !question.knowledge_point?.trim();
           const isInbox = buildQuestionQualityIssues([question]).length > 0;
+          const isRecent = isRecentQuestion(question.created_at);
+          const isWeak = isWeakQuestion(question);
           const quickScopeMatch =
             quickScope === "all" ||
+            (quickScope === "recent" && isRecent) ||
+            (quickScope === "weak" && isWeak) ||
             (quickScope === "inbox" && isInbox) ||
             (quickScope === "needs_fix" && isNeedsFix) ||
             (quickScope === "uncategorized" && isUncategorized);
 
-          return masteryMatch && textStatusMatch && keywordMatch && quickScopeMatch;
+          return masteryMatch && textStatusMatch && keywordMatch && knowledgeMatch && mistakeTypeMatch && quickScopeMatch;
         });
     },
-    [keyword, masteryStatus, questions, quickScope, textStatus],
+    [keyword, knowledgeKeyword, masteryStatus, mistakeType, questions, quickScope, textStatus],
   );
 
   const directory = useMemo(
@@ -191,6 +240,8 @@ export default function QuestionsPage() {
     masteryStatus,
     textStatus,
     keyword,
+    knowledgeKeyword,
+    mistakeType,
     showSearch: false,
     onQuickScopeChange: (scope) => {
       setQuickScope(scope);
@@ -206,6 +257,14 @@ export default function QuestionsPage() {
     },
     onKeywordChange: (value) => {
       setKeyword(value);
+      setSelectedIds([]);
+    },
+    onKnowledgeKeywordChange: (value) => {
+      setKnowledgeKeyword(value);
+      setSelectedIds([]);
+    },
+    onMistakeTypeChange: (value) => {
+      setMistakeType(value);
       setSelectedIds([]);
     },
   };
@@ -572,12 +631,16 @@ function FilterPanel({
   masteryStatus,
   textStatus,
   keyword,
+  knowledgeKeyword,
+  mistakeType,
   showSearch,
   searchPlaceholder = "搜索题目文字、知识点、章节或备注",
   onQuickScopeChange,
   onMasteryStatusChange,
   onTextStatusChange,
   onKeywordChange,
+  onKnowledgeKeywordChange,
+  onMistakeTypeChange,
 }: FilterPanelProps) {
   return (
     <details className="group rounded-lg border border-[#d9cffd] bg-white/80 p-2">
@@ -595,9 +658,11 @@ function FilterPanel({
             placeholder={searchPlaceholder}
           />
         ) : null}
-        <div className="grid grid-cols-4 rounded-lg bg-[#f8f5ff] p-1">
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-[#f8f5ff] p-1 sm:grid-cols-6">
           {[
             { key: "all", label: "全部" },
+            { key: "recent", label: "最近" },
+            { key: "weak", label: "薄弱" },
             { key: "inbox", label: "待整理" },
             { key: "needs_fix", label: "需修正" },
             { key: "uncategorized", label: "未分类" },
@@ -617,6 +682,18 @@ function FilterPanel({
           ))}
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
+          <input
+            value={knowledgeKeyword}
+            onChange={(event) => onKnowledgeKeywordChange(event.target.value)}
+            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            placeholder="按知识点筛选"
+          />
+          <input
+            value={mistakeType}
+            onChange={(event) => onMistakeTypeChange(event.target.value)}
+            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            placeholder="按错因筛选，如计算错误"
+          />
           <select
             value={masteryStatus}
             onChange={(event) => onMasteryStatusChange(event.target.value as MasteryStatus | "全部")}

@@ -3,17 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MobilePageShell, MobileSection } from "@/components/mobile/primitives";
-import { MotivationBanner } from "@/components/study/MotivationBanner";
 import {
-  buildQuestionQualitySummary,
-  buildWeaknessTrends,
-  selectHomeFocusTrend,
-  type AnalyticsReviewResult,
-  type QuestionQualitySummary,
-  type WeaknessTrend,
-} from "@/lib/analytics/learning-insights";
-import {
-  ProgressBar,
   SecondaryStudyLink,
   SectionHeader,
   SprintStatCard,
@@ -22,49 +12,57 @@ import {
   StudyDashboardCard,
   StudyPageHeader,
 } from "@/components/study/study-ui";
+import {
+  selectTodayLiftFocus,
+  type AnalyticsQuestion,
+  type AnalyticsReviewResult,
+  type TodayLiftFocus,
+} from "@/lib/analytics/learning-insights";
 import { todayIsoDate } from "@/lib/dates";
-import { getDailyMotivation } from "@/lib/motivation";
 import { createClient } from "@/lib/supabase/client";
 
-type DashboardStats = {
-  dueToday: number;
-  completedToday: number;
-  addedToday: number;
+type HomeStats = {
   totalQuestions: number;
-  completionRate: number;
-  focusChapters: string[];
-  subjectStats: Array<{ subject: string; total: number; highRisk: number }>;
-  weaknessTrends: WeaknessTrend[];
-  qualitySummary: QuestionQualitySummary;
+  weakQuestionCount: number;
+  inboxQuestionCount: number;
+  focus: TodayLiftFocus;
 };
 
-const emptyQualitySummary: QuestionQualitySummary = {
-  totalIssueCount: 0,
-  highIssueCount: 0,
-  severeIssueCount: 0,
-  needsFixCount: 0,
-  uncategorizedCount: 0,
-  aiUnverifiedCount: 0,
-  affectedQuestionCount: 0,
-  topIssues: [],
+const emptyFocus: TodayLiftFocus = {
+  questions: [],
+  weakTopic: null,
+  inboxIssue: null,
+  emptyMessage: "暂无明显薄弱点，先完成错题复习",
 };
 
-const emptyStats: DashboardStats = {
-  dueToday: 0,
-  completedToday: 0,
-  addedToday: 0,
+const emptyStats: HomeStats = {
   totalQuestions: 0,
-  completionRate: 0,
-  focusChapters: [],
-  subjectStats: [],
-  weaknessTrends: [],
-  qualitySummary: emptyQualitySummary,
+  weakQuestionCount: 0,
+  inboxQuestionCount: 0,
+  focus: emptyFocus,
 };
 
-const quickLinks = [
-  { href: "/questions", title: "错题库", description: "浏览、筛选和进入详情" },
-  { href: "/practice", title: "专项复盘", description: "按章节或错因开一轮" },
-  { href: "/sprint", title: "考前冲刺", description: "优先处理高风险错题" },
+const moduleLinks = [
+  {
+    href: "/questions",
+    title: "错题本",
+    description: "按章节、知识点、错因和掌握程度管理长期错题资产",
+  },
+  {
+    href: "/questions?scope=weak",
+    title: "今日提分焦点",
+    description: "只看最弱知识点、反复错误题和待处理问题",
+  },
+  {
+    href: "/import",
+    title: "导入诊断",
+    description: "粘贴 JSON 后定位字段、行列、片段和修复示例",
+  },
+  {
+    href: "/questions?scope=recent",
+    title: "错题分享",
+    description: "进入单题详情，导出 JSON 或生成 1080x1350 分享图",
+  },
 ];
 
 function addDays(dateKey: string, amount: number) {
@@ -73,14 +71,28 @@ function addDays(dateKey: string, amount: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function startOfNextDay(dateKey: string) {
-  return `${addDays(dateKey, 1)}T00:00:00.000Z`;
+function isWeakQuestion(question: AnalyticsQuestion) {
+  const mastery = question.mastery_status?.trim() ?? "";
+  return (
+    question.review_priority === "high" ||
+    question.needs_manual_check ||
+    question.question_text_status === "needs_fix" ||
+    question.answer_status === "needs_fix" ||
+    mastery.includes("没思路") ||
+    mastery.includes("有一点思路") ||
+    mastery.includes("不稳") ||
+    mastery.includes("卡住")
+  );
+}
+
+function questionTitle(question: AnalyticsQuestion) {
+  return question.knowledge_point?.trim() || question.chapter?.trim() || "待整理错题";
 }
 
 export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), []);
-  const [stats, setStats] = useState<DashboardStats>(emptyStats);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看真实学习统计。");
+  const [stats, setStats] = useState<HomeStats>(emptyStats);
+  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看真实错题资产。");
 
   useEffect(() => {
     if (!supabase) {
@@ -90,44 +102,25 @@ export default function DashboardPage() {
     const client = supabase;
     let isActive = true;
 
-    async function loadDashboardStats() {
+    async function loadHomeStats() {
       const {
         data: { user },
         error: userError,
       } = await client.auth.getUser();
 
       if (userError || !user) {
-        setMessage("登录后会显示你的实时学习统计。");
+        setMessage("登录后会显示你的错题资产和提分焦点。");
         return;
       }
 
-      const today = todayIsoDate();
-      const weekStart = `${addDays(today, -6)}T00:00:00.000Z`;
-      const [dueResult, completedResult, addedResult, questionsResult, recentReviewsResult] =
-        await Promise.all([
-        client
-          .from("reviews")
-          .select("id,questions!inner(deleted_at)", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .lte("scheduled_date", today)
-          .is("completed_at", null)
-          .is("questions.deleted_at", null),
-        client
-          .from("reviews")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .gte("completed_at", `${today}T00:00:00.000Z`)
-          .lt("completed_at", startOfNextDay(today)),
+      const currentDay = todayIsoDate();
+      const weekStart = `${addDays(currentDay, -6)}T00:00:00.000Z`;
+      const [questionsResult, recentReviewsResult] = await Promise.all([
         client
           .from("questions")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .is("deleted_at", null)
-          .gte("created_at", `${today}T00:00:00.000Z`)
-          .lt("created_at", startOfNextDay(today)),
-        client
-          .from("questions")
-          .select("id,subject,chapter,knowledge_point,question_text,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,created_at")
+          .select(
+            "id,subject,chapter,knowledge_point,question_text,choices,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,answer_source,mistake_types,created_at",
+          )
           .eq("user_id", user.id)
           .is("deleted_at", null),
         client
@@ -137,80 +130,30 @@ export default function DashboardPage() {
           .gte("completed_at", weekStart),
       ]);
 
-      const error =
-        dueResult.error ??
-        completedResult.error ??
-        addedResult.error ??
-        questionsResult.error ??
-        recentReviewsResult.error;
-
+      const error = questionsResult.error ?? recentReviewsResult.error;
       if (error) {
-        setMessage(`学习统计更新失败：${error.message}`);
+        setMessage(`错题资产更新失败：${error.message}`);
         return;
       }
 
-      const completedToday = completedResult.count ?? 0;
-      const dueToday = dueResult.count ?? 0;
-      const todayTotal = completedToday + dueToday;
-      const completionRate = todayTotal > 0 ? Math.round((completedToday / todayTotal) * 100) : 0;
-      const questionRows = questionsResult.data ?? [];
-      const recentReviews = (recentReviewsResult.data ?? []) as AnalyticsReviewResult[];
-      const weaknessTrends = buildWeaknessTrends(questionRows, recentReviews, {
-        today,
-        limit: 3,
-      });
-      const qualitySummary = buildQuestionQualitySummary(questionRows, { limit: 3 });
-      const subjectMap = new Map<string, { subject: string; total: number; highRisk: number }>();
-      const focusMap = new Map<string, number>();
-
-      for (const question of questionRows) {
-        const subject = String(question.subject ?? "未标科目");
-        const current = subjectMap.get(subject) ?? { subject, total: 0, highRisk: 0 };
-        current.total += 1;
-
-        const isHighRisk =
-          question.review_priority === "high" ||
-          question.needs_manual_check ||
-          question.question_text_status === "needs_fix" ||
-          question.answer_status === "needs_fix" ||
-          question.mastery_status === "完全没思路" ||
-          question.mastery_status === "思路对但卡住";
-
-        if (isHighRisk) {
-          current.highRisk += 1;
-          const focus = String(question.knowledge_point ?? question.chapter ?? "待整理错题");
-          focusMap.set(focus, (focusMap.get(focus) ?? 0) + 1);
-        }
-
-        subjectMap.set(subject, current);
-      }
-
-      const focusChapters = Array.from(focusMap, ([label, count]) => ({ label, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3)
-        .map((item) => item.label);
+      const questions = (questionsResult.data ?? []) as AnalyticsQuestion[];
+      const reviews = (recentReviewsResult.data ?? []) as AnalyticsReviewResult[];
+      const focus = selectTodayLiftFocus(questions, reviews, { today: currentDay });
 
       if (isActive) {
         setStats({
-          dueToday,
-          completedToday,
-          addedToday: addedResult.count ?? 0,
-          totalQuestions: questionRows.length,
-          completionRate,
-          focusChapters,
-          weaknessTrends,
-          qualitySummary,
-          subjectStats: Array.from(subjectMap.values())
-            .sort((a, b) => b.highRisk - a.highRisk || b.total - a.total)
-            .slice(0, 5),
+          totalQuestions: questions.length,
+          weakQuestionCount: questions.filter(isWeakQuestion).length,
+          inboxQuestionCount: focus.inboxIssue ? 1 : 0,
+          focus,
         });
         setMessage("");
       }
     }
 
-    loadDashboardStats().catch((error) => {
+    loadHomeStats().catch((error) => {
       if (isActive) {
-        setMessage(error instanceof Error ? error.message : "学习统计更新失败。");
+        setMessage(error instanceof Error ? error.message : "错题资产更新失败。");
       }
     });
 
@@ -219,73 +162,45 @@ export default function DashboardPage() {
     };
   }, [supabase]);
 
-  const homeFocusTrend = useMemo(
-    () => selectHomeFocusTrend(stats.weaknessTrends),
-    [stats.weaknessTrends],
-  );
+  const hasFocus =
+    stats.focus.questions.length > 0 || stats.focus.weakTopic || stats.focus.inboxIssue;
 
   return (
     <MobilePageShell className="bg-[#f4f0ff]">
       <StudyPageHeader
-        title="今日学习驾驶舱"
-        subtitle="先清掉到期复习，再补充新错题。打开首页就知道今天从哪里开始。"
+        title="数学错题资产管理"
+        subtitle="管理长期错题资产，分析薄弱点，并回答：我现在该做什么。"
       />
 
       <MobileSection>
         <StudyDashboardCard>
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold text-white/75">今日待复习</p>
-              <p className="mt-2 text-4xl font-black tracking-normal">{stats.dueToday}</p>
-              <p className="mt-1 text-sm text-white/75">已完成 {stats.completedToday} 题</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white/75">错题资产</p>
+              <p className="mt-2 text-4xl font-black tracking-normal">{stats.totalQuestions}</p>
+              <p className="mt-2 text-sm leading-6 text-white/75">
+                系统只保留错题本、今日提分焦点、导入诊断和错题分享四个模块。
+              </p>
             </div>
-            <div className="rounded-lg bg-white/14 px-3 py-2 text-right">
-              <p className="text-xs font-bold text-white/75">错题总量</p>
-              <p className="text-2xl font-black">{stats.totalQuestions}</p>
+            <div className="shrink-0 rounded-lg bg-white/14 px-3 py-2 text-right">
+              <p className="text-xs font-bold text-white/75">薄弱题</p>
+              <p className="text-2xl font-black">{stats.weakQuestionCount}</p>
             </div>
           </div>
-          <div className="mt-5">
-            <ProgressBar
-              value={stats.completionRate}
-              label="今日学习进度"
-              helper={`${stats.completionRate}%`}
-              inverse
-            />
+          <div className="mt-5 grid gap-2">
+            <Link
+              href="/questions"
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+            >
+              打开错题本
+            </Link>
+            <Link
+              href="/import"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white/35 px-4 text-sm font-black text-white"
+            >
+              进入导入诊断
+            </Link>
           </div>
-          {stats.dueToday > 0 ? (
-            <div className="mt-5 grid gap-2">
-              <Link
-                href="/review"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
-              >
-                开始今日复习
-              </Link>
-              <Link
-                href="/review/today"
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white/35 px-4 text-sm font-black text-white"
-              >
-                查看今日题单
-              </Link>
-            </div>
-          ) : (
-            <div className="mt-5 rounded-lg bg-white/14 p-3">
-              <p className="text-sm font-black text-white">今日暂无到期复习</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <Link
-                  href="/questions"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-xs font-black text-[#4f23b6]"
-                >
-                  去错题库看看
-                </Link>
-                <Link
-                  href="/upload"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/35 px-3 text-xs font-black text-white"
-                >
-                  拍题上传
-                </Link>
-              </div>
-            </div>
-          )}
         </StudyDashboardCard>
         {message ? (
           <p className="mt-3 rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 ring-1 ring-[#e4dcff]">
@@ -296,57 +211,29 @@ export default function DashboardPage() {
 
       <MobileSection>
         <div className="grid grid-cols-3 gap-3">
-          <SprintStatCard label="今日完成" value={stats.completedToday} helper="已写入复习记录" />
-          <SprintStatCard label="今日新增" value={stats.addedToday} helper="新整理错题" />
-          <SprintStatCard label="错题总量" value={stats.totalQuestions} helper="当前题库" />
+          <SprintStatCard label="错题总量" value={stats.totalQuestions} helper="长期资产" />
+          <SprintStatCard label="薄弱题" value={stats.weakQuestionCount} helper="需要优先回看" tone="purple" />
+          <SprintStatCard label="收件箱" value={stats.inboxQuestionCount} helper="待处理问题" tone="amber" />
         </div>
       </MobileSection>
 
       <MobileSection>
-        <SectionHeader
-          title="新增错题"
-          subtitle="拍题和导入分开处理，避免把日常入口混进分析卡片。"
-        />
+        <SectionHeader title="核心模块" subtitle="四个入口覆盖管理、决策、诊断和分享。" />
         <div className="grid gap-3">
-          <StudyCard className="bg-[#fbfaff]">
-            <Link href="/upload" className="flex min-h-14 items-center justify-between gap-3">
-              <span className="min-w-0">
-                <span className="block text-base font-black text-[#211536]">拍题上传</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">
-                  白天先拍题，保留原图和当时卡点。
+          {moduleLinks.map((link) => (
+            <StudyCard key={link.href}>
+              <Link href={link.href} className="flex min-h-14 items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-base font-black text-[#211536]">{link.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    {link.description}
+                  </span>
                 </span>
-              </span>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#5b2bd6] text-sm font-black text-white">
-                &gt;
-              </span>
-            </Link>
-          </StudyCard>
-          <StudyCard>
-            <Link href="/import" className="flex min-h-14 items-center justify-between gap-3">
-              <span className="min-w-0">
-                <span className="block text-base font-black text-[#211536]">
-                  导入 ChatGPT 错题卡
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#ede7ff] text-sm font-black text-[#4f23b6]">
+                  &gt;
                 </span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">
-                  晚上粘贴 JSON，把错题整理成可复习卡片。
-                </span>
-              </span>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#ede7ff] text-sm font-black text-[#4f23b6]">
-                &gt;
-              </span>
-            </Link>
-          </StudyCard>
-        </div>
-      </MobileSection>
-
-      <MobileSection>
-        <SectionHeader title="常用入口" subtitle="错题库、专项复盘和考前冲刺放在新增错题之后。" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {quickLinks.map((link) => (
-            <SecondaryStudyLink key={link.href} href={link.href} className="flex-col items-start text-left">
-              <span>{link.title}</span>
-              <span className="mt-1 text-xs font-semibold text-slate-500">{link.description}</span>
-            </SecondaryStudyLink>
+              </Link>
+            </StudyCard>
           ))}
         </div>
       </MobileSection>
@@ -354,123 +241,81 @@ export default function DashboardPage() {
       <MobileSection>
         <SectionHeader
           title="今日提分焦点"
-          subtitle="首页只保留最值得立即处理的一项，完整变化放在报告页。"
-          action={
-            <SecondaryStudyLink href="/reports" className="min-h-9 px-3 text-xs">
-              查看全部分析
-            </SecondaryStudyLink>
-          }
+          subtitle="不生成计划，只给最多三类可行动信息。"
         />
         <div className="grid gap-3">
-          {homeFocusTrend ? (
+          {!hasFocus ? (
             <StudyCard>
-              <Link href={homeFocusTrend.actionHref} className="block">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-[#211536]">{homeFocusTrend.topic}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      {homeFocusTrend.subject} / {homeFocusTrend.chapter}
-                    </p>
-                  </div>
-                  <StudyBadge tone={homeFocusTrend.trend === "up" ? "amber" : "purple"}>
-                    {homeFocusTrend.recentWrongCount > 0 ? "最近错题" : "题卡待整理"}
-                  </StudyBadge>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{homeFocusTrend.recommendation}</p>
-                <p className="mt-2 text-[11px] font-bold text-slate-400">
-                  近 7 天错 {homeFocusTrend.recentWrongCount} 次 · 题卡问题 {homeFocusTrend.qualityIssueCount} 个
-                </p>
-              </Link>
-            </StudyCard>
-          ) : (
-            <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-600 ring-1 ring-[#e4dcff]">
-              暂无明显拖后腿知识点，先完成今日复习。
-            </p>
-          )}
-          {stats.qualitySummary.totalIssueCount > 0 ? (
-            <SecondaryStudyLink href="/questions?scope=inbox" className="justify-between">
-              <span>整理收件箱</span>
-              <span className="text-xs font-semibold text-slate-500">
-                {stats.qualitySummary.affectedQuestionCount} 题待整理
-              </span>
-            </SecondaryStudyLink>
-          ) : null}
-        </div>
-      </MobileSection>
-
-      <MobileSection>
-        <MotivationBanner text={getDailyMotivation()} />
-      </MobileSection>
-
-      <MobileSection>
-        <SectionHeader title="科目入口" subtitle="按薄弱程度排序，先看高风险科目。" />
-        <div className="grid gap-3">
-          {stats.subjectStats.length === 0 ? (
-            <StudyCard>
-              <p className="text-sm font-black text-[#211536]">还没有错题数据</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                可以先拍题上传，或导入 ChatGPT 整理好的错题卡。
+              <p className="text-sm font-black text-[#211536]">{stats.focus.emptyMessage}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                数据不足时，先从错题本里挑最近或薄弱题快速回看。
               </p>
             </StudyCard>
           ) : null}
-          {stats.subjectStats.map((subject) => (
-            <StudyCard key={subject.subject}>
+
+          {stats.focus.questions.length > 0 ? (
+            <StudyCard>
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-black text-[#211536]">{subject.subject}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {subject.total} 题 · 高风险 {subject.highRisk} 题
-                  </p>
-                </div>
-                <StudyBadge tone={subject.highRisk > 0 ? "amber" : "green"}>
-                  {subject.highRisk > 0 ? "需要关注" : "节奏稳定"}
-                </StudyBadge>
+                <p className="text-sm font-black text-[#211536]">3道最该做错题</p>
+                <StudyBadge tone="purple">{stats.focus.questions.length} 题</StudyBadge>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {stats.focus.questions.map((question) => (
+                  <Link
+                    key={question.id}
+                    href={`/questions/${question.id}`}
+                    className="rounded-lg bg-[#f8f5ff] p-3 ring-1 ring-[#e4dcff]"
+                  >
+                    <p className="break-words text-sm font-black text-[#211536]">
+                      {questionTitle(question)}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {question.subject} / {question.chapter ?? "未分类"}
+                    </p>
+                  </Link>
+                ))}
               </div>
             </StudyCard>
-          ))}
-        </div>
-      </MobileSection>
+          ) : null}
 
-      <MobileSection>
-        <SectionHeader title="薄弱提醒" subtitle="优先处理会影响下一轮复盘的章节。" />
-        <StudyCard>
-          <div className="flex flex-wrap gap-2">
-            {(stats.focusChapters.length > 0 ? stats.focusChapters : ["先完成今日复习", "整理新错题"]).map((item) => (
-              <StudyBadge key={item} tone="purple">{item}</StudyBadge>
-            ))}
-          </div>
-        </StudyCard>
-      </MobileSection>
+          {stats.focus.weakTopic ? (
+            <StudyCard>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-[#211536]">1个最弱知识点</p>
+                  <p className="mt-1 break-words text-base font-black text-[#4f23b6]">
+                    {stats.focus.weakTopic.topic}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    最近错误 {stats.focus.weakTopic.recentWrongCount} 次 / 题卡问题 {stats.focus.weakTopic.qualityIssueCount} 个
+                  </p>
+                </div>
+                <SecondaryStudyLink href={stats.focus.weakTopic.actionHref} className="min-h-9 px-3 text-xs">
+                  回看
+                </SecondaryStudyLink>
+              </div>
+            </StudyCard>
+          ) : null}
 
-      <MobileSection>
-        <SectionHeader title="智能自检" subtitle="本阶段只预留入口，不自动改题干、图片或标准答案。" />
-        <StudyCard>
-          <div className="grid gap-3">
-            <div>
-              <p className="text-sm font-black text-[#211536]">数据异常检查</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                后续用于检查章节、知识点、难度、标签和复习计划异常。
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <SecondaryStudyLink href="/settings/system-check">查看系统检查</SecondaryStudyLink>
-              <SecondaryStudyLink href="/questions">查看错题库</SecondaryStudyLink>
-            </div>
-          </div>
-        </StudyCard>
-      </MobileSection>
-
-      <MobileSection>
-        <SectionHeader title="更多入口" subtitle="低频查看放在下面，学习时不用先处理它们。" />
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { href: "/reports", title: "学习报告" },
-            { href: "/settings", title: "账号与导出" },
-          ].map((link) => (
-            <SecondaryStudyLink key={link.href} href={link.href}>
-              {link.title}
-            </SecondaryStudyLink>
-          ))}
+          {stats.focus.inboxIssue ? (
+            <StudyCard>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-[#211536]">1个待处理导入问题</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {stats.focus.inboxIssue.labels.map((label) => (
+                      <StudyBadge key={label} tone="amber">
+                        {label}
+                      </StudyBadge>
+                    ))}
+                  </div>
+                </div>
+                <SecondaryStudyLink href={stats.focus.inboxIssue.actionHref} className="min-h-9 px-3 text-xs">
+                  整理
+                </SecondaryStudyLink>
+              </div>
+            </StudyCard>
+          ) : null}
         </div>
       </MobileSection>
     </MobilePageShell>
