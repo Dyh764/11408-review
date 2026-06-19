@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MathText } from "@/components/mobile/MathText";
+import { analyzeChapterWeakness, type ChapterWeaknessAnalysis } from "@/lib/analytics/chapter-weakness";
 import { buildQuestionQualityIssues, buildQuestionQualitySummary } from "@/lib/analytics/learning-insights";
 import {
   ProgressBar,
@@ -117,6 +118,25 @@ function isWeakQuestion(question: QuestionWithImage) {
   );
 }
 
+function isExam408DisplaySubject(subject: string) {
+  return ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(subject);
+}
+
+function formatSupabaseError(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+    return [record.message, record.details, record.hint, record.code]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .join(" / ") || fallback;
+  }
+
+  return fallback;
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [masteryStatus, setMasteryStatus] = useState<MasteryStatus | "全部">("全部");
@@ -154,35 +174,62 @@ export default function QuestionsPage() {
     }
 
     let isActive = true;
-    Promise.all([
-      fetchCurrentUserQuestions(supabase),
-      supabase
+    const client = supabase;
+
+    async function loadQuestions() {
+      try {
+        const items = await fetchCurrentUserQuestions(client);
+
+        if (isActive) {
+          setQuestions(items);
+          setMessage(items.length === 0 ? "还没有上传真实错题。" : "");
+        }
+      } catch (error) {
+        if (isActive) {
+          setMessage(formatSupabaseError(error, "读取错题库失败。"));
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    async function loadDueTodayIds() {
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await client.auth.getUser();
+
+        if (userError || !user) {
+          throw userError ?? new Error("请先登录。");
+        }
+
+        const dueResult = await client
         .from("reviews")
         .select("question_id")
+        .eq("user_id", user.id)
         .lte("scheduled_date", todayIsoDate())
-        .is("completed_at", null),
-    ])
-      .then(([items, dueResult]) => {
+        .is("completed_at", null);
+
         if (dueResult.error) {
           throw dueResult.error;
         }
 
         if (isActive) {
-          setQuestions(items);
           setDueTodayIds(new Set((dueResult.data ?? []).map((row) => String(row.question_id))));
-          setMessage(items.length === 0 ? "还没有上传真实错题。" : "");
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         if (isActive) {
-          setMessage(error instanceof Error ? error.message : "读取错题库失败。");
+          setDueTodayIds(new Set());
+          setMessage(`今日复习状态读取失败：${formatSupabaseError(error, "无法读取今日复习状态。")} 错题库已正常显示。`);
         }
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      });
+      }
+    }
+
+    loadQuestions();
+    loadDueTodayIds();
 
     return () => {
       isActive = false;
@@ -480,6 +527,52 @@ export default function QuestionsPage() {
     }
   }
 
+  async function handleClearQuestionLibrary() {
+    if (questions.length === 0) {
+      setMessage("当前错题库已经是空的。");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `此操作会软删除当前错题库中的全部错题，共 ${questions.length} 道。\n删除后它们不会出现在错题库、今日复习和报告统计中。\n确认清空错题库？`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsBatchProcessing(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/questions/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        deletedCount?: number;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setMessage(result.error ?? "清空错题库失败。");
+        return;
+      }
+
+      setQuestions([]);
+      setSelectedIds([]);
+      setActiveSubject("");
+      setActiveChapter("");
+      setDueTodayIds(new Set());
+      setMessage(`已清空错题库，软删除 ${result.deletedCount ?? questions.length} 道错题。`);
+    } catch (error) {
+      setMessage(formatSupabaseError(error, "清空错题库失败。"));
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }
+
   return (
     <MobilePageShell className="bg-[#f4f0ff]">
       <StudyPageHeader
@@ -587,6 +680,21 @@ export default function QuestionsPage() {
               暂无需要立即整理的题卡。
             </p>
           )}
+          {questions.length > 0 ? (
+            <div className="mt-4 border-t border-[#e4dcff] pt-3">
+              <button
+                type="button"
+                onClick={handleClearQuestionLibrary}
+                disabled={isBatchProcessing}
+                className="min-h-10 rounded-lg bg-red-50 px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
+              >
+                清空错题库
+              </button>
+              <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                只软删除当前账号的错题，复习、报告和导出会自动隐藏这些记录。
+              </p>
+            </div>
+          ) : null}
         </StudyCard>
       </MobileSection>
 
@@ -1028,6 +1136,10 @@ function QuestionDirectory({
   isBatchProcessing: boolean;
   dueTodayIds: Set<string>;
 }) {
+  const chapterWeakness = isExam408DisplaySubject(subject.subject)
+    ? analyzeChapterWeakness(chapter.questions)
+    : null;
+
   return (
     <section>
       <SectionHeader
@@ -1064,6 +1176,7 @@ function QuestionDirectory({
           默认按困难优先排序，同难度内优先显示需要处理和高风险题。
         </p>
       </div>
+      {chapterWeakness ? <ChapterWeaknessPanel analysis={chapterWeakness} /> : null}
       {selectedIds.length > 0 ? (
         <StudyCard className="mb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1192,5 +1305,56 @@ function QuestionDirectory({
         })}
       </div>
     </section>
+  );
+}
+
+function ChapterWeaknessPanel({ analysis }: { analysis: ChapterWeaknessAnalysis }) {
+  return (
+    <StudyCard className="mb-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-[#211536]">本章欠缺分析</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            基于本章已导入错题本地统计，不修改题目数据。
+          </p>
+        </div>
+        <StudyBadge tone="purple">{analysis.total_questions} 题</StudyBadge>
+      </div>
+      <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600">
+        <p>
+          高频知识点：
+          {analysis.frequent_knowledge_points.length
+            ? analysis.frequent_knowledge_points.map((item) => `${item.label}(${item.count})`).join("、")
+            : "暂无稳定统计"}
+        </p>
+        <p>
+          高频错因：
+          {analysis.frequent_mistake_types.length
+            ? analysis.frequent_mistake_types.map((item) => `${item.label}(${item.count})`).join("、")
+            : "暂无稳定统计"}
+        </p>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg bg-[#f8f5ff] p-3">
+          <p className="text-xs font-black text-[#4f23b6]">我的主要欠缺</p>
+          <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+            {analysis.weakness_summary.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-lg bg-[#f8f5ff] p-3">
+          <p className="text-xs font-black text-[#4f23b6]">下一轮复习建议</p>
+          <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
+            {analysis.next_review_suggestions.map((item) => (
+              <li key={item}>- {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <p className="mt-3 rounded-lg bg-white p-3 text-xs font-semibold leading-5 text-[#211536] ring-1 ring-[#e4dcff]">
+        {analysis.one_sentence_diagnosis}
+      </p>
+    </StudyCard>
   );
 }

@@ -35,23 +35,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请先登录。" }, { status: 401 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { ids?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { ids?: unknown; all?: unknown };
   const ids = normalizeIds(body.ids);
+  const deleteAll = body.all === true;
 
-  if (ids.length === 0) {
+  if (!deleteAll && ids.length === 0) {
     return NextResponse.json({ error: "请选择要删除的错题。" }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("questions")
     .update({
       deleted_at: new Date().toISOString(),
-      deleted_reason: "bulk_user_deleted",
+      deleted_reason: deleteAll ? "bulk_clear_user_library" : "bulk_user_deleted",
     })
-    .in("id", ids)
     .eq("user_id", user.id)
-    .is("deleted_at", null)
-    .select("id");
+    .is("deleted_at", null);
+
+  if (!deleteAll) {
+    query = query.in("id", ids);
+  }
+
+  const { data, error } = await query.select("id");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

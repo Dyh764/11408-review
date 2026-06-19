@@ -48,6 +48,7 @@ function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
     answer_explanation: card.answer_explanation ?? null,
     key_steps: card.key_steps,
     one_sentence_tip: card.one_sentence_tip ?? null,
+    related_practice_questions: card.related_practice_questions,
     review_priority: card.review_priority,
     confidence: card.confidence ?? null,
     needs_manual_check: card.needs_manual_check,

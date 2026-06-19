@@ -45,6 +45,17 @@ export type ChoiceOption = {
   text: string;
 };
 
+export type RelatedPracticeQuestion = {
+  question_text: string;
+  choices: ChoiceOption[];
+  correct_answer: "A" | "B" | "C" | "D";
+  answer_explanation: string;
+  knowledge_point: string;
+  why_related: string;
+  difficulty: "简单" | "中等" | "困难";
+  rigor_check: string;
+};
+
 export type MockAnalysis = {
   question_text: string;
   question_text_status: QuestionTextStatus;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { MobileCard, MobilePageShell, MobileSection, Notice, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
@@ -14,6 +15,7 @@ import {
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import {
   chatGptImportPrompt,
+  exam408ImportPrompt,
   importExampleJson,
   parseImportJsonText,
   parseImportWithDiagnostics,
@@ -26,9 +28,17 @@ type ImportApiResult = {
   error?: string;
   successCount?: number;
   failureCount?: number;
-  successes?: Array<{ index: number; questionId: string; reviewCount: number; warning?: string; inbox?: boolean }>;
+  successes?: ImportSuccess[];
   failures?: ImportRowError[];
   diagnostics?: ImportDiagnostic[];
+};
+
+type ImportSuccess = {
+  index: number;
+  questionId: string;
+  reviewCount: number;
+  warning?: string;
+  inbox?: boolean;
 };
 
 function ImportDiagnosticCard({ diagnostic }: { diagnostic: ImportDiagnostic }) {
@@ -173,6 +183,71 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
   );
 }
 
+function ImportActionPanel({
+  previewCount,
+  directCount,
+  inboxCount,
+  seriousCount,
+  repairNotices,
+  canImport,
+  isImporting,
+  onImport,
+  onInboxImport,
+}: {
+  previewCount: number;
+  directCount: number;
+  inboxCount: number;
+  seriousCount: number;
+  repairNotices: string[];
+  canImport: boolean;
+  isImporting: boolean;
+  onImport: () => void;
+  onInboxImport: () => void;
+}) {
+  return (
+    <MobileSection title="顶部确认">
+      <SectionCard subtitle="解析后可直接在这里确认导入，不用翻到预览列表底部。">
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard label="共解析" value={previewCount} tone="blue" />
+          <StatCard label="严重错误" value={seriousCount} tone={seriousCount > 0 ? "red" : "slate"} />
+          <StatCard label="可直接导入" value={directCount} tone="green" />
+          <StatCard label="建议待整理" value={inboxCount} tone="amber" />
+        </div>
+        {repairNotices.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {repairNotices.map((notice) => (
+              <span
+                key={notice}
+                className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
+              >
+                {notice}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onImport}
+            disabled={!canImport}
+            className="min-h-14 rounded-lg bg-slate-950 px-4 text-base font-semibold text-white disabled:bg-slate-300"
+          >
+            {isImporting ? "导入中..." : "确认导入"}
+          </button>
+          <button
+            type="button"
+            onClick={onInboxImport}
+            disabled={!canImport}
+            className="min-h-14 rounded-lg bg-[#5b2bd6] px-4 text-base font-semibold text-white disabled:bg-slate-300"
+          >
+            导入到待整理
+          </button>
+        </div>
+      </SectionCard>
+    </MobileSection>
+  );
+}
+
 export default function ImportPage() {
   const [jsonText, setJsonText] = useState("");
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
@@ -181,6 +256,9 @@ export default function ImportPage() {
   const [parseRepairNotices, setParseRepairNotices] = useState<string[]>([]);
   const [apiResult, setApiResult] = useState<ImportApiResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const [lastImportSuccesses, setLastImportSuccesses] = useState<ImportSuccess[]>([]);
+  const [undoStatus, setUndoStatus] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
 
   const parsed = useMemo(() => parseImportJsonText(jsonText), [jsonText]);
@@ -218,6 +296,8 @@ export default function ImportPage() {
       setJsonText(result.sanitizedText);
     }
     setApiResult(null);
+    setLastImportSuccesses([]);
+    setUndoStatus("");
   }
 
   async function copyTextToClipboard(text: string) {
@@ -233,6 +313,10 @@ export default function ImportPage() {
     copyTextToClipboard(chatGptImportPrompt);
   }
 
+  function copyExam408Prompt() {
+    copyTextToClipboard(exam408ImportPrompt);
+  }
+
   function copyImportExampleJson() {
     copyTextToClipboard(importExampleJson);
   }
@@ -240,6 +324,7 @@ export default function ImportPage() {
   async function handleImport(importMode: "normal" | "inbox" = "normal") {
     setIsImporting(true);
     setApiResult(null);
+    setUndoStatus("");
 
     try {
       const response = await fetch("/api/import", {
@@ -251,6 +336,7 @@ export default function ImportPage() {
 
       setApiResult(result);
       setImportDiagnostics(result.diagnostics ?? []);
+      setLastImportSuccesses(response.ok ? (result.successes ?? []) : []);
       if (!response.ok && result.error) {
         setParseErrors([{ index: 0, message: result.error }]);
       }
@@ -258,8 +344,51 @@ export default function ImportPage() {
       setApiResult({
         error: error instanceof Error ? error.message : "导入失败，请稍后重试。",
       });
+      setLastImportSuccesses([]);
     } finally {
       setIsImporting(false);
+    }
+  }
+
+  async function handleUndoLastImport() {
+    if (lastImportSuccesses.length === 0) {
+      setUndoStatus("没有可撤销的本次导入记录。");
+      return;
+    }
+
+    const shouldUndo = window.confirm(
+      `撤销本次导入的 ${lastImportSuccesses.length} 道错题？\n本操作会软删除这些题，不影响其他错题。`,
+    );
+
+    if (!shouldUndo) {
+      return;
+    }
+
+    setIsUndoing(true);
+    setUndoStatus("");
+
+    try {
+      const response = await fetch("/api/questions/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: lastImportSuccesses.map((success) => success.questionId) }),
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        deletedCount?: number;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setUndoStatus(result.error ?? "撤销本次导入失败。");
+        return;
+      }
+
+      setUndoStatus(`已撤销本次导入，软删除 ${result.deletedCount ?? lastImportSuccesses.length} 道错题。`);
+      setLastImportSuccesses([]);
+    } catch (error) {
+      setUndoStatus(error instanceof Error ? error.message : "撤销本次导入失败。");
+    } finally {
+      setIsUndoing(false);
     }
   }
 
@@ -293,9 +422,18 @@ export default function ImportPage() {
             <button
               type="button"
               onClick={copyChatGptPrompt}
+              aria-label="复制 ChatGPT 整理指令"
+              title="复制 ChatGPT 整理指令"
               className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
             >
-              复制 ChatGPT 整理指令
+              复制数学 GPT 整理模板
+            </button>
+            <button
+              type="button"
+              onClick={copyExam408Prompt}
+              className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-semibold text-white"
+            >
+              复制 408 GPT 整理模板
             </button>
             <button
               type="button"
@@ -326,6 +464,8 @@ export default function ImportPage() {
                 setParseNotice("");
                 setParseRepairNotices([]);
                 setApiResult(null);
+                setLastImportSuccesses([]);
+                setUndoStatus("");
               }}
               rows={12}
               className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-3 text-sm leading-6 text-slate-950 outline-none focus:border-blue-500"
@@ -343,6 +483,8 @@ export default function ImportPage() {
                 setParseNotice("");
                 setParseRepairNotices([]);
                 setApiResult(null);
+                setLastImportSuccesses([]);
+                setUndoStatus("");
               }}
               className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
             >
@@ -397,22 +539,24 @@ export default function ImportPage() {
       ) : null}
 
       {previewCards.length > 0 ? (
+        <ImportActionPanel
+          previewCount={previewCards.length}
+          directCount={qualityReport.importableCount - qualityReport.inboxRecommendedCount}
+          inboxCount={qualityReport.inboxRecommendedCount}
+          seriousCount={qualityReport.seriousCount}
+          repairNotices={visibleRepairNotices}
+          canImport={canImport}
+          isImporting={isImporting}
+          onImport={() => handleImport("normal")}
+          onInboxImport={() => handleImport("inbox")}
+        />
+      ) : null}
+
+      {previewCards.length > 0 ? (
         <MobileSection>
           <div className="space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-950">导入前质检</h2>
-            {visibleRepairNotices.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {visibleRepairNotices.map((notice) => (
-                  <span
-                    key={notice}
-                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 ring-1 ring-emerald-100"
-                  >
-                    {notice}
-                  </span>
-                ))}
-              </div>
-            ) : null}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <StatCard label="共解析" value={previewCards.length} tone="blue" />
               <StatCard label="可直接导入" value={qualityReport.importableCount - qualityReport.inboxRecommendedCount} tone="green" />
@@ -436,24 +580,6 @@ export default function ImportPage() {
               存在严重错误，请先修正 JSON 后再导入。
             </p>
           ) : null}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => handleImport("normal")}
-              disabled={!canImport}
-              className="min-h-14 rounded-lg bg-slate-950 px-4 text-base font-semibold text-white disabled:bg-slate-300"
-            >
-              {isImporting ? "导入中..." : "确认导入"}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleImport("inbox")}
-              disabled={!canImport}
-              className="min-h-14 rounded-lg bg-[#5b2bd6] px-4 text-base font-semibold text-white disabled:bg-slate-300"
-            >
-              导入到待整理
-            </button>
-          </div>
           </div>
         </MobileSection>
       ) : null}
@@ -470,7 +596,30 @@ export default function ImportPage() {
             <div className="rounded-lg bg-emerald-50 p-4 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
               已导入 {apiResult.successCount} 条；失败 {apiResult.failureCount ?? 0} 条。
               {apiResult.successes?.some((success) => success.inbox) ? " 已自动标记部分题为待整理。" : ""}
+              {lastImportSuccesses.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href="/questions?scope=recent"
+                    className="inline-flex min-h-9 items-center rounded-lg bg-white px-3 text-xs font-black text-emerald-800 ring-1 ring-emerald-100"
+                  >
+                    查看最近导入
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleUndoLastImport}
+                    disabled={isUndoing}
+                    className="min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
+                  >
+                    {isUndoing ? "撤销中..." : "撤销本次导入"}
+                  </button>
+                </div>
+              ) : null}
             </div>
+          ) : null}
+          {undoStatus ? (
+            <p className="rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
+              {undoStatus}
+            </p>
           ) : null}
           {apiResult.failures?.map((failure) => (
             <p

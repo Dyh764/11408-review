@@ -9,6 +9,7 @@ import type {
   QuestionSource,
   QuestionSourceInfo,
   QuestionTextStatus,
+  RelatedPracticeQuestion,
   ReviewPriority,
   Subject,
 } from "@/lib/types";
@@ -32,6 +33,7 @@ export type QuestionRecord = {
   answer_explanation: string | null;
   key_steps: string[];
   one_sentence_tip: string | null;
+  related_practice_questions: RelatedPracticeQuestion[];
   review_priority: ReviewPriority | null;
   confidence: string | null;
   needs_manual_check: boolean;
@@ -68,6 +70,7 @@ const questionColumns = `
   answer_explanation,
   key_steps,
   one_sentence_tip,
+  related_practice_questions,
   review_priority,
   confidence,
   needs_manual_check,

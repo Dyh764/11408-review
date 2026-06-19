@@ -8,6 +8,7 @@ import type {
   QuestionSource,
   QuestionSourceInfo,
   QuestionTextStatus,
+  RelatedPracticeQuestion,
   ReviewPriority,
   Subject,
 } from "@/lib/types";
@@ -32,6 +33,7 @@ export type ImportQuestionCard = {
   answer_explanation?: string;
   key_steps: string[];
   one_sentence_tip?: string;
+  related_practice_questions: RelatedPracticeQuestion[];
   review_priority: ReviewPriority;
   confidence?: Confidence;
   needs_manual_check: boolean;
@@ -67,6 +69,7 @@ export type ImportDiagnosticType =
   | "字段类型错误"
   | "source格式错误"
   | "choices格式错误"
+  | "related_practice_questions格式错误"
   | "chapter不合法"
   | "difficulty不合法"
   | "LaTeX错误"
@@ -110,6 +113,16 @@ const answerSources: AnswerSource[] = ["chatgpt_import", "manual", "ai_enhanced"
 const reviewPriorities: ReviewPriority[] = ["low", "medium", "high"];
 const confidences: Confidence[] = ["low", "medium", "high"];
 const mathSubjectAliases = ["高等数学", "线性代数", "概率论与数理统计"] as const;
+const exam408Subjects = ["数据结构", "计算机组成原理", "操作系统", "计算机网络"] as const;
+const exam408SubjectSet = new Set<string>(exam408Subjects);
+const exam408ChapterCatalog: Record<(typeof exam408Subjects)[number], string[]> = {
+  数据结构: ["绪论", "线性表", "栈和队列", "串", "树与二叉树", "图", "查找", "排序", "待整理 / 未分类"],
+  计算机组成原理: ["计算机系统概述", "数据的表示和运算", "存储系统", "指令系统", "中央处理器", "总线", "输入输出系统", "待整理 / 未分类"],
+  操作系统: ["操作系统概述", "进程与线程", "处理机调度", "同步与互斥", "死锁", "内存管理", "文件管理", "输入输出管理", "待整理 / 未分类"],
+  计算机网络: ["计算机网络体系结构", "物理层", "数据链路层", "网络层", "传输层", "应用层", "待整理 / 未分类"],
+};
+const relatedPracticeDifficulties = ["简单", "中等", "困难"] as const;
+const answerLabels = ["A", "B", "C", "D"] as const;
 const difficultyAliases: Record<string, Difficulty> = {
   简单: "基础",
   容易: "基础",
@@ -197,6 +210,20 @@ confidence
 needs_manual_check
 answer_status
 answer_source`;
+
+export const exam408ImportPrompt = `请把今天的 408 专业课选择题错题整理成可导入 11408-review 的 Import Protocol v2 JSON 数组。
+只处理数据结构、计算机组成原理、操作系统、计算机网络四科。
+默认题源 source 使用王道408；如果没有明确来源，source.raw 写“未标来源”。
+每题必须输出 subject、chapter、knowledge_point、question_text、choices、standard_answer、answer_explanation、user_note、mistake_types。
+subject 必须是四科之一，不要写成“408”。
+choices 必须是 A/B/C/D 四个选项数组，每项包含 label 和 text。
+standard_answer 必须以“答案：”开头。
+answer_explanation 必须以“过程：”开头，并逐项分析 A/B/C/D。
+user_note 里记录 user_answer 和 correct_answer，例如“我选了B，正确答案是C；主要问题是概念混淆”。
+每题可以包含 related_practice_questions；如果无法保证严谨，则写 []。
+related_practice_questions 每道题必须包含 question_text、choices、correct_answer、answer_explanation、knowledge_point、why_related、difficulty、rigor_check。
+related_practice_questions 必须严格符合 408 范围、单选题、答案唯一；correct_answer 只能是 A/B/C/D，answer_explanation 必须以“过程：”开头。
+最后只输出 JSON 数组，不要 Markdown，不要解释。`;
 
 export const importExampleJson = JSON.stringify(
   [
@@ -377,6 +404,67 @@ function requireEnum<T extends string>(value: unknown, field: string, allowed: r
   return value as T;
 }
 
+function isExam408Subject(subject: Subject) {
+  return exam408SubjectSet.has(subject);
+}
+
+function hasChoiceLabels(choices: ChoiceOption[], labels: readonly string[]) {
+  const present = new Set(choices.map((choice) => choice.label));
+  return labels.every((label) => present.has(label));
+}
+
+function normalizeRelatedPracticeQuestions(value: unknown, subject: Subject): RelatedPracticeQuestion[] {
+  if (!isExam408Subject(subject)) {
+    return [];
+  }
+
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("related_practice_questions 格式错误，请检查 choices / correct_answer / answer_explanation。");
+  }
+
+  return value.map((item) => {
+    if (!isObject(item)) {
+      throw new Error("related_practice_questions 格式错误，请检查 choices / correct_answer / answer_explanation。");
+    }
+
+    const questionText = optionalString(item.question_text, "related_practice_questions.question_text");
+    const choices = extractChoicesFromQuestionText(questionText, item.choices);
+    const correctAnswer = requireEnum(item.correct_answer, "related_practice_questions.correct_answer", answerLabels);
+    const answerExplanation = optionalString(item.answer_explanation, "related_practice_questions.answer_explanation");
+    const knowledgePoint = optionalString(item.knowledge_point, "related_practice_questions.knowledge_point");
+    const whyRelated = optionalString(item.why_related, "related_practice_questions.why_related");
+    const difficulty = requireEnum(item.difficulty, "related_practice_questions.difficulty", relatedPracticeDifficulties);
+    const rigorCheck = optionalString(item.rigor_check, "related_practice_questions.rigor_check");
+
+    if (
+      !questionText ||
+      choices.length !== 4 ||
+      !hasChoiceLabels(choices, answerLabels) ||
+      !answerExplanation.startsWith("过程：") ||
+      !knowledgePoint ||
+      !whyRelated ||
+      !rigorCheck
+    ) {
+      throw new Error("related_practice_questions 格式错误，请检查 choices / correct_answer / answer_explanation。");
+    }
+
+    return {
+      question_text: questionText,
+      choices,
+      correct_answer: correctAnswer,
+      answer_explanation: answerExplanation,
+      knowledge_point: knowledgePoint,
+      why_related: whyRelated,
+      difficulty,
+      rigor_check: rigorCheck,
+    };
+  });
+}
+
 function requireMappedEnum<T extends string>(
   value: unknown,
   field: string,
@@ -418,7 +506,12 @@ function normalizeChapterForSubject(rawSubject: unknown, rawChapter: string) {
 
   const subject = rawSubject.trim();
   if (!mathSubjectAliases.includes(subject as (typeof mathSubjectAliases)[number])) {
-    return rawChapter || undefined;
+    const chapters = exam408ChapterCatalog[subject as (typeof exam408Subjects)[number]];
+    if (!chapters) {
+      return rawChapter || undefined;
+    }
+
+    return chapters.includes(rawChapter) ? rawChapter : "待整理 / 未分类";
   }
 
   if (!rawChapter) {
@@ -549,6 +642,21 @@ function normalizeRow(value: unknown): ImportQuestionCard {
   if (value.choices !== undefined && value.choices !== null && !Array.isArray(value.choices)) {
     throw new Error("choices 必须是数组。");
   }
+  if (isExam408Subject(subject)) {
+    if (choices.length !== 4 || !hasChoiceLabels(choices, answerLabels)) {
+      throw new Error("choices 必须包含 A/B/C/D 四个选项。");
+    }
+
+    const standardAnswer = optionalString(value.standard_answer, "standard_answer");
+    if (!standardAnswer.startsWith("答案：")) {
+      throw new Error("standard_answer 必须以“答案：”开头。");
+    }
+
+    const answerExplanation = optionalString(value.answer_explanation, "answer_explanation");
+    if (!answerExplanation.startsWith("过程：")) {
+      throw new Error("answer_explanation 必须以“过程：”开头。");
+    }
+  }
   const displayQuestionText =
     choices.length > 0 && value.choices === undefined
       ? splitQuestionTextAndChoices(questionText).questionText
@@ -573,6 +681,7 @@ function normalizeRow(value: unknown): ImportQuestionCard {
       optionalString(value.answer_explanation, "answer_explanation") || undefined,
     key_steps: optionalStringArray(value.key_steps, "key_steps"),
     one_sentence_tip: optionalString(value.one_sentence_tip, "one_sentence_tip") || undefined,
+    related_practice_questions: normalizeRelatedPracticeQuestions(value.related_practice_questions, subject),
     review_priority: reviewPriority,
     confidence,
     needs_manual_check: needsManualCheck,
@@ -701,6 +810,7 @@ function fieldFromErrorMessage(message: string) {
     "difficulty",
     "source",
     "question_text",
+    "related_practice_questions",
     "choices",
     "question_text_status",
     "mastery_status",
@@ -709,6 +819,7 @@ function fieldFromErrorMessage(message: string) {
     "solution_summary",
     "standard_answer",
     "answer_explanation",
+    "related_practice_questions",
     "key_steps",
     "one_sentence_tip",
     "review_priority",
@@ -724,6 +835,10 @@ function fieldFromErrorMessage(message: string) {
 function diagnosticTypeFromRowError(message: string): ImportDiagnosticType {
   if (message.includes("source")) {
     return "source格式错误";
+  }
+
+  if (message.includes("related_practice_questions")) {
+    return "related_practice_questions格式错误";
   }
 
   if (message.includes("choices")) {
@@ -768,6 +883,10 @@ function diagnosticSuggestion(type: ImportDiagnosticType, field?: string) {
 
   if (type === "choices格式错误") {
     return "choices 必须是数组；没有选项时请写 []，选择题请写成 [{\"label\":\"A\",\"text\":\"...\"}]。";
+  }
+
+  if (type === "related_practice_questions格式错误") {
+    return "同知识点类题格式错误，请检查 choices / correct_answer / answer_explanation。";
   }
 
   if (type === "chapter不合法") {
@@ -939,6 +1058,14 @@ function buildCommonFieldDiagnostics(parsed: unknown, input: string) {
 
     if (row.choices !== undefined && row.choices !== null && !Array.isArray(row.choices)) {
       diagnostics.push(buildManualFieldDiagnostic(input, "choices", "choices格式错误"));
+    }
+
+    if (
+      row.related_practice_questions !== undefined &&
+      row.related_practice_questions !== null &&
+      !Array.isArray(row.related_practice_questions)
+    ) {
+      diagnostics.push(buildManualFieldDiagnostic(input, "related_practice_questions", "related_practice_questions格式错误"));
     }
   }
 

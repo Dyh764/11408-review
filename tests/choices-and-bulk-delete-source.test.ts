@@ -36,6 +36,18 @@ test("import schema accepts choices and persists them during import", () => {
   assert.match(route, /choices: card\.choices/);
 });
 
+test("related practice questions use a minimal jsonb migration and flow through import and question queries", () => {
+  const migrationPath = "supabase/migrations/008_add_related_practice_questions.sql";
+
+  assert.equal(existsSync(join(root, migrationPath)), true);
+
+  const sql = read(migrationPath);
+  assert.match(sql, /add column if not exists related_practice_questions jsonb not null default '\[\]'::jsonb/i);
+  assert.match(read("lib/import/import-schema.ts"), /related_practice_questions/);
+  assert.match(read("app/api/import/route.ts"), /related_practice_questions: card\.related_practice_questions/);
+  assert.match(read("lib/questions.ts"), /related_practice_questions/);
+});
+
 test("choices render through shared ChoiceList on import, detail, and review pages", () => {
   assert.equal(existsSync(join(root, "components/mobile/ChoiceList.tsx")), true);
 
@@ -72,4 +84,15 @@ test("bulk delete route only soft deletes current user questions", () => {
   assert.match(source, /\.in\("id", ids\)/);
   assert.doesNotMatch(source, /\.storage[\s\S]*\.remove\(/);
   assert.doesNotMatch(source, /\.from\("reviews"\)[\s\S]*\.delete\(/);
+});
+
+test("bulk delete route can soft delete all current user questions without ids", () => {
+  const source = read("app/api/questions/bulk-delete/route.ts");
+
+  assert.match(source, /all\?: unknown/);
+  assert.match(source, /body\.all === true/);
+  assert.match(source, /bulk_clear_user_library/);
+  assert.match(source, /\.eq\("user_id", user\.id\)/);
+  assert.match(source, /\.is\("deleted_at", null\)/);
+  assert.match(source, /if \(!deleteAll\)[\s\S]*\.in\("id", ids\)/);
 });

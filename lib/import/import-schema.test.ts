@@ -256,6 +256,122 @@ test("Import Protocol v2 parses structured source and keeps the old database sub
   });
 });
 
+test("408 Import Protocol v2 keeps subject, choices, defaults source, and related practice questions", () => {
+  const result = parseImportJsonText(
+    JSON.stringify([
+      validRow({
+        import_protocol_version: "2.0",
+        subject: "操作系统",
+        source: undefined,
+        chapter: "操作系统概述",
+        knowledge_point: "并发与并行",
+        difficulty: "中等",
+        question_text: "下列关于并发和并行的说法，正确的是？",
+        choices: [
+          { label: "A", text: "并发一定要求多个处理器" },
+          { label: "B", text: "并行是宏观上同时推进" },
+          { label: "C", text: "并发强调宏观上同时推进" },
+          { label: "D", text: "并发和并行完全相同" },
+        ],
+        mastery_status: "需要复习",
+        user_note: "我选了B，正确答案是C。",
+        mistake_types: ["概念混淆", "选项陷阱"],
+        standard_answer: "答案：C",
+        answer_explanation: "过程：A 错在处理器条件；B 错在概念对象；C 正确；D 错在二者不等同。",
+        related_practice_questions: [
+          {
+            question_text: "下列关于共享和虚拟的说法，正确的是？",
+            choices: [
+              { label: "A", text: "共享只能互斥共享" },
+              { label: "B", text: "虚拟把物理实体映射为多个逻辑实体" },
+              { label: "C", text: "共享和虚拟含义相同" },
+              { label: "D", text: "虚拟不属于操作系统特征" },
+            ],
+            correct_answer: "B",
+            answer_explanation: "过程：A 错在过窄；B 正确；C 错在混淆；D 错在否定基本特征。",
+            knowledge_point: "操作系统基本特征",
+            why_related: "同样考查操作系统基本特征的概念边界。",
+            difficulty: "中等",
+            rigor_check: "408 范围内单选题，答案唯一。",
+          },
+        ],
+      }),
+    ]),
+  );
+
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.cards[0].card.subject, "操作系统");
+  assert.equal(result.cards[0].card.chapter, "操作系统概述");
+  assert.equal(result.cards[0].card.source_info.name, "未标来源");
+  assert.equal(result.cards[0].card.choices.length, 4);
+  assert.equal(result.cards[0].card.related_practice_questions?.[0].correct_answer, "B");
+});
+
+test("related practice questions are ignored for math and diagnosed when malformed", () => {
+  const mathResult = parseImportJsonText(
+    JSON.stringify([
+      validRow({
+        subject: "数学",
+        related_practice_questions: [
+          {
+            question_text: "数学不启用类题",
+            choices: [
+              { label: "A", text: "1" },
+              { label: "B", text: "2" },
+              { label: "C", text: "3" },
+              { label: "D", text: "4" },
+            ],
+            correct_answer: "A",
+            answer_explanation: "过程：不应保存。",
+            knowledge_point: "极限",
+            why_related: "测试",
+            difficulty: "中等",
+            rigor_check: "测试",
+          },
+        ],
+      }),
+    ]),
+  );
+  const malformed = parseImportWithDiagnostics(
+    JSON.stringify([
+      validRow({
+        subject: "数据结构",
+        choices: [
+          { label: "A", text: "顺序表" },
+          { label: "B", text: "链表" },
+          { label: "C", text: "栈" },
+          { label: "D", text: "队列" },
+        ],
+        standard_answer: "答案：C",
+        answer_explanation: "过程：A 错；B 错；C 正确；D 错。",
+        related_practice_questions: [
+          {
+            question_text: "缺少 D 选项",
+            choices: [
+              { label: "A", text: "1" },
+              { label: "B", text: "2" },
+              { label: "C", text: "3" },
+            ],
+            correct_answer: "E",
+            answer_explanation: "解析：错误前缀",
+            knowledge_point: "栈",
+            why_related: "同考点",
+            difficulty: "普通",
+            rigor_check: "测试",
+          },
+        ],
+      }),
+    ]),
+  );
+
+  assert.equal(mathResult.errors.length, 0);
+  assert.deepEqual(mathResult.cards[0].card.related_practice_questions, []);
+  assert.equal(malformed.cards.length, 0);
+  assert.equal(malformed.diagnostics[0].type, "related_practice_questions格式错误");
+  assert.equal(malformed.diagnostics[0].field, "related_practice_questions");
+  assert.match(malformed.diagnostics[0].suggestion, /choices \/ correct_answer \/ answer_explanation/);
+});
+
 test("source string imports are converted to source_info objects", () => {
   const result = parseImportJsonText(
     JSON.stringify([

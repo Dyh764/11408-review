@@ -363,6 +363,41 @@ test("import page exposes copyable ChatGPT prompt and JSON example templates", (
   assert.match(schema, /answer_explanation 必须以“过程：”开头/);
 });
 
+test("import page keeps math template and adds a dedicated 408 GPT template", () => {
+  const source = read("app/import/page.tsx");
+  const schema = read("lib/import/import-schema.ts");
+
+  assert.match(source, /copyChatGptPrompt/);
+  assert.match(source, /copyExam408Prompt/);
+  assert.match(source, /复制数学 GPT 整理模板/);
+  assert.match(source, /复制 408 GPT 整理模板/);
+  assert.match(schema, /exam408ImportPrompt/);
+  assert.match(schema, /Import Protocol v2 JSON 数组/);
+  assert.match(schema, /related_practice_questions/);
+});
+
+test("408 question detail shows related practice only for 408 and keeps answers hidden until click", () => {
+  const source = read("app/questions/[id]/page.tsx");
+
+  assert.match(source, /isExam408Subject/);
+  assert.match(source, /RelatedPracticeSection/);
+  assert.match(source, /同知识点类题检测/);
+  assert.match(source, /查看答案与解析/);
+  assert.match(source, /visibleAnswerIndexes/);
+  assert.match(source, /related_practice_questions/);
+  assert.match(source, /question\.subject !== "数学"/);
+});
+
+test("/questions chapter level surfaces rule-based chapter weakness analysis", () => {
+  const source = read("app/questions/page.tsx");
+
+  assert.match(source, /analyzeChapterWeakness/);
+  assert.match(source, /ChapterWeaknessPanel/);
+  assert.match(source, /本章欠缺分析/);
+  assert.match(source, /frequent_knowledge_points/);
+  assert.match(source, /next_review_suggestions/);
+});
+
 test("/review supports skipping and explicit next-step actions after recording", () => {
   const source = read("app/review/page.tsx");
 
@@ -480,4 +515,40 @@ test("v3 questions page exposes asset filters and share entry without changing r
   assert.match(source, /quickScope === "inbox"/);
   assert.match(detail, /share-card/);
   assert.match(detail, /generateShareCardImage/);
+});
+
+test("/questions keeps question rows visible when due-review loading fails", () => {
+  const source = read("app/questions/page.tsx");
+
+  assert.match(source, /formatSupabaseError/);
+  assert.match(source, /loadQuestions\(\)/);
+  assert.match(source, /loadDueTodayIds\(\)/);
+  assert.match(source, /今日复习状态读取失败/);
+  assert.match(source, /\.eq\("user_id", user\.id\)/);
+  assert.doesNotMatch(source, /Promise\.all\(\[\s*fetchCurrentUserQuestions\(supabase\)/);
+});
+
+test("/questions exposes a guarded clear-library action", () => {
+  const source = read("app/questions/page.tsx");
+
+  assert.match(source, /handleClearQuestionLibrary/);
+  assert.match(source, /清空错题库/);
+  assert.match(source, /body: JSON\.stringify\(\{ all: true \}\)/);
+  assert.match(source, /setQuestions\(\[\]\)/);
+  assert.match(source, /此操作会软删除当前错题库中的全部错题/);
+});
+
+test("import page confirms import from the top action panel and supports undoing the last import", () => {
+  const source = read("app/import/page.tsx");
+  const bottomPreview = source.slice(source.indexOf("{previewCards.map"));
+
+  assert.match(source, /function ImportActionPanel/);
+  assert.match(source, /顶部确认/);
+  assert.match(source, /handleUndoLastImport/);
+  assert.match(source, /lastImportSuccesses/);
+  assert.match(source, /body: JSON\.stringify\(\{ ids: lastImportSuccesses\.map/);
+  assert.match(source, /查看最近导入/);
+  assert.match(source, /撤销本次导入/);
+  assert.doesNotMatch(bottomPreview, /确认导入/);
+  assert.doesNotMatch(bottomPreview, /导入到待整理/);
 });

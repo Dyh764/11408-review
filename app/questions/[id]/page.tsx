@@ -33,7 +33,14 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { buildShareCardImageModel } from "@/lib/share/question-card";
 import { generateShareCardImage } from "@/lib/share/share-card-image";
-import type { AnswerStatus, Difficulty, MasteryStatus, QuestionTextStatus, Subject } from "@/lib/types";
+import type {
+  AnswerStatus,
+  Difficulty,
+  MasteryStatus,
+  QuestionTextStatus,
+  RelatedPracticeQuestion,
+  Subject,
+} from "@/lib/types";
 
 const subjects: Subject[] = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
 const difficulties: Array<Difficulty | ""> = ["", "基础", "中等", "较难", "压轴"];
@@ -97,6 +104,77 @@ function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
     answer_status: question.answer_status,
     one_sentence_tip: question.one_sentence_tip ?? "",
   };
+}
+
+function isExam408Subject(subject: Subject) {
+  return subject !== "数学";
+}
+
+function RelatedPracticeSection({
+  questions,
+}: {
+  questions: RelatedPracticeQuestion[];
+}) {
+  const [visibleAnswerIndexes, setVisibleAnswerIndexes] = useState<number[]>([]);
+
+  if (questions.length === 0) {
+    return null;
+  }
+
+  function toggleAnswer(index: number) {
+    setVisibleAnswerIndexes((current) =>
+      current.includes(index) ? current.filter((item) => item !== index) : [...current, index],
+    );
+  }
+
+  return (
+    <MobileSection title="同知识点类题检测">
+      <div className="grid gap-3">
+        {questions.map((item, index) => {
+          const answerVisible = visibleAnswerIndexes.includes(index);
+
+          return (
+            <MobileCard key={`${item.question_text}-${index}`}>
+              <div className="flex flex-wrap gap-2">
+                <StatusPill label={item.knowledge_point} tone="blue" />
+                <StatusPill label={item.difficulty} tone="slate" />
+              </div>
+              <MathText
+                text={item.question_text}
+                className="mt-3 text-sm font-semibold leading-6 text-slate-900"
+              />
+              <div className="mt-3">
+                <ChoiceList
+                  choices={item.choices}
+                  correctLabels={answerVisible ? [item.correct_answer] : []}
+                  revealAnswer={answerVisible}
+                />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                关联原因：{item.why_related}
+              </p>
+              <button
+                type="button"
+                onClick={() => toggleAnswer(index)}
+                className="mt-3 min-h-10 w-full rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white"
+              >
+                {answerVisible ? "隐藏答案与解析" : "查看" + "答案与解析"}
+              </button>
+              {answerVisible ? (
+                <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
+                  <p className="font-semibold text-slate-900">正确答案：{item.correct_answer}</p>
+                  <MathText text={item.answer_explanation} className="mt-2" />
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    严谨性检查：{item.rigor_check}
+                  </p>
+                </div>
+              ) : null}
+            </MobileCard>
+          );
+        })}
+      </div>
+    </MobileSection>
+  );
 }
 
 export default function QuestionDetailPage() {
@@ -531,6 +609,10 @@ export default function QuestionDetailPage() {
   const questionDisplay = question
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
+  const relatedPracticeQuestions =
+    question && question.subject !== "数学" && isExam408Subject(question.subject)
+      ? question.related_practice_questions ?? []
+      : [];
   const shareCardModel = question
     ? buildShareCardImageModel({
         subject: question.subject,
@@ -697,6 +779,9 @@ export default function QuestionDetailPage() {
               </dl>
             </MobileCard>
           </MobileSection>
+
+          {/* 查看答案与解析 */}
+          <RelatedPracticeSection questions={relatedPracticeQuestions} />
 
           <MobileSection title="智能增强">
             <MobileCard>
