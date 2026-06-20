@@ -5,7 +5,7 @@ import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MathText } from "@/components/mobile/MathText";
 import { analyzeChapterWeakness, type ChapterWeaknessAnalysis } from "@/lib/analytics/chapter-weakness";
-import { buildQuestionQualityIssues, buildQuestionQualitySummary } from "@/lib/analytics/learning-insights";
+import { buildQuestionQualityIssues } from "@/lib/analytics/learning-insights";
 import {
   ProgressBar,
   SectionHeader,
@@ -158,7 +158,6 @@ export default function QuestionsPage() {
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
-  const [showAiUnverified, setShowAiUnverified] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
@@ -310,10 +309,6 @@ export default function QuestionsPage() {
   );
   const activeDirectory =
     directoryMode === "source" && activeSourceKey ? sourceDirectory : directory;
-  const qualitySummary = useMemo(
-    () => buildQuestionQualitySummary(questions, { includeAiUnverified: showAiUnverified, limit: 4 }),
-    [questions, showAiUnverified],
-  );
   const selectedSubject = activeDirectory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
     selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
@@ -599,104 +594,28 @@ export default function QuestionsPage() {
         </StudyCard>
       </MobileSection>
 
-      <MobileSection>
-        <StudyCard>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-950">整理收件箱</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                集中处理缺题干、缺答案、缺章节、缺知识点、待修正和格式异常题卡。
-              </p>
-            </div>
-            <StudyBadge tone={qualitySummary.highIssueCount > 0 ? "amber" : "purple"}>
-              {qualitySummary.affectedQuestionCount} 题
-            </StudyBadge>
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
-              <p className="text-[11px] font-bold text-slate-500">严重问题</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.severeIssueCount}</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
-              <p className="text-[11px] font-bold text-slate-500">需修正</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.needsFixCount}</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
-              <p className="text-[11px] font-bold text-slate-500">未分类</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.uncategorizedCount}</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
-              <p className="text-[11px] font-bold text-slate-500">AI 未核对</p>
-              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.aiUnverifiedCount}</p>
-            </div>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowAiUnverified((current) => !current)}
-              className="min-h-9 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
-            >
-              {showAiUnverified ? "隐藏 AI 未核对" : "显示 AI 未核对"}
-            </button>
-          </div>
-          {qualitySummary.topIssues.length > 0 ? (
-            <div className="mt-3 grid gap-2">
-              {qualitySummary.topIssues.map((issue) => (
-                <Link
-                  key={issue.questionId}
-                  href={issue.actionHref}
-                  className="rounded-lg bg-slate-50 p-3 text-left ring-1 ring-slate-200"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-blue-700">
-                      {issue.isAiOnly ? "AI 未核对" : "待整理题卡"}
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-400">进入详情</span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {issue.labels.map((label) => (
-                      <StudyBadge key={label} tone={issue.severity === "high" ? "amber" : "purple"}>
-                        {label}
-                      </StudyBadge>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">{issue.details[0]}</p>
-                </Link>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickScope("inbox");
-                  setActiveSubject("");
-                  setActiveChapter("");
-                }}
-                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
-              >
-                查看全部待整理题卡
-              </button>
-            </div>
-          ) : (
-            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
-              暂无需要立即整理的题卡。
-            </p>
-          )}
-          {questions.length > 0 ? (
-            <div className="mt-4 border-t border-slate-200 pt-3">
+      {questions.length > 0 ? (
+        <MobileSection>
+          <StudyCard className="border-red-100 bg-red-50/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-black text-red-700">清空错题库</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  只软删除当前账号的错题，复习、报告和导出会自动隐藏这些记录。
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleClearQuestionLibrary}
                 disabled={isBatchProcessing}
-                className="min-h-10 rounded-lg bg-red-50 px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
+                className="min-h-10 shrink-0 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
               >
-                清空错题库
+                清空
               </button>
-              <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                只软删除当前账号的错题，复习、报告和导出会自动隐藏这些记录。
-              </p>
             </div>
-          ) : null}
-        </StudyCard>
-      </MobileSection>
+          </StudyCard>
+        </MobileSection>
+      ) : null}
 
       {isLoading ? (
         <MobileSection>

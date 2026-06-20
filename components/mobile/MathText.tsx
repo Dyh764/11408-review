@@ -40,8 +40,8 @@ export function MathText({ text, fallback = "", compact = false, className = "" 
         const html = renderMath(part);
         const wrapperClass =
           part.type === "blockMath"
-            ? "my-2 block max-w-full overflow-x-auto overflow-y-hidden py-1"
-            : "inline-block max-w-full overflow-x-auto overflow-y-hidden align-baseline";
+            ? "math-block my-2 block max-w-full overflow-x-auto overflow-y-hidden py-1"
+            : "math-inline inline-flex max-w-full overflow-x-auto overflow-y-hidden align-middle";
 
         return (
           <span key={`${part.type}-${index}`} className={wrapperClass}>

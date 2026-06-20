@@ -431,6 +431,33 @@ test("import page explains JSON import with aggregate preview stats", () => {
   }
 });
 
+test("import page keeps guidance compact so paste controls lead the mobile flow", () => {
+  const source = read("app/import/page.tsx");
+  const headerToPaste = source.slice(source.indexOf("<PageHeader"), source.indexOf("title=\"粘贴错题卡\""));
+
+  assert.match(source, /<details[\s\S]*导入步骤/);
+  assert.match(source, /模板与示例/);
+  assert.match(source, /aria-label="导入到待整理"/);
+  assert.doesNotMatch(headerToPaste, /<Notice[\s\S]*3 步完成导入/);
+});
+
+test("shared choice and math renderers keep mobile formulas aligned without page overflow", () => {
+  const choices = read("components/mobile/ChoiceList.tsx");
+  const mathText = read("components/mobile/MathText.tsx");
+  const globals = read("app/globals.css");
+
+  assert.match(choices, /min-h-12/);
+  assert.match(choices, /rounded-xl/);
+  assert.match(choices, /aria-pressed/);
+  assert.match(choices, /items-start/);
+  assert.match(mathText, /math-inline/);
+  assert.match(mathText, /align-middle/);
+  assert.doesNotMatch(mathText, /align-baseline/);
+  assert.match(globals, /\.math-inline/);
+  assert.match(globals, /max-width: 100%/);
+  assert.match(globals, /overflow-x: auto/);
+});
+
 test("/questions exposes focused practice and inbox entries without expanding bottom nav", () => {
   const questions = read("app/questions/page.tsx");
   const bottomNav = read("components/bottom-nav.tsx");
@@ -445,6 +472,16 @@ test("/questions exposes focused practice and inbox entries without expanding bo
   assert.doesNotMatch(bottomNav, /拍题/);
 });
 
+test("/questions removes the organize inbox card but keeps inbox filtering safeguards", () => {
+  const questions = read("app/questions/page.tsx");
+
+  assert.doesNotMatch(questions, /整理收件箱/);
+  assert.match(questions, /quickScope === "inbox"/);
+  assert.match(questions, /buildQuestionQualityIssues/);
+  assert.match(questions, /待整理/);
+  assert.match(questions, /清空错题库/);
+});
+
 test("learning analytics surfaces stay mobile-first across home, review, questions, practice, and reports", () => {
   const home = read("app/page.tsx");
   const review = read("app/review/page.tsx");
@@ -457,14 +494,10 @@ test("learning analytics surfaces stay mobile-first across home, review, questio
   assert.match(home, /3道最该做错题/);
   assert.match(review, /buildRoundExposureSummary/);
   assert.match(review, /本轮暴露问题/);
-  assert.match(questions, /buildQuestionQualitySummary/);
-  assert.match(questions, /整理收件箱/);
-  assert.match(questions, /showAiUnverified/);
-  assert.match(questions, /includeAiUnverified: showAiUnverified/);
-  assert.match(questions, /显示 AI 未核对/);
-  assert.match(questions, /暂无需要立即整理的题卡/);
-  assert.match(questions, /issue\.labels/);
-  assert.match(questions, /key=\{issue\.questionId\}/);
+  assert.match(questions, /buildQuestionQualityIssues/);
+  assert.match(questions, /quickScope === "inbox"/);
+  assert.match(questions, /需要修正/);
+  assert.match(questions, /未分类/);
   assert.match(practice, /URLSearchParams/);
   assert.match(practice, /topic/);
   assert.match(reports, /7 天薄弱点变化/);

@@ -666,19 +666,21 @@ export default function QuestionDetailPage() {
         ) : (
         <>
           <MobileSection title="题目">
-            <MobileCard>
-              <div className="flex items-start justify-between gap-3">
+            <MobileCard className="bg-white">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-slate-900">
+                  <p className="break-words text-base font-black leading-6 text-slate-950">
                     {question.chapter?.trim() || "未标章节"}
                   </p>
-                  {question.knowledge_point ? (
-                    <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                      {question.knowledge_point}
-                    </p>
-                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <StatusPill label={question.subject} tone="blue" />
+                    <StatusPill label={question.difficulty || "难度待补充"} tone="slate" />
+                    <StatusPill
+                      label={question.knowledge_point?.trim() || "待补充知识点"}
+                      tone={question.knowledge_point?.trim() ? "blue" : "amber"}
+                    />
+                  </div>
                 </div>
-                <StatusPill label={question.difficulty || "未标记"} tone="slate" />
               </div>
 
               {question.signedImageUrl ? (
@@ -705,7 +707,7 @@ export default function QuestionDetailPage() {
               <MathText
                 text={questionDisplay.questionText}
                 fallback="暂无题目文字。"
-                className="mt-4 text-slate-900"
+                className="mt-4 text-base font-semibold leading-8 text-slate-950"
               />
 
               {questionDisplay.choices.length > 0 ? (

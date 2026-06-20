@@ -25,10 +25,10 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-lg text-xs font-bold transition ${
+              className={`flex min-h-14 flex-col items-center justify-center rounded-xl text-xs font-bold transition ${
                 isActive
-                  ? "bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.22)]"
-                  : "bg-slate-50/70 text-slate-500 hover:bg-slate-100"
+                  ? "bg-blue-600 text-white shadow-[0_10px_22px_rgba(37,99,235,0.24)]"
+                  : "bg-white text-slate-500 ring-1 ring-slate-100 hover:bg-slate-50"
               }`}
             >
               <span className="text-lg leading-none" aria-hidden="true">

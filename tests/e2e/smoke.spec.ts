@@ -448,7 +448,7 @@ test("reports page presents report tabs instead of raw JSON", async ({ page }) =
   await expect(page.getByText("题卡质量概览")).toBeVisible();
 });
 
-test("questions page exposes the organize inbox when reachable", async ({ page }) => {
+test("questions page removes the organize inbox card when reachable", async ({ page }) => {
   const response = await page.goto("/questions");
 
   expect(response?.status()).toBeLessThan(400);
@@ -457,8 +457,42 @@ test("questions page exposes the organize inbox when reachable", async ({ page }
     return;
   }
 
-  await expect(page.getByText("整理收件箱").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /显示 AI 未核对|隐藏 AI 未核对/ })).toBeVisible();
+  await expect(page.getByText("整理收件箱")).toHaveCount(0);
+  await expect(page.getByText(/按章节看|还没有导入错题卡/).first()).toBeVisible();
+});
+
+test("import page keeps compact guidance above the paste flow on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const response = await page.goto("/import");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await expect(page.getByText("导入步骤")).toBeVisible();
+  await expect(page.getByText("模板与示例")).toBeVisible();
+  await expect(page.getByLabel("ChatGPT 输出内容")).toBeVisible();
+  await expect(page.getByRole("button", { name: "解析" })).toBeVisible();
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
+test("question detail keeps choices and formulas inside the mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const response = await page.goto("/questions/example-answer");
+
+  expect(response?.status()).toBeLessThan(400);
+
+  if (page.url().includes("/login")) {
+    return;
+  }
+
+  await expectPageHasNoHorizontalOverflow(page);
+  const answerChoice = page.locator(".answer-choice").first();
+  if ((await answerChoice.count()) > 0) {
+    await expect(answerChoice).toBeVisible();
+  }
 });
 
 test("reports page uses user-facing empty copy and exposes manual rule report generation", async ({
@@ -598,6 +632,7 @@ test("mobile viewport has no obvious horizontal scroll and keeps bottom nav visi
     "/review",
     "/reports",
     "/login",
+    "/questions/example-answer",
   ]) {
     await page.goto(route);
     await expectPageHasNoHorizontalOverflow(page);

@@ -45,7 +45,29 @@ canvas {
 
 .katex {
   max-width: 100%;
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.math-inline {
+  max-width: 100%;
+  scrollbar-width: thin;
+  vertical-align: -0.08em;
+}
+
+.math-inline > .katex,
+.math-inline .katex {
+  display: inline-block;
+  max-width: max-content;
+  line-height: 1.2;
+}
+
+.math-block {
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
+.math-block .katex-display {
+  margin: 0.25rem 0;
 }
 
 p,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MobileCard, MobilePageShell, MobileSection, Notice, SectionCard, StatCard } from "@/components/mobile/primitives";
+import { MobileCard, MobilePageShell, MobileSection, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
@@ -228,12 +228,12 @@ function ImportActionPanel({
             ))}
           </div>
         ) : null}
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="mt-4 grid gap-2">
           <button
             type="button"
             onClick={onImport}
             disabled={!canImport}
-            className="min-h-14 rounded-lg bg-slate-950 px-4 text-base font-semibold text-white disabled:bg-slate-300"
+            className="min-h-14 rounded-lg bg-blue-600 px-4 text-base font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.2)] disabled:bg-slate-300"
           >
             {isImporting ? "导入中..." : "确认导入"}
           </button>
@@ -241,7 +241,8 @@ function ImportActionPanel({
             type="button"
             onClick={onInboxImport}
             disabled={!canImport}
-            className="min-h-14 rounded-lg bg-blue-600 px-4 text-base font-semibold text-white disabled:bg-slate-300"
+            aria-label="导入到待整理"
+            className="min-h-11 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 disabled:text-slate-400"
           >
             导入到待整理
           </button>
@@ -403,45 +404,47 @@ export default function ImportPage() {
       />
 
       <MobileSection>
-        <Notice tone="blue">
-          <p className="font-bold">3 步完成导入</p>
-          <ol className="mt-2 grid gap-1">
+        <details className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-950">
+          <summary className="cursor-pointer list-none text-xs font-black text-blue-700">
+            导入步骤
+          </summary>
+          <ol className="mt-2 grid gap-1 text-xs leading-5 text-blue-900">
             <li>1. 复制 ChatGPT 生成的 JSON</li>
             <li>2. 粘贴到这里</li>
             <li>3. 预览确认后导入</li>
           </ol>
-          <p className="mt-2 text-sm leading-6">
+          <p className="mt-2 text-xs leading-5 text-blue-900">
             数学公式请使用 LaTeX：行内写作 $\\sum_&#123;n=1&#125;^&#123;\\infty&#125; u_n$，块级公式使用 $$...$$。
           </p>
-          <p className="mt-2 text-sm leading-6">
-            选择题请尽量把 A/B/C/D 放进 choices，不要全部塞进 question_text。
+          <p className="mt-1 text-xs leading-5 text-blue-900">
+            选择题请把 A/B/C/D 放进 choices，不要全部塞进 question_text。
           </p>
-        </Notice>
+        </details>
       </MobileSection>
 
-      <MobileSection title="给 ChatGPT 的整理模板">
-        <SectionCard subtitle="晚上整理错题时，先复制指令或示例，再让 ChatGPT 按格式输出 JSON。">
-          <div className="grid gap-2 sm:grid-cols-2">
+      <MobileSection title="模板与示例">
+        <SectionCard subtitle="需要时再复制模板；已经有 JSON 就直接往下粘贴。">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={copyChatGptPrompt}
               aria-label="复制 ChatGPT 整理指令"
               title="复制 ChatGPT 整理指令"
-              className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+              className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
             >
               复制数学 GPT 整理模板
             </button>
             <button
               type="button"
               onClick={copyExam408Prompt}
-              className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+              className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
             >
               复制 408 GPT 整理模板
             </button>
             <button
               type="button"
               onClick={copyImportExampleJson}
-              className="min-h-12 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+              className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-700 ring-1 ring-slate-200"
             >
               复制 JSON 示例
             </button>
