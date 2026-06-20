@@ -9,7 +9,7 @@ const cardToneClass: Record<Tone, string> = {
   green: "border-emerald-100 bg-emerald-50 text-emerald-950",
   amber: "border-amber-100 bg-amber-50 text-amber-950",
   red: "border-red-100 bg-red-50 text-red-950",
-  slate: "border-slate-100 bg-white text-slate-950",
+  slate: "border-slate-200 bg-white text-slate-950",
 };
 
 const actionToneClass: Record<Tone, string> = {
@@ -65,7 +65,7 @@ export function MobileCard({
   tone?: Tone;
 }) {
   return (
-    <div className={`rounded-lg border p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ${cardToneClass[tone]} ${className}`}>
+    <div className={`rounded-lg border p-4 shadow-[0_8px_20px_rgba(15,23,42,0.045)] ${cardToneClass[tone]} ${className}`}>
       {children}
     </div>
   );

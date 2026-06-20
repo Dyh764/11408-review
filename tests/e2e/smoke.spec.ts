@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const protectedRoutes = ["/upload", "/import", "/questions", "/reports"];
-const utilityRoutes = ["/settings", "/sprint", "/practice"];
+const utilityRoutes = ["/settings", "/sprint", "/practice", "/knowledge-map", "/statistics"];
 
 async function expectPageHasNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => {
@@ -16,7 +16,8 @@ async function expectBottomNav(page: Page) {
   await expect(page.locator("nav").getByRole("link", { name: /首页|棣栭〉/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /错题|閿欓/ })).toBeVisible();
   await expect(page.locator("nav").getByRole("link", { name: /导入|瀵煎叆/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /拍题|鎷嶉/ })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link", { name: /练习|专项|缁冧範/ })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link", { name: /拍题|鎷嶉/ })).toHaveCount(0);
   await expect(page.locator("nav").getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
 }
 
@@ -31,13 +32,21 @@ async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
   }
 }
 
-test("home page is accessible and includes bottom navigation", async ({ page }) => {
+test("home page is accessible and exposes the responsive 408 dashboard", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   const response = await page.goto("/");
 
   expect(response?.status()).toBeLessThan(400);
-  await expectBottomNav(page);
-  await expect(page.getByRole("link", { name: "打开错题本" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "进入导入诊断" })).toBeVisible();
+  await expect(page.getByTestId("home-desktop-dashboard")).toBeVisible();
+  await expect(page.getByTestId("home-mobile-dashboard")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "桌面首页导航" })).toBeVisible();
+  await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
+  await expect(page.getByText("四科掌握进度").first()).toBeVisible();
+  await expect(page.getByText("功能区").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(page.getByRole("link", { name: "数据统计" })).toHaveAttribute("href", "/statistics");
+  await expectPageHasNoHorizontalOverflow(page);
 });
 
 test("home mobile first screen exposes primary asset actions", async ({ page }) => {
@@ -61,6 +70,34 @@ test("home mobile first screen exposes primary asset actions", async ({ page }) 
   expect(modulesBox?.y ?? 0).toBeLessThan(focusBox?.y ?? 0);
   await expect(page.getByRole("link", { name: /开始今日复习/ })).toHaveCount(0);
   await expectPageHasNoHorizontalOverflow(page);
+});
+
+test("design preview routes expose desktop dashboard and dedicated 390px mobile layouts", async ({
+  page,
+}) => {
+  for (const variant of ["a", "b", "c"]) {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/design-preview/${variant}`);
+    const desktopPreview = page.getByTestId(`desktop-preview-${variant}`);
+    await expect(desktopPreview).toBeVisible();
+    await expect(page.getByTestId(`mobile-preview-${variant}`)).toBeHidden();
+    await expect(page.getByRole("navigation", { name: "桌面预览导航" })).toBeVisible();
+    await expect(desktopPreview.getByText("四科进度").first()).toBeVisible();
+    await expect(desktopPreview.getByText("薄弱章节").first()).toBeVisible();
+    await expectPageHasNoHorizontalOverflow(page);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/design-preview/${variant}`);
+    const mobilePreview = page.getByTestId(`mobile-preview-${variant}`);
+    await expect(mobilePreview).toBeVisible();
+    await expect(page.getByTestId(`desktop-preview-${variant}`)).toBeHidden();
+    await expect(page.getByRole("navigation", { name: "移动预览底部导航" })).toBeVisible();
+    await expect(mobilePreview.getByText("错题本").first()).toBeVisible();
+    await expect(mobilePreview.getByText("导入错题").first()).toBeVisible();
+    await expect(mobilePreview.getByText("408 四科入口").first()).toBeVisible();
+    await expect(mobilePreview.getByText("本章欠缺分析").first()).toBeVisible();
+    await expectPageHasNoHorizontalOverflow(page);
+  }
 });
 
 test("login page is accessible", async ({ page }) => {
@@ -455,9 +492,15 @@ test("home page keeps optional DeepSeek out of the primary asset cockpit", async
   const response = await page.goto("/");
 
   expect(response?.status()).toBeLessThan(400);
-  await expect(page.getByText("数学错题资产管理")).toBeVisible();
-  await expect(page.getByText("核心模块")).toBeVisible();
-  await expect(page.getByRole("link", { name: /错题分享 进入单题详情/ })).toBeVisible();
+  if (await page.getByTestId("home-mobile-dashboard").isVisible()) {
+    await expect(page.getByText("数学错题资产管理")).toBeVisible();
+    await expect(page.getByText("核心模块")).toBeVisible();
+    await expect(page.getByRole("link", { name: /错题分享 进入单题详情/ })).toBeVisible();
+  } else {
+    await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
+    await expect(page.getByText("功能区").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "错题分享" })).toBeVisible();
+  }
   await expect(page.getByText("现在应该点这里")).toHaveCount(0);
   await expect(page.getByText("主流程入口保留，低频功能不抢首屏。")).toHaveCount(0);
   await expect(page.getByText("智能建议")).toHaveCount(0);

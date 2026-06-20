@@ -150,9 +150,10 @@ function RelatedPracticeSection({
                   revealAnswer={answerVisible}
                 />
               </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">
-                关联原因：{item.why_related}
-              </p>
+              <div className="mt-3 text-xs leading-5 text-slate-500">
+                <span className="font-semibold text-slate-600">关联原因：</span>
+                <MathText text={item.why_related} compact className="mt-1 text-xs leading-5" />
+              </div>
               <button
                 type="button"
                 onClick={() => toggleAnswer(index)}
@@ -164,9 +165,10 @@ function RelatedPracticeSection({
                 <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
                   <p className="font-semibold text-slate-900">正确答案：{item.correct_answer}</p>
                   <MathText text={item.answer_explanation} className="mt-2" />
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    严谨性检查：{item.rigor_check}
-                  </p>
+                  <div className="mt-2 text-xs leading-5 text-slate-500">
+                    <span className="font-semibold text-slate-600">严谨性检查：</span>
+                    <MathText text={item.rigor_check} compact className="mt-1 text-xs leading-5" />
+                  </div>
                 </div>
               ) : null}
             </MobileCard>
@@ -892,7 +894,7 @@ export default function QuestionDetailPage() {
                   type="button"
                   onClick={handleCopyShareJson}
                   disabled={isSharing}
-                  className="min-h-12 rounded-lg bg-[#ede7ff] px-4 text-sm font-black text-[#4f23b6] disabled:text-slate-400"
+                  className="min-h-12 rounded-lg bg-blue-50 px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
                 >
                   复制分享 JSON
                 </button>
@@ -900,7 +902,7 @@ export default function QuestionDetailPage() {
                   type="button"
                   onClick={handleDownloadShareImage}
                   disabled={isSharing}
-                  className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white disabled:bg-slate-300"
+                  className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-300"
                 >
                   下载错题卡 PNG
                 </button>
@@ -910,50 +912,50 @@ export default function QuestionDetailPage() {
                   <div
                     ref={shareCardRef}
                     style={{ width: 1080, height: 1350 }}
-                    className="overflow-hidden bg-[#f4f0ff] p-[72px] text-[#211536]"
+                    className="overflow-hidden bg-slate-50 p-[72px] text-slate-950"
                   >
                     <div className="flex h-full flex-col rounded-[32px] border border-[#d8ccff] bg-white p-[56px] shadow-[0_32px_90px_rgba(79,35,182,0.18)]">
                       <div className="flex items-start justify-between gap-8">
                         <div className="min-w-0">
-                          <p className="text-[34px] font-black leading-tight text-[#4f23b6]">
+                          <p className="text-[34px] font-black leading-tight text-blue-700">
                             {shareCardModel.subject}
                           </p>
                           <p className="mt-4 break-words text-[46px] font-black leading-tight">
                             {shareCardModel.knowledgePoint}
                           </p>
                         </div>
-                        <div className="shrink-0 rounded-full bg-[#ede7ff] px-8 py-4 text-[28px] font-black text-[#4f23b6]">
+                        <div className="shrink-0 rounded-full bg-blue-50 px-8 py-4 text-[28px] font-black text-blue-700">
                           {shareCardModel.difficulty}
                         </div>
                       </div>
 
-                      <div className="my-12 h-px bg-[#e4dcff]" />
+                      <div className="my-12 h-px bg-slate-200" />
 
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <MathText
                           text={shareCardModel.questionText}
-                          className="text-[38px] leading-[1.55] text-[#211536]"
+                          className="text-[38px] leading-[1.55] text-slate-950"
                         />
                       </div>
 
-                      <div className="mt-10 rounded-[28px] bg-[#f8f5ff] p-8">
+                      <div className="mt-10 rounded-[28px] bg-slate-50 p-8">
                         <div className="flex flex-wrap gap-3">
                           {shareCardModel.mistakeTypes.length > 0 ? (
                             shareCardModel.mistakeTypes.map((item) => (
                               <span
                                 key={item}
-                                className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-[#4f23b6] ring-1 ring-[#e4dcff]"
+                                className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-blue-700 ring-1 ring-slate-200"
                               >
                                 {item}
                               </span>
                             ))
                           ) : (
-                            <span className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-[#4f23b6] ring-1 ring-[#e4dcff]">
+                            <span className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-blue-700 ring-1 ring-slate-200">
                               待整理错因
                             </span>
                           )}
                         </div>
-                        <p className="mt-6 break-words text-[30px] font-bold leading-[1.45] text-[#211536]">
+                        <p className="mt-6 break-words text-[30px] font-bold leading-[1.45] text-slate-950">
                           {shareCardModel.oneSentenceTip}
                         </p>
                       </div>

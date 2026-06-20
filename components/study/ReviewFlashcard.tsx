@@ -137,12 +137,12 @@ export function ReviewFlashcard({
           ))}
         </div>
 
-        <div className="rounded-lg bg-[#f8f5ff] p-4">
+        <div className="rounded-lg bg-slate-50 p-4">
           <div className="flex gap-3">
             {review.signedImageUrl || review.questions.image_path ? (
               <Link
                 href={`/questions/${review.question_id}`}
-                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-[#e4dcff]"
+                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-slate-200"
               >
                 {review.signedImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -157,7 +157,7 @@ export function ReviewFlashcard({
               </Link>
             ) : null}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-black text-[#5b2bd6]">
+              <p className="text-xs font-black text-blue-600">
                 {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
               </p>
               <MathText
@@ -186,7 +186,7 @@ export function ReviewFlashcard({
 
         {questionDisplay.choices.length > 0 ? (
           <div>
-            <p className="mb-2 text-sm font-black text-[#211536]">选择题选项</p>
+            <p className="mb-2 text-sm font-black text-slate-950">选择题选项</p>
             <ChoiceList
               choices={questionDisplay.choices}
               mode={submittedChoice ? "reviewed" : "answering"}
@@ -199,14 +199,14 @@ export function ReviewFlashcard({
           </div>
         ) : (
           <label className="block">
-            <span className="text-sm font-black text-[#211536]">
+            <span className="text-sm font-black text-slate-950">
               非选择题答案核对区（可不填）
             </span>
             <textarea
               value={draftAnswer}
               onChange={(event) => onDraftAnswer(event.target.value)}
               rows={3}
-              className="mt-2 w-full resize-y rounded-lg border border-[#d9cffd] bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#5b2bd6]"
+              className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
               placeholder="先写下你的答案或关键步骤，再查看标准答案。"
             />
           </label>
@@ -219,7 +219,7 @@ export function ReviewFlashcard({
                 type="button"
                 onClick={onSubmitChoice}
                 disabled={selectedChoices.length === 0 && answerChoices.labels.length > 0}
-                className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+                className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
               >
                 提交答案
               </button>
@@ -228,7 +228,7 @@ export function ReviewFlashcard({
                 type="button"
                 onClick={onRevealAnswer}
                 disabled={answerRevealed}
-                className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+                className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
               >
                 {answerRevealed ? "答案已显示" : "我做完了，查看答案"}
               </button>
@@ -240,7 +240,7 @@ export function ReviewFlashcard({
             type="button"
             onClick={onSkip}
             disabled={processingLocked}
-            className="min-h-12 rounded-lg border border-[#d9cffd] bg-white px-4 text-sm font-black text-[#4f23b6] disabled:text-slate-400"
+            className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
           >
             跳过本题
           </button>
@@ -260,7 +260,7 @@ export function ReviewFlashcard({
               </p>
             ) : null}
             {!isChoiceQuestion ? (
-              <div className="rounded-lg bg-[#ede7ff] p-3 text-sm leading-6 text-[#4f23b6] ring-1 ring-[#d9cffd]">
+              <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-700 ring-1 ring-blue-100">
                 <p>请对照标准答案自行判断，本工具暂不自动判定非选择题对错。</p>
                 {draftAnswer.trim() ? <p className="mt-2 break-words">本次答案/思路：{draftAnswer}</p> : null}
               </div>
@@ -278,7 +278,7 @@ export function ReviewFlashcard({
 
         {canRecordReview ? (
           <div>
-            <p className="mb-2 text-sm font-black text-[#211536]">记录本题结果</p>
+            <p className="mb-2 text-sm font-black text-slate-950">记录本题结果</p>
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
                 <button
@@ -286,7 +286,7 @@ export function ReviewFlashcard({
                   type="button"
                   onClick={() => onReview(key)}
                   disabled={processing || processingLocked}
-                  className="min-h-12 rounded-lg bg-[#ede7ff] px-3 text-sm font-black text-[#4f23b6] disabled:bg-slate-200 disabled:text-slate-400"
+                  className="min-h-12 rounded-lg bg-blue-50 px-3 text-sm font-black text-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
                 >
                   {processing ? "写入中..." : resultLabels[key]}
                 </button>

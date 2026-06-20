@@ -335,7 +335,7 @@ export default function ReviewPage() {
                   <Link
                     key={topic.topic}
                     href={topic.actionHref}
-                    className="rounded-lg bg-white px-3 py-2 text-left text-[#211536]"
+                    className="rounded-lg bg-white px-3 py-2 text-left text-slate-950"
                   >
                     <span className="block text-sm font-black">{topic.topic}</span>
                     <span className="mt-1 block text-xs text-slate-500">
@@ -353,13 +353,13 @@ export default function ReviewPage() {
           <div className="mt-5 grid grid-cols-2 gap-3">
             <Link
               href={roundExposureSummary.nextActionHref}
-              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-blue-700"
             >
               {roundExposureSummary.nextActionLabel}
             </Link>
             <Link
               href="/questions"
-              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+              className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-blue-700"
             >
               去错题库
             </Link>
@@ -370,7 +370,7 @@ export default function ReviewPage() {
   }
 
   return (
-    <MobilePageShell className="bg-[#f4f0ff]">
+    <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         title="今日复习闪卡"
         subtitle="先处理最该复盘的题，一次只推进一道。先做题，再看答案，最后记录结果。"
@@ -402,7 +402,7 @@ export default function ReviewPage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-[#e4dcff]">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             {message}
           </p>
         </MobileSection>

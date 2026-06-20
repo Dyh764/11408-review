@@ -69,9 +69,9 @@ export function MotivationBanner({
   }, [fallback, userId]);
 
   return (
-    <StudyCard className="bg-[#fbfaff]">
-      <p className="text-xs font-black text-[#5b2bd6]">今日激励句</p>
-      <p className="mt-2 text-sm leading-6 text-[#211536]">{message}</p>
+    <StudyCard className="bg-blue-50">
+      <p className="text-xs font-black text-blue-600">今日激励句</p>
+      <p className="mt-2 text-sm leading-6 text-slate-950">{message}</p>
     </StudyCard>
   );
 }

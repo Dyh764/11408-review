@@ -85,7 +85,7 @@ function buildNextActions({
     return [
       {
         title: "先补充错题数据",
-        detail: "今天还没有足够错题或复习记录，先去拍题或导入错题卡。",
+        detail: "今天还没有足够错题或复习记录，先去导入错题卡或复盘错题库。",
       },
     ];
   }
@@ -211,6 +211,6 @@ export function buildRuleReportContent(input: RuleReportInput) {
     }),
     warning: hasEnoughData
       ? ""
-      : "今天还没有足够错题或复习记录，先去拍题或导入错题卡。",
+      : "今天还没有足够错题或复习记录，先去导入错题卡或复盘错题库。",
   };
 }

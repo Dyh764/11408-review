@@ -11,10 +11,11 @@ const mathCommandRules: Array<[RegExp, string]> = [
   [/(?<!\\)sqrt\{/g, "\\sqrt{"],
   [/(?<!\\)lim_/g, "\\lim_"],
   [/(?<!\\)int_/g, "\\int_"],
+  [/(?<!\\)tan\^/g, "\\tan^"],
 ];
 
 const obviousMathPattern =
-  /(\\(?:sum|frac|sqrt|lim|int)(?:\{[^{}]*\}|_[{\w=+\-^\\]+|\^[{\w=+\-^\\]+|\s*[a-zA-Z0-9_{}=+\-^\\]+)*)/g;
+  /(\\lim_\{[^}]+\}|\\tan\^[a-zA-Z0-9{}]+(?:\([^，,。；;]*\))?|\\(?:sum|int)_[^\s，,。；;]+|\\(?:frac|sqrt)\{[^{}]*\}(?:\{[^{}]*\})?)/g;
 
 function normalizeMathCommands(value: string) {
   return mathCommandRules.reduce((result, [pattern, replacement]) => {
@@ -32,31 +33,32 @@ function normalizePlainTextSegment(segment: string) {
 }
 
 function normalizeMathText(input: string) {
+  const preparedInput = input.replace(/\\\$/g, "$");
   const parts: string[] = [];
   let index = 0;
 
-  while (index < input.length) {
-    const next = input.indexOf("$", index);
+  while (index < preparedInput.length) {
+    const next = preparedInput.indexOf("$", index);
 
     if (next === -1) {
-      parts.push(normalizePlainTextSegment(input.slice(index)));
+      parts.push(normalizePlainTextSegment(preparedInput.slice(index)));
       break;
     }
 
     if (next > index) {
-      parts.push(normalizePlainTextSegment(input.slice(index, next)));
+      parts.push(normalizePlainTextSegment(preparedInput.slice(index, next)));
     }
 
-    const isBlock = input.startsWith("$$", next);
+    const isBlock = preparedInput.startsWith("$$", next);
     const delimiter = isBlock ? "$$" : "$";
-    const end = input.indexOf(delimiter, next + delimiter.length);
+    const end = preparedInput.indexOf(delimiter, next + delimiter.length);
 
     if (end === -1) {
-      parts.push(input.slice(next));
+      parts.push(preparedInput.slice(next));
       break;
     }
 
-    parts.push(input.slice(next, end + delimiter.length));
+    parts.push(preparedInput.slice(next, end + delimiter.length));
     index = end + delimiter.length;
   }
 

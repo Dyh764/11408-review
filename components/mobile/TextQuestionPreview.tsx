@@ -65,9 +65,11 @@ export function TextQuestionPreview({
   return (
     <article className={containerClass}>
       {!hideTitle ? (
-        <p className="break-words text-xs font-semibold leading-5 text-slate-500">
-          {topicLabel}
-        </p>
+        <MathText
+          text={topicLabel}
+          compact
+          className="break-words text-xs font-semibold leading-5 text-slate-500"
+        />
       ) : null}
       <MathText
         text={question_text}
@@ -90,9 +92,11 @@ export function TextQuestionPreview({
         </div>
       ) : null}
       {!hideMeta && (chapter || knowledge_point) ? (
-        <p className="mt-2 break-words text-xs leading-5 text-slate-500">
-          {[chapter, knowledge_point].filter(Boolean).join(" / ")}
-        </p>
+        <MathText
+          text={[chapter, knowledge_point].filter(Boolean).join(" / ")}
+          compact
+          className="mt-2 break-words text-xs leading-5 text-slate-500"
+        />
       ) : null}
     </article>
   );

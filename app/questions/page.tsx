@@ -182,7 +182,7 @@ export default function QuestionsPage() {
 
         if (isActive) {
           setQuestions(items);
-          setMessage(items.length === 0 ? "还没有上传真实错题。" : "");
+          setMessage(items.length === 0 ? "还没有导入错题卡。" : "");
         }
       } catch (error) {
         if (isActive) {
@@ -574,7 +574,7 @@ export default function QuestionsPage() {
   }
 
   return (
-    <MobilePageShell className="bg-[#f4f0ff]">
+    <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         title="错题库目录"
         subtitle="按科目、章节、题目三层浏览。数学题会拆到高数、线代和概率统计，找题更快。"
@@ -584,14 +584,14 @@ export default function QuestionsPage() {
         <StudyCard>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-black text-[#211536]">专项复盘</p>
+              <p className="text-sm font-black text-slate-950">专项复盘</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 按章节或错因主动开一轮闪卡，不影响今日复习入口。
               </p>
             </div>
             <Link
               href="/practice"
-              className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-[#5b2bd6] px-3 text-xs font-black text-white"
+              className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-xs font-black text-white"
             >
               去复盘
             </Link>
@@ -603,7 +603,7 @@ export default function QuestionsPage() {
         <StudyCard>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-black text-[#211536]">整理收件箱</p>
+              <p className="text-sm font-black text-slate-950">整理收件箱</p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 集中处理缺题干、缺答案、缺章节、缺知识点、待修正和格式异常题卡。
               </p>
@@ -613,28 +613,28 @@ export default function QuestionsPage() {
             </StudyBadge>
           </div>
           <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-bold text-slate-500">严重问题</p>
-              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.severeIssueCount}</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.severeIssueCount}</p>
             </div>
-            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-bold text-slate-500">需修正</p>
-              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.needsFixCount}</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.needsFixCount}</p>
             </div>
-            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-bold text-slate-500">未分类</p>
-              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.uncategorizedCount}</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.uncategorizedCount}</p>
             </div>
-            <div className="rounded-lg bg-[#f8f5ff] p-2 ring-1 ring-[#e4dcff]">
+            <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
               <p className="text-[11px] font-bold text-slate-500">AI 未核对</p>
-              <p className="mt-1 text-lg font-black text-[#211536]">{qualitySummary.aiUnverifiedCount}</p>
+              <p className="mt-1 text-lg font-black text-slate-950">{qualitySummary.aiUnverifiedCount}</p>
             </div>
           </div>
           <div className="mt-3 flex justify-end">
             <button
               type="button"
               onClick={() => setShowAiUnverified((current) => !current)}
-              className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+              className="min-h-9 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
             >
               {showAiUnverified ? "隐藏 AI 未核对" : "显示 AI 未核对"}
             </button>
@@ -645,10 +645,10 @@ export default function QuestionsPage() {
                 <Link
                   key={issue.questionId}
                   href={issue.actionHref}
-                  className="rounded-lg bg-[#f8f5ff] p-3 text-left ring-1 ring-[#e4dcff]"
+                  className="rounded-lg bg-slate-50 p-3 text-left ring-1 ring-slate-200"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-[#4f23b6]">
+                    <span className="text-xs font-black text-blue-700">
                       {issue.isAiOnly ? "AI 未核对" : "待整理题卡"}
                     </span>
                     <span className="text-[11px] font-bold text-slate-400">进入详情</span>
@@ -670,18 +670,18 @@ export default function QuestionsPage() {
                   setActiveSubject("");
                   setActiveChapter("");
                 }}
-                className="min-h-10 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
               >
                 查看全部待整理题卡
               </button>
             </div>
           ) : (
-            <p className="mt-3 rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-500">
+            <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
               暂无需要立即整理的题卡。
             </p>
           )}
           {questions.length > 0 ? (
-            <div className="mt-4 border-t border-[#e4dcff] pt-3">
+            <div className="mt-4 border-t border-slate-200 pt-3">
               <button
                 type="button"
                 onClick={handleClearQuestionLibrary}
@@ -706,7 +706,7 @@ export default function QuestionsPage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-[#e4dcff]">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             {message}
           </p>
         </MobileSection>
@@ -714,7 +714,7 @@ export default function QuestionsPage() {
 
       <MobileSection>
         <StudyCard>
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-[#f8f5ff] p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-1">
             {[
               { key: "chapter", label: "按章节看" },
               { key: "source", label: "按题源看" },
@@ -731,7 +731,7 @@ export default function QuestionsPage() {
                 }}
                 className={`min-h-10 rounded-md text-sm font-black ${
                   directoryMode === item.key
-                    ? "bg-white text-[#4f23b6] shadow-sm"
+                    ? "bg-white text-blue-700 shadow-sm"
                     : "text-slate-500"
                 }`}
               >
@@ -747,8 +747,8 @@ export default function QuestionsPage() {
         {!isLoading && filteredQuestions.length === 0 ? (
           <EmptyState
             title="还没有符合条件的错题"
-            description="可以清空筛选条件，或先拍一题、导入 ChatGPT 错题卡。"
-            action={{ href: "/upload", label: "去拍题" }}
+            description="可以清空筛选条件，或先导入 ChatGPT 错题卡。"
+            action={{ href: "/import", label: "导入错题卡" }}
           />
         ) : null}
         {directoryMode === "source" && !activeSourceKey ? (
@@ -842,8 +842,8 @@ function FilterPanel({
   onMistakeTypeChange,
 }: FilterPanelProps) {
   return (
-    <details className="group rounded-lg border border-[#d9cffd] bg-white/80 p-2">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-black text-[#4f23b6] marker:hidden">
+    <details className="group rounded-lg border border-blue-100 bg-white/80 p-2">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 text-xs font-black text-blue-700 marker:hidden">
         <span>{showSearch ? "搜索 / 筛选" : "筛选"}</span>
         <span className="text-[11px] font-bold text-slate-400 group-open:hidden">展开</span>
         <span className="hidden text-[11px] font-bold text-slate-400 group-open:inline">收起</span>
@@ -853,11 +853,11 @@ function FilterPanel({
           <input
             value={keyword}
             onChange={(event) => onKeywordChange(event.target.value)}
-            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
             placeholder={searchPlaceholder}
           />
         ) : null}
-        <div className="grid grid-cols-3 gap-1 rounded-lg bg-[#f8f5ff] p-1 sm:grid-cols-6">
+        <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-50 p-1 sm:grid-cols-6">
           {[
             { key: "all", label: "全部" },
             { key: "recent", label: "最近" },
@@ -872,7 +872,7 @@ function FilterPanel({
               onClick={() => onQuickScopeChange(item.key as QuickScope)}
               className={`min-h-8 rounded-md px-1 text-[11px] font-black ${
                 quickScope === item.key
-                  ? "bg-white text-[#4f23b6] shadow-sm"
+                  ? "bg-white text-blue-700 shadow-sm"
                   : "text-slate-500"
               }`}
             >
@@ -884,19 +884,19 @@ function FilterPanel({
           <input
             value={knowledgeKeyword}
             onChange={(event) => onKnowledgeKeywordChange(event.target.value)}
-            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
             placeholder="按知识点筛选"
           />
           <input
             value={mistakeType}
             onChange={(event) => onMistakeTypeChange(event.target.value)}
-            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
             placeholder="按错因筛选，如计算错误"
           />
           <select
             value={masteryStatus}
             onChange={(event) => onMasteryStatusChange(event.target.value as MasteryStatus | "全部")}
-            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
           >
             {masteryFilters.map((item) => (
               <option key={item} value={item}>
@@ -907,7 +907,7 @@ function FilterPanel({
           <select
             value={textStatus}
             onChange={(event) => onTextStatusChange(event.target.value as QuestionTextStatus | "全部")}
-            className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+            className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
           >
             {textStatusFilters.map((item) => (
               <option key={item} value={item}>
@@ -942,7 +942,7 @@ function SubjectDirectory({
             <button
               type="button"
               onClick={onBackSource}
-              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+              className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
             >
               返回题源
             </button>
@@ -962,7 +962,7 @@ function SubjectDirectory({
             <StudyCard>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-black text-[#211536]">{subject.subject}</p>
+                  <p className="text-lg font-black text-slate-950">{subject.subject}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
                     今日待复习 {subject.dueTodayCount} · 困难 {subject.hardCount} · 需处理 {subject.needsAttentionCount}
                   </p>
@@ -1011,7 +1011,7 @@ function SourceDirectory({
             <StudyCard>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-black text-[#211536]">{source.name}</p>
+                  <p className="text-lg font-black text-slate-950">{source.name}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
                     {source.type} · {source.section || "未标模块"} · 最近更新 {formatSourceDate(source.latest_added_at)}
                   </p>
@@ -1062,7 +1062,7 @@ function ChapterDirectory({
           <button
             type="button"
             onClick={onBack}
-            className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+            className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
           >
             返回科目
           </button>
@@ -1086,7 +1086,7 @@ function ChapterDirectory({
             <StudyCard>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-black text-[#211536]">{chapter.chapter}</p>
+                  <p className="font-black text-slate-950">{chapter.chapter}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {chapter.totalCount} 题 · 困难 {chapter.hardCount} · 已掌握 {chapter.masteredCount}
                   </p>
@@ -1150,14 +1150,14 @@ function QuestionDirectory({
             <button
               type="button"
               onClick={onToggleBatchTools}
-              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+              className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
             >
               {showBatchTools ? "退出选择" : "选择题目"}
             </button>
             <button
               type="button"
               onClick={onBack}
-              className="min-h-9 rounded-lg border border-[#d9cffd] bg-white px-3 text-xs font-black text-[#4f23b6]"
+              className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
             >
               返回章节
             </button>
@@ -1168,11 +1168,11 @@ function QuestionDirectory({
         <input
           value={filterPanelProps.keyword}
           onChange={(event) => filterPanelProps.onKeywordChange(event.target.value)}
-          className="min-h-10 w-full rounded-lg border border-[#d9cffd] bg-white px-3 text-sm font-semibold text-[#211536] outline-none focus:border-[#5b2bd6]"
+          className="min-h-10 w-full rounded-lg border border-blue-100 bg-white px-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-500"
           placeholder="搜索本章题目"
         />
         <FilterPanel {...filterPanelProps} showSearch={false} />
-        <p className="rounded-lg bg-[#f8f5ff] p-3 text-xs leading-5 text-slate-600 ring-1 ring-[#e4dcff]">
+        <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600 ring-1 ring-slate-200">
           默认按困难优先排序，同难度内优先显示需要处理和高风险题。
         </p>
       </div>
@@ -1180,19 +1180,19 @@ function QuestionDirectory({
       {selectedIds.length > 0 ? (
         <StudyCard className="mb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-black text-[#211536]">已选择 {selectedIds.length} 题</p>
+            <p className="text-sm font-black text-slate-950">已选择 {selectedIds.length} 题</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={onSelectAll}
-                className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+                className="min-h-9 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
               >
                 全选本章
               </button>
               <button
                 type="button"
                 onClick={onClearSelected}
-                className="min-h-9 rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+                className="min-h-9 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
               >
                 取消选择
               </button>
@@ -1211,7 +1211,7 @@ function QuestionDirectory({
               type="button"
               onClick={() => onBatchAction("mastered")}
               disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-[#5b2bd6] px-3 text-sm font-black text-white disabled:bg-slate-300"
+              className="min-h-11 rounded-lg bg-blue-600 px-3 text-sm font-black text-white disabled:bg-slate-300"
             >
               标记已掌握
             </button>
@@ -1227,7 +1227,7 @@ function QuestionDirectory({
               type="button"
               onClick={() => onBatchAction("sprint")}
               disabled={isBatchProcessing}
-              className="min-h-11 rounded-lg bg-[#211536] px-3 text-sm font-black text-white disabled:bg-slate-300"
+              className="min-h-11 rounded-lg bg-slate-950 px-3 text-sm font-black text-white disabled:bg-slate-300"
             >
               加入冲刺
             </button>
@@ -1253,7 +1253,7 @@ function QuestionDirectory({
                       type="checkbox"
                       checked={selectedIds.includes(question.id)}
                       onChange={() => onSelect(question.id)}
-                      className="h-5 w-5 rounded border-[#d9cffd]"
+                      className="h-5 w-5 rounded border-blue-100"
                       aria-label={`选择 ${question.knowledge_point ?? question.chapter ?? "错题"}`}
                     />
                   </label>
@@ -1268,7 +1268,7 @@ function QuestionDirectory({
                     text={questionDisplay.questionText || question.user_note}
                     fallback="暂无题目摘要，进入详情后补充题干或卡点。"
                     compact
-                    className="line-clamp-4 text-base font-black leading-7 text-[#211536]"
+                    className="line-clamp-4 text-base font-black leading-7 text-slate-950"
                   />
                   <div className="mt-2 text-xs leading-5 text-slate-500">
                     <MathText
@@ -1293,7 +1293,7 @@ function QuestionDirectory({
                   <div className="mt-3 flex justify-end">
                     <Link
                       href={`/questions/${question.id}`}
-                      className="inline-flex min-h-9 shrink-0 items-center rounded-lg bg-[#ede7ff] px-3 text-xs font-black text-[#4f23b6]"
+                      className="inline-flex min-h-9 shrink-0 items-center rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700"
                     >
                       进入详情
                     </Link>
@@ -1313,7 +1313,7 @@ function ChapterWeaknessPanel({ analysis }: { analysis: ChapterWeaknessAnalysis 
     <StudyCard className="mb-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-black text-[#211536]">本章欠缺分析</p>
+          <p className="text-sm font-black text-slate-950">本章欠缺分析</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">
             基于本章已导入错题本地统计，不修改题目数据。
           </p>
@@ -1335,16 +1335,16 @@ function ChapterWeaknessPanel({ analysis }: { analysis: ChapterWeaknessAnalysis 
         </p>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg bg-[#f8f5ff] p-3">
-          <p className="text-xs font-black text-[#4f23b6]">我的主要欠缺</p>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-black text-blue-700">我的主要欠缺</p>
           <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
             {analysis.weakness_summary.map((item) => (
               <li key={item}>- {item}</li>
             ))}
           </ul>
         </div>
-        <div className="rounded-lg bg-[#f8f5ff] p-3">
-          <p className="text-xs font-black text-[#4f23b6]">下一轮复习建议</p>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-black text-blue-700">下一轮复习建议</p>
           <ul className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
             {analysis.next_review_suggestions.map((item) => (
               <li key={item}>- {item}</li>
@@ -1352,7 +1352,7 @@ function ChapterWeaknessPanel({ analysis }: { analysis: ChapterWeaknessAnalysis 
           </ul>
         </div>
       </div>
-      <p className="mt-3 rounded-lg bg-white p-3 text-xs font-semibold leading-5 text-[#211536] ring-1 ring-[#e4dcff]">
+      <p className="mt-3 rounded-lg bg-white p-3 text-xs font-semibold leading-5 text-slate-950 ring-1 ring-slate-200">
         {analysis.one_sentence_diagnosis}
       </p>
     </StudyCard>

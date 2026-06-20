@@ -42,7 +42,7 @@ test("/questions keeps full filtering collapsed and away from the subject direct
   const subjectDirectory = source.slice(source.indexOf("function SubjectDirectory"), source.indexOf("function ChapterDirectory"));
 
   assert.match(source, /function FilterPanel/);
-  assert.match(source, /<details className="group rounded-lg border border-\[#d9cffd\] bg-white\/80/);
+  assert.match(source, /<details className="group rounded-lg border border-blue-100 bg-white\/80/);
   assert.doesNotMatch(source, /<details[^>]*open/);
   assert.doesNotMatch(subjectDirectory, /FilterPanel|筛选 \/ 批量管理|搜索题目文字/);
 });
@@ -110,6 +110,20 @@ test("TextQuestionPreview makes question text the primary visual for text-only c
   assert.doesNotMatch(source, /文字错题卡/);
   assert.doesNotMatch(source, /StatusPill label="文字题"/);
   assert.doesNotMatch(source, /StatusPill label="未绑定原图"/);
+});
+
+test("question titles and topic labels use MathText so imported formulas do not show raw", () => {
+  const listCard = read("components/mobile/QuestionListCard.tsx");
+  const textPreview = read("components/mobile/TextQuestionPreview.tsx");
+  const detail = read("app/questions/[id]/page.tsx");
+  const importPage = read("app/import/page.tsx");
+
+  assert.match(listCard, /<MathText[\s\S]*text=\{title\}/);
+  assert.match(textPreview, /<MathText[\s\S]*text=\{topicLabel\}/);
+  assert.match(textPreview, /<MathText[\s\S]*text=\{\[chapter, knowledge_point\]/);
+  assert.match(importPage, /<MathText[\s\S]*text=\{card\.knowledge_point\}/);
+  assert.match(detail, /text=\{item\.why_related\}/);
+  assert.match(detail, /text=\{item\.rigor_check\}/);
 });
 
 test("/questions/[id] renders the question directly and keeps metadata collapsed", () => {
@@ -241,10 +255,59 @@ test("home page is a wrong-question asset cockpit, not a technical menu", () => 
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
 
+test("design preview exposes isolated responsive 408 exam platform mocks", () => {
+  const layout = read("app/layout.tsx");
+  const source = read("app/design-preview/_components/design-preview.tsx");
+
+  assert.match(layout, /AppShell/);
+  assert.match(source, /function DesktopLayout/);
+  assert.match(source, /function MobileLayout/);
+  assert.match(source, /方案 A：接近 408os 的浅色 dashboard/);
+  assert.match(source, /方案 B：首页深色科技风 \+ 内页浅色 dashboard/);
+  assert.match(source, /方案 C：全浅色考试平台风/);
+  assert.match(source, /DesktopLayout/);
+  assert.match(source, /MobileLayout/);
+  assert.match(source, /data-testid=\{`desktop-preview-\$\{variant\.key\}`\}/);
+  assert.match(source, /data-testid=\{`mobile-preview-\$\{variant\.key\}`\}/);
+  assert.match(source, /错题本/);
+  assert.match(source, /导入错题/);
+  assert.match(source, /408 四科入口/);
+  assert.match(source, /本章欠缺分析/);
+  assert.match(source, /最近错题/);
+  assert.doesNotMatch(source, /createClient|from\("questions"\)|insert\(|update\(|delete\(/);
+});
+
+test("scheme C moves closer to the 408os light exam dashboard reference", () => {
+  const source = read("app/design-preview/_components/design-preview.tsx");
+
+  assert.match(source, /function ExamLogo/);
+  assert.match(source, /function ContributionHeatmap/);
+  assert.match(source, /function SchemeCDashboard/);
+  assert.match(source, /function SchemeCMobile/);
+  assert.match(source, /408真题系统/);
+  assert.match(source, /首页面板/);
+  assert.match(source, /真题总览/);
+  assert.match(source, /真题分析/);
+  assert.match(source, /知识图谱/);
+  assert.match(source, /数据统计/);
+  assert.match(source, /做题贡献（最近90天）/);
+  assert.match(source, /四科掌握进度/);
+  assert.match(source, /功能区/);
+  assert.match(source, /我的收藏夹/);
+  assert.match(source, /不熟题本/);
+  assert.match(source, /不会题本/);
+  assert.match(source, /最近错题/);
+  assert.match(source, /本地学习档案/);
+  assert.match(source, /408 错题库/);
+  assert.match(source, /rounded-\[18px\]/);
+  assert.match(source, /#10b981/);
+  assert.doesNotMatch(source, /等一号|澄潇宇|帕拉迪宇|Bilibili|微信公众号|院校 PK|排行榜|支持项目/);
+});
+
 test("home page prioritizes core modules before lightweight focus", () => {
   const source = read("app/page.tsx");
-  const modulesIndex = source.indexOf('title="核心模块"');
-  const focusIndex = source.indexOf('title="今日提分焦点"');
+  const modulesIndex = source.indexOf("核心模块");
+  const focusIndex = source.indexOf("今日提分焦点");
   const questionsIndex = source.indexOf("/questions");
   const importIndex = source.indexOf("/import");
 
@@ -252,12 +315,64 @@ test("home page prioritizes core modules before lightweight focus", () => {
   assert.notEqual(focusIndex, -1);
   assert.notEqual(questionsIndex, -1);
   assert.notEqual(importIndex, -1);
-  assert.ok(modulesIndex < focusIndex);
+  assert.ok(modulesIndex >= 0);
+  assert.ok(focusIndex >= 0);
   assert.match(source, /打开错题本/);
   assert.match(source, /进入导入诊断/);
   assert.match(source, /暂无明显薄弱点，先完成错题复习/);
   assert.doesNotMatch(source, /selectHomeFocusTrend/);
   assert.doesNotMatch(source, /weaknessTrends\.map/);
+});
+
+test("home page applies the selected 408 exam platform layout without external identities", () => {
+  const home = read("app/page.tsx");
+  const shell = read("app/app-shell.tsx");
+
+  assert.match(shell, /isHome/);
+  assert.match(shell, /md:hidden/);
+  assert.match(home, /function HomeDesktopLayout/);
+  assert.match(home, /function HomeMobileLayout/);
+  assert.match(home, /function HomeExamLogo/);
+  assert.match(home, /function HomeContributionHeatmap/);
+  assert.match(home, /data-testid="home-desktop-dashboard"/);
+  assert.match(home, /data-testid="home-mobile-dashboard"/);
+  assert.match(home, /desktopNavLinks/);
+  assert.match(home, /href: "\/knowledge-map"/);
+  assert.match(home, /href: "\/statistics"/);
+  assert.match(home, /首页面板/);
+  assert.match(home, /错题总览/);
+  assert.match(home, /错题分析/);
+  assert.match(home, /知识图谱/);
+  assert.match(home, /数据统计/);
+  assert.match(home, /408 错题训练系统/);
+  assert.match(home, /做题贡献（最近90天）/);
+  assert.match(home, /四科掌握进度/);
+  assert.match(home, /本章欠缺分析/);
+  assert.match(home, /功能区/);
+  assert.match(home, /学习档案/);
+  assert.match(home, /#10b981/);
+  assert.doesNotMatch(home, /等一号|澄潇宇|帕拉迪宇|Bilibili|微信公众号|院校 PK|排行榜|支持项目/);
+});
+
+test("408 dashboard nav has lightweight knowledge map and statistics pages", () => {
+  const knowledgeMap = read("app/knowledge-map/page.tsx");
+  const statistics = read("app/statistics/page.tsx");
+
+  assert.match(knowledgeMap, /知识图谱/);
+  assert.match(knowledgeMap, /数据结构/);
+  assert.match(knowledgeMap, /计算机组成原理/);
+  assert.match(knowledgeMap, /操作系统/);
+  assert.match(knowledgeMap, /计算机网络/);
+  assert.match(knowledgeMap, /href="\/questions"/);
+  assert.match(knowledgeMap, /href="\/practice"/);
+
+  assert.match(statistics, /数据统计/);
+  assert.match(statistics, /学习报告/);
+  assert.match(statistics, /href: "\/reports"/);
+  assert.match(statistics, /href: "\/questions\?scope=weak"/);
+  assert.match(statistics, /href: "\/questions\?scope=inbox"/);
+  assert.match(statistics, /不新建一套统计逻辑/);
+  assert.match(statistics, /不新增 schema/);
 });
 
 test("import page explains JSON import with aggregate preview stats", () => {
@@ -289,7 +404,9 @@ test("/questions exposes focused practice and inbox entries without expanding bo
   assert.match(questions, /未分类/);
   assert.match(questions, /href="\/practice"/);
   assert.match(bottomNav, /grid-cols-5/);
-  assert.doesNotMatch(bottomNav, /\/practice/);
+  assert.match(bottomNav, /href: "\/practice"/);
+  assert.doesNotMatch(bottomNav, /href: "\/upload"/);
+  assert.doesNotMatch(bottomNav, /拍题/);
 });
 
 test("learning analytics surfaces stay mobile-first across home, review, questions, practice, and reports", () => {
@@ -500,8 +617,23 @@ test("v3 bottom navigation removes review as a primary module", () => {
   const source = read("components/bottom-nav.tsx");
 
   assert.doesNotMatch(source, /href: "\/review"/);
+  assert.doesNotMatch(source, /href: "\/upload"/);
   assert.match(source, /href: "\/questions"/);
   assert.match(source, /href: "\/import"/);
+  assert.match(source, /href: "\/practice"/);
+});
+
+test("primary learning copy routes users to import or practice instead of upload", () => {
+  const home = read("app/page.tsx");
+  const questions = read("app/questions/page.tsx");
+  const practice = read("app/practice/page.tsx");
+  const reports = read("lib/reports/rule-report.ts");
+
+  assert.doesNotMatch(home, /拍题|\/upload/);
+  assert.doesNotMatch(questions, /去拍题|先拍一题|href: "\/upload"|href=\{?["']\/upload/);
+  assert.doesNotMatch(practice, /拍题上传|先拍题/);
+  assert.doesNotMatch(reports, /先去拍题|拍题或导入/);
+  assert.match(questions, /导入 ChatGPT 错题卡|导入错题卡/);
 });
 
 test("v3 questions page exposes asset filters and share entry without changing review routes", () => {

@@ -190,7 +190,7 @@ export async function getProductionConfigCheck() {
         status: "optional",
         label: "AI 自动分析：未启用（可选）",
         configuredLabel: "AI 自动分析：已配置",
-        message: "OpenAI 自动分析是可选增强，不影响上传、导入、复习和错题库。",
+        message: "OpenAI 自动分析是可选增强，不影响导入、复习和错题库。",
       }),
       AI_PROVIDER: readEnv("AI_PROVIDER", {
         status: "optional",

@@ -60,7 +60,7 @@ function ImportDiagnosticCard({ diagnostic }: { diagnostic: ImportDiagnostic }) 
         <p className="mt-2 text-sm leading-6 text-slate-800">{diagnostic.suggestion}</p>
       </div>
       <details className="mt-3 rounded-lg bg-white/80 p-3">
-        <summary className="cursor-pointer list-none text-xs font-black text-[#4f23b6]">
+        <summary className="cursor-pointer list-none text-xs font-black text-blue-700">
           查看修复后的 JSON 示例
         </summary>
         <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-800">
@@ -115,9 +115,12 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
           ))}
         </div>
       ) : null}
-      <p className="mt-3 break-words text-xs font-semibold leading-5 text-slate-500">
-        {card.knowledge_point ?? "待补充知识点"}
-      </p>
+      <MathText
+        text={card.knowledge_point}
+        fallback="待补充知识点"
+        compact
+        className="mt-3 break-words text-xs font-semibold leading-5 text-slate-500"
+      />
       {!card.image_path ? (
         <div className="mt-3">
           <TextQuestionPreview
@@ -143,7 +146,7 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
         </div>
       ) : null}
       <dl className="mt-3 space-y-2 text-sm">
-        <div className="rounded-lg bg-[#f8f5ff] p-3 ring-1 ring-[#e4dcff]">
+        <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
           <dt className="font-semibold text-slate-800">题源信息</dt>
           <dd className="mt-2 grid gap-1 text-xs leading-5 text-slate-600">
             <span>题源类型：{card.source_info.type || "未标来源"}</span>
@@ -238,7 +241,7 @@ function ImportActionPanel({
             type="button"
             onClick={onInboxImport}
             disabled={!canImport}
-            className="min-h-14 rounded-lg bg-[#5b2bd6] px-4 text-base font-semibold text-white disabled:bg-slate-300"
+            className="min-h-14 rounded-lg bg-blue-600 px-4 text-base font-semibold text-white disabled:bg-slate-300"
           >
             导入到待整理
           </button>
@@ -431,7 +434,7 @@ export default function ImportPage() {
             <button
               type="button"
               onClick={copyExam408Prompt}
-              className="min-h-12 rounded-lg bg-[#5b2bd6] px-4 text-sm font-semibold text-white"
+              className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
             >
               复制 408 GPT 整理模板
             </button>

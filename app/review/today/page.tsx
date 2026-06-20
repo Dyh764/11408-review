@@ -107,7 +107,7 @@ export default function TodayReviewListPage() {
   );
 
   return (
-    <MobilePageShell className="bg-[#f4f0ff]">
+    <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         title="今日复习题单"
         subtitle="查看今天所有到期和逾期题，按难度分组，任选一道开始闪卡复习。"
@@ -129,7 +129,7 @@ export default function TodayReviewListPage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-[#e4dcff]">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             {message}
           </p>
         </MobileSection>
@@ -175,14 +175,14 @@ export default function TodayReviewListPage() {
                       ))}
                       <StudyBadge tone="purple">{priority.level}</StudyBadge>
                     </div>
-                    <p className="mt-3 text-xs font-black text-[#5b2bd6]">
+                    <p className="mt-3 text-xs font-black text-blue-600">
                       {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
                     </p>
                     <MathText
                       text={questionDisplay.questionText}
                       fallback="暂无题目摘要。"
                       compact
-                      className="mt-2 line-clamp-4 text-base font-black leading-7 text-[#211536]"
+                      className="mt-2 line-clamp-4 text-base font-black leading-7 text-slate-950"
                     />
                     <MathText
                       text={review.questions.knowledge_point}
@@ -192,14 +192,14 @@ export default function TodayReviewListPage() {
                     />
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {priority.reasons.slice(0, 3).map((reason) => (
-                        <span key={reason} className="rounded-full bg-[#f8f5ff] px-2.5 py-1 text-xs font-bold text-[#4f23b6] ring-1 ring-[#e4dcff]">
+                        <span key={reason} className="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-slate-200">
                           {reason}
                         </span>
                       ))}
                     </div>
                     <Link
                       href={`/review?startQuestionId=${review.question_id}`}
-                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white"
+                      className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-black text-white"
                     >
                       开始这题
                     </Link>

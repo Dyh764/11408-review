@@ -19,3 +19,35 @@ test("keeps malformed LaTeX delimiters as plain text", () => {
     { type: "text", value: "这里有 $\\frac{1}{n} 但没闭合" },
   ]);
 });
+
+test("treats escaped dollar delimiters from imported JSON as real math", () => {
+  assert.deepEqual(splitMathText("\\$1^\\infty\\$ 型极限；取对数"), [
+    { type: "inlineMath", value: "1^\\infty" },
+    { type: "text", value: " 型极限；取对数" },
+  ]);
+});
+
+test("wraps common bare math fragments without showing raw LaTeX", () => {
+  assert.deepEqual(splitMathText("求极限 lim_{n->\\infty} tan^n(π/4 + 2/n)。"), [
+    { type: "text", value: "求极限 " },
+    { type: "inlineMath", value: "\\lim_{n->\\infty}" },
+    { type: "text", value: " " },
+    { type: "inlineMath", value: "\\tan^n(π/4 + 2/n)" },
+    { type: "text", value: "。" },
+  ]);
+});
+
+test("keeps bare trigonometric arguments inside the generated math segment", () => {
+  const parts = splitMathText("求极限 lim_{n->\\infty} tan^n(\\pi/4 + 2/n)。");
+  const renderedMath = parts
+    .filter((part) => part.type === "inlineMath")
+    .map((part) => part.value)
+    .join(" ");
+  const renderedText = parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.value)
+    .join(" ");
+
+  assert.match(renderedMath, /\\tan\^n\(\\pi\/4 \+ 2\/n\)/);
+  assert.doesNotMatch(renderedText, /\\pi/);
+});

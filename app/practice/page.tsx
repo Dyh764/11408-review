@@ -318,7 +318,7 @@ export default function PracticePage() {
                 setInitialCount(0);
                 setMessage("");
               }}
-              className="min-h-12 rounded-lg bg-white px-4 text-sm font-black text-[#4f23b6]"
+              className="min-h-12 rounded-lg bg-white px-4 text-sm font-black text-blue-700"
             >
               再选一组
             </button>
@@ -338,7 +338,7 @@ export default function PracticePage() {
   }
 
   return (
-    <MobilePageShell className="bg-[#f4f0ff]">
+    <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         title="专项复盘"
         subtitle="主动挑一个章节或一类错因，开一轮更聚焦的闪卡复盘。"
@@ -360,7 +360,7 @@ export default function PracticePage() {
 
       {message ? (
         <MobileSection>
-          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-[#e4dcff]">
+          <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             {message}
           </p>
         </MobileSection>
@@ -370,7 +370,7 @@ export default function PracticePage() {
         <MobileSection>
           <EmptyState
             title="还没有可复盘的错题"
-            description="先拍题上传或导入 ChatGPT 错题卡，再按章节和错因专项复盘。"
+            description="先导入 ChatGPT 错题卡，再按章节和错因专项复盘。"
             action={{ href: "/import", label: "导入错题卡" }}
           />
         </MobileSection>
@@ -393,7 +393,7 @@ export default function PracticePage() {
                   <StudyCard>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-black text-[#211536]">{option.chapter}</p>
+                        <p className="font-black text-slate-950">{option.chapter}</p>
                         <p className="mt-1 text-xs text-slate-500">{option.subject}</p>
                       </div>
                       <StudyBadge tone={option.needsAttentionCount > 0 ? "amber" : "green"}>
@@ -417,7 +417,7 @@ export default function PracticePage() {
                   className="text-left"
                 >
                   <StudyCard>
-                    <p className="font-black text-[#211536]">{option.mistakeType}</p>
+                    <p className="font-black text-slate-950">{option.mistakeType}</p>
                     <p className="mt-2 text-xs text-slate-500">{option.count} 题</p>
                   </StudyCard>
                 </button>

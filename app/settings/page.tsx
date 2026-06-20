@@ -324,7 +324,7 @@ export default function SettingsPage() {
             />
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            当前主流程不依赖 OpenAI、Gemini 或 DeepSeek。你可以正常上传、导入、复习和查看答案。
+            当前主流程不依赖 OpenAI、Gemini 或 DeepSeek。你可以正常导入、复习和查看答案。
           </p>
         </SectionCard>
       </MobileSection>

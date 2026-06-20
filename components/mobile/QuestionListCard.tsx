@@ -50,8 +50,8 @@ export function QuestionListCard({
         <div className="min-w-0 flex-1">
           <Link href={href} className="block">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="min-w-0 break-words text-base font-bold leading-6 text-slate-950">
-                {title}
+              <h2 className="min-w-0 text-base font-bold leading-6 text-slate-950">
+                <MathText text={title} compact className="text-base font-bold leading-6" />
               </h2>
               <span className="shrink-0 pt-0.5 text-xs text-slate-500">{createdAt}</span>
             </div>

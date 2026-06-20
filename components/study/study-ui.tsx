@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 type Tone = "purple" | "cyan" | "green" | "amber" | "red" | "slate";
 
 const badgeClass: Record<Tone, string> = {
-  purple: "bg-[#ede7ff] text-[#4f23b6] ring-[#d9cffd]",
+  purple: "bg-blue-50 text-blue-700 ring-blue-100",
   cyan: "bg-cyan-50 text-cyan-800 ring-cyan-100",
   green: "bg-emerald-50 text-emerald-800 ring-emerald-100",
   amber: "bg-amber-50 text-amber-800 ring-amber-100",
@@ -23,8 +23,8 @@ export function StudyPageHeader({
 }) {
   return (
     <header className="px-5 pt-6">
-      <p className="text-xs font-black tracking-normal text-[#5b2bd6]">{eyebrow}</p>
-      <h1 className="mt-2 text-2xl font-black tracking-normal text-[#211536]">{title}</h1>
+      <p className="text-xs font-black tracking-normal text-blue-600">{eyebrow}</p>
+      <h1 className="mt-2 text-2xl font-black tracking-normal text-slate-950">{title}</h1>
       <p className="mt-2 max-w-[30rem] text-sm leading-6 text-slate-600">{subtitle}</p>
     </header>
   );
@@ -39,7 +39,7 @@ export function StudyCard({
 }) {
   return (
     <div
-      className={`rounded-lg border border-[#e4dcff] bg-white p-4 shadow-[0_10px_28px_rgba(62,38,123,0.08)] ${className}`}
+      className={`rounded-lg border border-slate-200 bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.045)] ${className}`}
     >
       {children}
     </div>
@@ -48,7 +48,7 @@ export function StudyCard({
 
 export function StudyDashboardCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg bg-[#4f23b6] p-5 text-white shadow-[0_18px_42px_rgba(79,35,182,0.28)]">
+    <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
       {children}
     </div>
   );
@@ -66,7 +66,7 @@ export function SectionHeader({
   return (
     <div className="mb-3 flex items-end justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="text-base font-black tracking-normal text-[#211536]">{title}</h2>
+        <h2 className="text-base font-black tracking-normal text-slate-950">{title}</h2>
         {subtitle ? <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -86,9 +86,9 @@ export function SprintStatCard({
   tone?: Tone;
 }) {
   return (
-    <StudyCard className={tone === "purple" ? "bg-[#f8f5ff]" : ""}>
+    <StudyCard className={tone === "purple" ? "bg-slate-50" : ""}>
       <p className="text-xs font-bold text-slate-500">{label}</p>
-      <p className={tone === "purple" ? "mt-2 text-2xl font-black text-[#4f23b6]" : "mt-2 text-2xl font-black text-slate-950"}>
+      <p className={tone === "purple" ? "mt-2 text-2xl font-black text-blue-700" : "mt-2 text-2xl font-black text-slate-950"}>
         {value}
       </p>
       {helper ? <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p> : null}
@@ -117,8 +117,8 @@ export function ProgressBar({
           <span>{helper}</span>
         </div>
       ) : null}
-      <div className={`h-2 overflow-hidden rounded-full ${inverse ? "bg-white/20" : "bg-[#e5ddff]"}`}>
-        <div className="h-full rounded-full bg-[#7c3aed]" style={{ width: `${width}%` }} />
+      <div className={`h-2 overflow-hidden rounded-full ${inverse ? "bg-white/20" : "bg-slate-200"}`}>
+        <div className="h-full rounded-full bg-blue-600" style={{ width: `${width}%` }} />
       </div>
     </div>
   );
@@ -182,7 +182,7 @@ export function PrimaryStudyLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-12 items-center justify-center rounded-lg bg-[#5b2bd6] px-4 text-sm font-black text-white shadow-[0_12px_26px_rgba(91,43,214,0.26)] ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-black text-white shadow-[0_12px_24px_rgba(37,99,235,0.22)] ${className}`}
     >
       {children}
     </Link>
@@ -201,7 +201,7 @@ export function SecondaryStudyLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-11 items-center justify-center rounded-lg border border-[#d9cffd] bg-white px-4 text-sm font-black text-[#4f23b6] ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 ${className}`}
     >
       {children}
     </Link>
@@ -210,9 +210,9 @@ export function SecondaryStudyLink({
 
 export function MotivationBanner({ text }: { text: string }) {
   return (
-    <StudyCard className="bg-[#fbfaff]">
-      <p className="text-xs font-black text-[#5b2bd6]">今日激励句</p>
-      <p className="mt-2 text-sm leading-6 text-[#211536]">{text}</p>
+    <StudyCard className="bg-blue-50">
+      <p className="text-xs font-black text-blue-700">今日激励句</p>
+      <p className="mt-2 text-sm leading-6 text-slate-950">{text}</p>
     </StudyCard>
   );
 }

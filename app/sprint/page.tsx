@@ -84,7 +84,7 @@ export default function SprintPage() {
 
         if (isActive) {
           setItems(nextItems);
-          setMessage(nextItems.length === 0 ? "暂无高危错题。可以先去错题库或拍题上传。" : "");
+          setMessage(nextItems.length === 0 ? "暂无高危错题。可以先去错题库或导入错题卡。" : "");
         }
       } catch (error) {
         if (isActive) {
