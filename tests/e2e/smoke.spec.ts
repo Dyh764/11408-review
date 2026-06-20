@@ -13,12 +13,25 @@ async function expectPageHasNoHorizontalOverflow(page: Page) {
 }
 
 async function expectBottomNav(page: Page) {
-  await expect(page.locator("nav").getByRole("link", { name: /首页|棣栭〉/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /错题|閿欓/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /导入|瀵煎叆/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /练习|专项|缁冧範/ })).toBeVisible();
-  await expect(page.locator("nav").getByRole("link", { name: /拍题|鎷嶉/ })).toHaveCount(0);
-  await expect(page.locator("nav").getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
+  const bottomNav = page.locator("nav.fixed");
+
+  await expect(bottomNav.getByRole("link", { name: /首页|棣栭〉/ })).toBeVisible();
+  await expect(bottomNav.getByRole("link", { name: /错题|閿欓/ })).toBeVisible();
+  await expect(bottomNav.getByRole("link", { name: /导入|瀵煎叆/ })).toBeVisible();
+  await expect(bottomNav.getByRole("link", { name: /练习|专项|缁冧範/ })).toBeVisible();
+  await expect(bottomNav.getByRole("link", { name: /拍题|鎷嶉/ })).toHaveCount(0);
+  await expect(bottomNav.getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
+}
+
+async function expectDesktopNav(page: Page) {
+  const desktopNav = page.getByRole("navigation", { name: "桌面主导航" });
+
+  await expect(desktopNav).toBeVisible();
+  await expect(desktopNav.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
+  await expect(desktopNav.getByRole("link", { name: "错题总览" })).toHaveAttribute("href", "/questions");
+  await expect(desktopNav.getByRole("link", { name: "错题分析" })).toHaveAttribute("href", "/reports");
+  await expect(desktopNav.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(desktopNav.getByRole("link", { name: "数据统计" })).toHaveAttribute("href", "/statistics");
 }
 
 async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
@@ -28,7 +41,12 @@ async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
   await expect(page).toHaveURL(new RegExp(`(${route.replace("/", "\\/")}|\\/login)`));
 
   if (!page.url().includes("/login")) {
-    await expectBottomNav(page);
+    const viewport = page.viewportSize();
+    if ((viewport?.width ?? 0) >= 1024) {
+      await expectDesktopNav(page);
+    } else {
+      await expectBottomNav(page);
+    }
   }
 }
 
@@ -41,11 +59,24 @@ test("home page is accessible and exposes the responsive 408 dashboard", async (
   await expect(page.getByTestId("home-mobile-dashboard")).toBeHidden();
   await expect(page.getByRole("navigation", { name: "桌面首页导航" })).toBeVisible();
   await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
-  await expect(page.getByText("四科掌握进度").first()).toBeVisible();
+  await expect(page.getByText("数学 + 408 掌握进度").first()).toBeVisible();
   await expect(page.getByText("功能区").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
   await expect(page.getByRole("link", { name: "数据统计" })).toHaveAttribute("href", "/statistics");
+  await expectPageHasNoHorizontalOverflow(page);
+});
+
+test("desktop inner routes use the shared desktop navigation shell", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const response = await page.goto("/questions");
+
+  expect(response?.status()).toBeLessThan(400);
+  await expect(page.getByRole("navigation", { name: "桌面主导航" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "错题总览" })).toHaveAttribute("href", "/questions");
+  await expect(page.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(page.getByRole("link", { name: "首页", exact: true })).toHaveCount(0);
   await expectPageHasNoHorizontalOverflow(page);
 });
 

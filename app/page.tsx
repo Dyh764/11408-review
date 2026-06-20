@@ -27,7 +27,7 @@ type HomeStats = {
   reviewActivity: Record<string, number>;
 };
 
-const examSubjects = ["数据结构", "计算机组成原理", "操作系统", "计算机网络"];
+const examSubjects = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
 
 const emptyFocus: TodayLiftFocus = {
   questions: [],
@@ -173,6 +173,9 @@ function HomePanel({
 function HomeContributionHeatmap({ activity }: { activity: Record<string, number> }) {
   const today = todayIsoDate();
   const days = Array.from({ length: 90 }, (_, index) => addDays(today, index - 89));
+  const reviewActivityTotal = days.reduce((total, day) => total + (activity[day] ?? 0), 0);
+  const activeReviewDays = days.filter((day) => (activity[day] ?? 0) > 0).length;
+  const todayCount = activity[today] ?? 0;
 
   return (
     <div>
@@ -201,6 +204,34 @@ function HomeContributionHeatmap({ activity }: { activity: Record<string, number
         <span className="h-3 w-3 rounded bg-emerald-600" />
         <span>多</span>
       </div>
+      <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-slate-50 px-2 py-3">
+          <p className="text-lg font-black text-slate-950">{reviewActivityTotal}</p>
+          <p className="mt-1 text-[11px] font-bold text-slate-500">90天内完成</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 px-2 py-3">
+          <p className="text-lg font-black text-slate-950">{activeReviewDays}</p>
+          <p className="mt-1 text-[11px] font-bold text-slate-500">活跃天数</p>
+        </div>
+        <div className="rounded-lg bg-emerald-50 px-2 py-3">
+          <p className="text-lg font-black text-emerald-700">{todayCount}</p>
+          <p className="mt-1 text-[11px] font-bold text-emerald-700">今日完成</p>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Link
+          href="/review/today"
+          className="rounded-lg bg-[#10b981] px-3 py-3 text-center text-sm font-black text-white"
+        >
+          今日复习
+        </Link>
+        <Link
+          href="/practice"
+          className="rounded-lg bg-white px-3 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-100"
+        >
+          专项练习
+        </Link>
+      </div>
     </div>
   );
 }
@@ -215,10 +246,10 @@ function HomeSubjectProgress({ subjects }: { subjects: SubjectProgress[] }) {
     <HomePanel>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-slate-950">四科掌握进度</h2>
-          <p className="mt-1 text-sm font-bold text-slate-400">四科进度按真实错题资产和薄弱题比例展示。</p>
+          <h2 className="text-xl font-black text-slate-950">数学 + 408 掌握进度</h2>
+          <p className="mt-1 text-sm font-bold text-slate-400">数学与 408 进度按真实错题资产和薄弱题比例展示。</p>
         </div>
-        <p className="text-sm font-black text-slate-600">四科平均掌握率 {average}%</p>
+        <p className="text-sm font-black text-slate-600">数学 + 408 平均掌握率 {average}%</p>
       </div>
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         {subjects.map((subject) => (
@@ -353,7 +384,7 @@ function HomeDesktopLayout({ stats, message }: { stats: HomeStats; message: stri
           <HomePanel className="flex min-h-36 items-center gap-5">
             <div className="grid h-12 w-12 place-items-center rounded-lg bg-emerald-100 text-2xl font-black text-emerald-600">中</div>
             <div>
-              <p className="text-sm font-black text-slate-700">408通关进度</p>
+              <p className="text-sm font-black text-slate-700">11408通关进度</p>
               <p className="mt-2 text-3xl font-black tracking-normal text-slate-900">
                 {Math.round(stats.subjects.reduce((sum, subject) => sum + subject.progress, 0) / stats.subjects.length)}%
               </p>
@@ -505,7 +536,7 @@ function HomeMobileLayout({ stats, message }: { stats: HomeStats; message: strin
 
       <section className="mt-5">
         <div className="mb-3">
-          <h2 className="text-base font-black text-slate-950">408 四科入口</h2>
+          <h2 className="text-base font-black text-slate-950">数学 + 408 入口</h2>
           <p className="mt-1 text-xs leading-5 text-slate-500">按真实题库数量和薄弱题比例展示。</p>
         </div>
         <div className="grid gap-3">

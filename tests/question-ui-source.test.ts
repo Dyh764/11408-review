@@ -346,12 +346,48 @@ test("home page applies the selected 408 exam platform layout without external i
   assert.match(home, /数据统计/);
   assert.match(home, /408 错题训练系统/);
   assert.match(home, /做题贡献（最近90天）/);
-  assert.match(home, /四科掌握进度/);
+  assert.match(home, /数学 \+ 408 掌握进度/);
   assert.match(home, /本章欠缺分析/);
   assert.match(home, /功能区/);
   assert.match(home, /学习档案/);
   assert.match(home, /#10b981/);
   assert.doesNotMatch(home, /等一号|澄潇宇|帕拉迪宇|Bilibili|微信公众号|院校 PK|排行榜|支持项目/);
+});
+
+test("home dashboard includes math in the subject progress system", () => {
+  const home = read("app/page.tsx");
+
+  assert.match(home, /const examSubjects = \["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"\]/);
+  assert.match(home, /数学 \+ 408 掌握进度/);
+  assert.match(home, /数学 \+ 408 平均掌握率/);
+  assert.match(home, /11408通关进度/);
+  assert.match(home, /数学 \+ 408 入口/);
+  assert.doesNotMatch(home, /四科掌握进度/);
+  assert.doesNotMatch(home, /四科平均掌握率/);
+});
+
+test("home contribution panel has real review and practice entry points", () => {
+  const home = read("app/page.tsx");
+
+  assert.match(home, /function HomeContributionHeatmap/);
+  assert.match(home, /reviewActivityTotal/);
+  assert.match(home, /activeReviewDays/);
+  assert.match(home, /href="\/review\/today"/);
+  assert.match(home, /href="\/practice"/);
+  assert.match(home, /今日复习/);
+  assert.match(home, /专项练习/);
+  assert.match(home, /90天内完成/);
+});
+
+test("non-home routes keep a desktop navigation shell instead of forcing phone width", () => {
+  const shell = read("app/app-shell.tsx");
+
+  assert.match(shell, /function DesktopAppNav/);
+  assert.match(shell, /aria-label="桌面主导航"/);
+  assert.match(shell, /max-w-\[1500px\]/);
+  assert.match(shell, /lg:block/);
+  assert.match(shell, /lg:hidden/);
+  assert.doesNotMatch(shell, /return \(\s*<div className="phone-shell">/);
 });
 
 test("408 dashboard nav has lightweight knowledge map and statistics pages", () => {
