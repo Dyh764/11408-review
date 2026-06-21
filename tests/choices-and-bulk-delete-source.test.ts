@@ -96,3 +96,19 @@ test("bulk delete route can soft delete all current user questions without ids",
   assert.match(source, /\.is\("deleted_at", null\)/);
   assert.match(source, /if \(!deleteAll\)[\s\S]*\.in\("id", ids\)/);
 });
+
+test("choice practice result route records review result without storing selected option text", () => {
+  const routePath = "app/api/questions/[id]/practice-result/route.ts";
+
+  assert.equal(existsSync(join(root, routePath)), true);
+
+  const source = read(routePath);
+  assert.match(source, /export async function POST/);
+  assert.match(source, /parseAnswerChoiceLabels/);
+  assert.match(source, /areChoiceAnswersEqual/);
+  assert.match(source, /review_result:\s*reviewResult/);
+  assert.match(source, /review_priority:\s*"high"/);
+  assert.match(source, /review_priority:\s*"low"/);
+  assert.doesNotMatch(source, /selectedLabels:/);
+  assert.doesNotMatch(source, /selected_option|selected_answer|answer_text/);
+});

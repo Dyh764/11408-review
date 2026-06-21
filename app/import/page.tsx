@@ -41,6 +41,27 @@ type ImportSuccess = {
   inbox?: boolean;
 };
 
+const LAST_IMPORT_STORAGE_KEY = "11408-review:last-import-successes";
+
+function readCachedLastImportSuccesses() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LAST_IMPORT_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const cached = JSON.parse(raw) as ImportSuccess[];
+    return Array.isArray(cached) ? cached : [];
+  } catch {
+    window.localStorage.removeItem(LAST_IMPORT_STORAGE_KEY);
+    return [];
+  }
+}
+
 function ImportDiagnosticCard({ diagnostic }: { diagnostic: ImportDiagnostic }) {
   return (
     <MobileCard tone="red">
@@ -253,6 +274,7 @@ function ImportActionPanel({
 }
 
 export default function ImportPage() {
+  const initialLastImportSuccesses = useMemo(() => readCachedLastImportSuccesses(), []);
   const [jsonText, setJsonText] = useState("");
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
   const [importDiagnostics, setImportDiagnostics] = useState<ImportDiagnostic[]>([]);
@@ -261,16 +283,30 @@ export default function ImportPage() {
   const [apiResult, setApiResult] = useState<ImportApiResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
-  const [lastImportSuccesses, setLastImportSuccesses] = useState<ImportSuccess[]>([]);
-  const [undoStatus, setUndoStatus] = useState("");
+  const [lastImportSuccesses, setLastImportSuccesses] = useState<ImportSuccess[]>(initialLastImportSuccesses);
+  const [undoStatus, setUndoStatus] = useState(
+    initialLastImportSuccesses.length > 0 ? `可撤销最近一次导入的 ${initialLastImportSuccesses.length} 道错题。` : "",
+  );
   const [copyStatus, setCopyStatus] = useState("");
+  const [hasParsed, setHasParsed] = useState(false);
 
-  const parsed = useMemo(() => parseImportJsonText(jsonText), [jsonText]);
+  const parsed = useMemo(
+    () => (hasParsed ? parseImportJsonText(jsonText) : { cards: [], errors: [], repairNotices: [] }),
+    [hasParsed, jsonText],
+  );
   const previewCards = parsed.cards;
   const qualityReport = useMemo(() => getImportQualityReport(parsed), [parsed]);
   const qualityByIndex = useMemo(
     () => new Map(qualityReport.rows.map((row) => [row.index, row])),
     [qualityReport],
+  );
+  const previewIssueCards = useMemo(
+    () =>
+      previewCards.filter((item) => {
+        const quality = qualityByIndex.get(item.index);
+        return Boolean(quality?.recommendedInbox || quality?.issues.length);
+      }),
+    [previewCards, qualityByIndex],
   );
   const previewStats = useMemo(() => {
     const withAnswer = previewCards.filter((item) => item.card.standard_answer?.trim()).length;
@@ -285,9 +321,37 @@ export default function ImportPage() {
   const visibleRepairNotices =
     parseRepairNotices.length > 0 ? parseRepairNotices : (parsed.repairNotices ?? []);
 
+  function persistLastImportSuccesses(successes: ImportSuccess[]) {
+    setLastImportSuccesses(successes);
+    if (successes.length > 0) {
+      window.localStorage.setItem(LAST_IMPORT_STORAGE_KEY, JSON.stringify(successes));
+    } else {
+      window.localStorage.removeItem(LAST_IMPORT_STORAGE_KEY);
+    }
+  }
+
+  function resetImportParsing(options: { clearText?: boolean } = {}) {
+    if (options.clearText) {
+      setJsonText("");
+    }
+    setHasParsed(false);
+    setParseErrors([]);
+    setImportDiagnostics([]);
+    setParseNotice("");
+    setParseRepairNotices([]);
+    setApiResult(null);
+    setCopyStatus("");
+  }
+
+  function clearImportDraft() {
+    resetImportParsing({ clearText: true });
+    setUndoStatus(lastImportSuccesses.length > 0 ? `可撤销最近一次导入的 ${lastImportSuccesses.length} 道错题。` : "");
+  }
+
   function handleParse() {
     const result = parseImportJsonText(jsonText);
     const diagnosticResult = parseImportWithDiagnostics(jsonText);
+    setHasParsed(true);
     setParseErrors(result.errors);
     setImportDiagnostics(diagnosticResult.diagnostics);
     setParseRepairNotices(result.repairNotices ?? []);
@@ -300,7 +364,6 @@ export default function ImportPage() {
       setJsonText(result.sanitizedText);
     }
     setApiResult(null);
-    setLastImportSuccesses([]);
     setUndoStatus("");
   }
 
@@ -340,7 +403,7 @@ export default function ImportPage() {
 
       setApiResult(result);
       setImportDiagnostics(result.diagnostics ?? []);
-      setLastImportSuccesses(response.ok ? (result.successes ?? []) : []);
+      persistLastImportSuccesses(response.ok ? (result.successes ?? []) : []);
       if (!response.ok && result.error) {
         setParseErrors([{ index: 0, message: result.error }]);
       }
@@ -348,7 +411,7 @@ export default function ImportPage() {
       setApiResult({
         error: error instanceof Error ? error.message : "导入失败，请稍后重试。",
       });
-      setLastImportSuccesses([]);
+      persistLastImportSuccesses([]);
     } finally {
       setIsImporting(false);
     }
@@ -388,7 +451,7 @@ export default function ImportPage() {
       }
 
       setUndoStatus(`已撤销本次导入，软删除 ${result.deletedCount ?? lastImportSuccesses.length} 道错题。`);
-      setLastImportSuccesses([]);
+      persistLastImportSuccesses([]);
     } catch (error) {
       setUndoStatus(error instanceof Error ? error.message : "撤销本次导入失败。");
     } finally {
@@ -422,41 +485,6 @@ export default function ImportPage() {
         </details>
       </MobileSection>
 
-      <MobileSection title="模板与示例">
-        <SectionCard subtitle="需要时再复制模板；已经有 JSON 就直接往下粘贴。">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={copyChatGptPrompt}
-              aria-label="复制 ChatGPT 整理指令"
-              title="复制 ChatGPT 整理指令"
-              className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
-            >
-              复制数学 GPT 整理模板
-            </button>
-            <button
-              type="button"
-              onClick={copyExam408Prompt}
-              className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
-            >
-              复制 408 GPT 整理模板
-            </button>
-            <button
-              type="button"
-              onClick={copyImportExampleJson}
-              className="min-h-10 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-700 ring-1 ring-slate-200"
-            >
-              复制 JSON 示例
-            </button>
-          </div>
-          {copyStatus ? (
-            <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
-              {copyStatus}
-            </p>
-          ) : null}
-        </SectionCard>
-      </MobileSection>
-
       <MobileSection title="粘贴错题卡">
         <SectionCard subtitle="不用手改格式，先粘贴，点解析后再检查每一题。">
           <label className="block">
@@ -465,13 +493,7 @@ export default function ImportPage() {
               value={jsonText}
               onChange={(event) => {
                 setJsonText(event.target.value);
-                setParseErrors([]);
-                setImportDiagnostics([]);
-                setParseNotice("");
-                setParseRepairNotices([]);
-                setApiResult(null);
-                setLastImportSuccesses([]);
-                setUndoStatus("");
+                resetImportParsing();
               }}
               rows={12}
               className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-3 text-sm leading-6 text-slate-950 outline-none focus:border-blue-500"
@@ -479,22 +501,23 @@ export default function ImportPage() {
             />
           </label>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={() => {
                 setJsonText(importExampleJson);
-                setParseErrors([]);
-                setImportDiagnostics([]);
-                setParseNotice("");
-                setParseRepairNotices([]);
-                setApiResult(null);
-                setLastImportSuccesses([]);
-                setUndoStatus("");
+                resetImportParsing();
               }}
               className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
             >
               插入示例 JSON
+            </button>
+            <button
+              type="button"
+              onClick={clearImportDraft}
+              className="min-h-12 rounded-lg bg-white px-4 text-sm font-semibold text-red-700 ring-1 ring-red-100"
+            >
+              清空输入
             </button>
             <button
               type="button"
@@ -503,6 +526,40 @@ export default function ImportPage() {
             >
               解析
             </button>
+          </div>
+
+          <div className="mt-4 rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
+            <p className="text-xs font-black text-slate-500">模板与示例</p>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={copyChatGptPrompt}
+                aria-label="复制 ChatGPT 整理指令"
+                title="复制 ChatGPT 整理指令"
+                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                复制数学 GPT 整理模板
+              </button>
+              <button
+                type="button"
+                onClick={copyExam408Prompt}
+                className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                复制 408 GPT 整理模板
+              </button>
+              <button
+                type="button"
+                onClick={copyImportExampleJson}
+                className="min-h-10 rounded-lg bg-white px-3 text-xs font-black text-slate-700 ring-1 ring-slate-200"
+              >
+                复制 JSON 示例
+              </button>
+            </div>
+            {copyStatus ? (
+              <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
+                {copyStatus}
+              </p>
+            ) : null}
           </div>
         </SectionCard>
       </MobileSection>
@@ -544,6 +601,31 @@ export default function ImportPage() {
         </MobileSection>
       ) : null}
 
+      {lastImportSuccesses.length > 0 && !apiResult ? (
+        <MobileSection title="最近一次导入">
+          <SectionCard subtitle="刷新页面后仍可撤销最近一次成功导入；撤销会软删除这些题卡。">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-semibold leading-6 text-slate-700">
+                可撤销 {lastImportSuccesses.length} 道最近导入的错题。
+              </p>
+              <button
+                type="button"
+                onClick={handleUndoLastImport}
+                disabled={isUndoing}
+                className="min-h-10 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
+              >
+                {isUndoing ? "撤销中..." : "撤销本次导入"}
+              </button>
+            </div>
+            {undoStatus ? (
+              <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-100">
+                {undoStatus}
+              </p>
+            ) : null}
+          </SectionCard>
+        </MobileSection>
+      ) : null}
+
       {previewCards.length > 0 ? (
         <ImportActionPanel
           previewCount={previewCards.length}
@@ -576,9 +658,14 @@ export default function ImportPage() {
             </div>
           </div>
           <h2 className="text-base font-semibold text-slate-950">
-            预览 {previewCards.length} 张错题卡
+            需要检查 {previewIssueCards.length} 张错题卡
           </h2>
-          {previewCards.map((item) => (
+          {previewIssueCards.length === 0 ? (
+            <p className="rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
+              本次解析没有发现需要预览的问题题卡，干净题可直接从顶部确认导入。
+            </p>
+          ) : null}
+          {previewIssueCards.map((item) => (
             <ImportPreviewCard key={item.index} item={item} quality={qualityByIndex.get(item.index)} />
           ))}
           {qualityReport.seriousCount > 0 ? (

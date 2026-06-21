@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildQuestionDirectory,
+  filterVisibleQuestionDirectory,
   getDisplayChapter,
   getDisplaySubject,
   higherMathChapterOrder,
@@ -301,4 +302,70 @@ test("question directory groups by subject then fixed chapter with uncategorized
   assert.equal(directory[3].masteredCount, 1);
   assert.equal(directory[7].chapters[0].chapter, "待整理 / 未分类");
   assert.equal(directory[7].needsAttentionCount, 1);
+});
+
+test("source directory view hides empty subjects and keeps 408 subject order", () => {
+  const directory = buildQuestionDirectory([
+    {
+      ...baseQuestion,
+      id: "os-1",
+      subject: "操作系统",
+      chapter: "进程与线程",
+      knowledge_point: "CPU 调度",
+    },
+    {
+      ...baseQuestion,
+      id: "net-1",
+      subject: "计算机网络",
+      chapter: "网络层",
+      knowledge_point: "IPv4",
+    },
+  ]);
+
+  const visible = filterVisibleQuestionDirectory(directory, { hideEmptySubjects: true });
+
+  assert.deepEqual(
+    visible.map((subject) => subject.subject),
+    ["操作系统", "计算机网络"],
+  );
+  assert.equal(visible.some((subject) => subject.totalCount === 0), false);
+});
+
+test("408 chapters follow reference catalog aliases instead of raw import text", () => {
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      subject: "操作系统",
+      chapter: "2.2 CPU 调度",
+      knowledge_point: "时间片轮转",
+    }),
+    "进程与线程",
+  );
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      subject: "计算机网络",
+      chapter: "4.3 IP",
+      knowledge_point: "IPv4 分片",
+    }),
+    "网络层",
+  );
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      subject: "计算机组成原理",
+      chapter: "5.3 数据通路的功能和基本结构",
+      knowledge_point: "数据通路",
+    }),
+    "中央处理器",
+  );
+  assert.equal(
+    getDisplayChapter({
+      ...baseQuestion,
+      subject: "数据结构",
+      chapter: "7.5 散列(Hash)表",
+      knowledge_point: "哈希冲突",
+    }),
+    "查找",
+  );
 });

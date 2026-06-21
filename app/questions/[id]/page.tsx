@@ -15,6 +15,7 @@ import {
   getAnswerStatusLabel,
   getAnswerStatusTone,
 } from "@/lib/questions/answer-labels";
+import { parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import {
   getQuestionSourceLabel,
   getQuestionTextStatusLabel,
@@ -67,6 +68,12 @@ type StatusResponse = {
     label: string;
     model: string;
   };
+};
+
+type ChoicePracticeResult = {
+  correct: boolean;
+  correctLabels: string[];
+  reviewResult: "mastered" | "wrong_again";
 };
 
 function DetailField({
@@ -198,6 +205,9 @@ export default function QuestionDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isAnswerVisible, setIsAnswerVisible] = useState(false);
+  const [selectedAnswerLabels, setSelectedAnswerLabels] = useState<string[]>([]);
+  const [choicePracticeResult, setChoicePracticeResult] = useState<ChoicePracticeResult | null>(null);
+  const [isSubmittingPractice, setIsSubmittingPractice] = useState(false);
   const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
   const [aiStatus, setAiStatus] = useState<StatusResponse["ai"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
@@ -236,6 +246,8 @@ export default function QuestionDetailPage() {
         if (isActive) {
           setQuestion(item);
           setForm(formFromQuestion(item));
+          setSelectedAnswerLabels([]);
+          setChoicePracticeResult(null);
         }
       })
       .catch((error) => {
@@ -430,6 +442,60 @@ export default function QuestionDetailPage() {
     });
   }
 
+  function handleToggleChoice(label: string, isMultiple: boolean) {
+    if (choicePracticeResult) {
+      return;
+    }
+
+    setSelectedAnswerLabels((current) => {
+      if (!isMultiple) {
+        return current.includes(label) ? [] : [label];
+      }
+
+      return current.includes(label)
+        ? current.filter((item) => item !== label)
+        : [...current, label].sort();
+    });
+  }
+
+  async function handleSubmitChoicePractice() {
+    if (!question || selectedAnswerLabels.length === 0 || choicePracticeResult) {
+      return;
+    }
+
+    setIsSubmittingPractice(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${question.id}/practice-result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedLabels: selectedAnswerLabels }),
+      });
+      const result = (await response.json().catch(() => ({}))) as Partial<ChoicePracticeResult> & {
+        error?: string;
+      };
+
+      if (!response.ok || typeof result.correct !== "boolean" || !Array.isArray(result.correctLabels)) {
+        setMessage(result.error ?? "提交答案失败。");
+        return;
+      }
+
+      setChoicePracticeResult({
+        correct: result.correct,
+        correctLabels: result.correctLabels,
+        reviewResult: result.correct ? "mastered" : "wrong_again",
+      });
+      setIsAnswerVisible(true);
+      await refreshQuestion();
+      setMessage(result.correct ? "作答正确，已记录为掌握。" : "作答错误，已提高后续复盘优先级。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "提交答案失败。");
+    } finally {
+      setIsSubmittingPractice(false);
+    }
+  }
+
   async function handleSaveEdit() {
     if (!supabase || !question || !form) {
       setMessage("请先配置 Supabase 并读取错题详情。");
@@ -611,6 +677,9 @@ export default function QuestionDetailPage() {
   const questionDisplay = question
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
+  const parsedChoiceAnswer = question ? parseAnswerChoiceLabels(question.standard_answer) : { labels: [], isMultiple: false };
+  const canSubmitChoiceAnswer =
+    questionDisplay.choices.length > 0 && parsedChoiceAnswer.labels.length > 0 && selectedAnswerLabels.length > 0;
   const relatedPracticeQuestions =
     question && question.subject !== "数学" && isExam408Subject(question.subject)
       ? question.related_practice_questions ?? []
@@ -720,12 +789,54 @@ export default function QuestionDetailPage() {
 
           <MobileSection title="先做题">
             <SectionCard>
-              <p className="text-sm font-semibold leading-6 text-slate-900">
-                先自己做一遍，做完后再看答案。
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                这一步只保留题目和必要信息，避免答案提前干扰回忆。
-              </p>
+              {questionDisplay.choices.length > 0 ? (
+                <div className="space-y-3">
+                  <ChoiceList
+                    choices={questionDisplay.choices}
+                    mode={choicePracticeResult ? "reviewed" : "answering"}
+                    selectedLabels={selectedAnswerLabels}
+                    correctLabels={choicePracticeResult?.correctLabels ?? []}
+                    revealAnswer={Boolean(choicePracticeResult)}
+                    disabled={Boolean(choicePracticeResult) || isSubmittingPractice}
+                    onToggleChoice={(label) => handleToggleChoice(label, parsedChoiceAnswer.isMultiple)}
+                  />
+                  {parsedChoiceAnswer.labels.length === 0 ? (
+                    <p className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-800 ring-1 ring-amber-100">
+                      这道选择题的标准答案暂未识别，先核对答案后再提交作答。
+                    </p>
+                  ) : null}
+                  {choicePracticeResult ? (
+                    <p
+                      className={`rounded-lg p-3 text-sm font-semibold leading-6 ring-1 ${
+                        choicePracticeResult.correct
+                          ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
+                          : "bg-red-50 text-red-700 ring-red-100"
+                      }`}
+                    >
+                      {choicePracticeResult.correct
+                        ? "答对了，已记录为掌握。"
+                        : "答错了，已记录为需要继续复盘。"}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handleSubmitChoicePractice}
+                    disabled={!canSubmitChoiceAnswer || Boolean(choicePracticeResult) || isSubmittingPractice}
+                    className="min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+                  >
+                    {isSubmittingPractice ? "提交中..." : "提交答案"}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold leading-6 text-slate-900">
+                    先自己做一遍，做完后再看答案。
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    这一步只保留题目和必要信息，避免答案提前干扰回忆。
+                  </p>
+                </>
+              )}
             </SectionCard>
           </MobileSection>
 

@@ -152,12 +152,11 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await page.getByRole("button", { name: "插入示例 JSON" }).click();
   await page.getByRole("button", { name: "解析" }).click();
 
-  await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
+  await expect(page.getByText("需要检查 0 张错题卡")).toBeVisible();
+  await expect(page.getByText("本次解析没有发现需要预览的问题题卡，干净题可直接从顶部确认导入。")).toBeVisible();
   await expect(page.getByText("文字错题卡")).toHaveCount(0);
   await expect(page.getByText("文字题卡预览")).toHaveCount(0);
-  const textPreview = page.locator("article").filter({ hasText: "幂级数收敛半径、比值法" });
-  await expect(textPreview.getByText("幂级数 / 幂级数收敛半径、比值法")).toBeVisible();
-  await expect(page.getByText("选择题 / 4 个选项")).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: "幂级数收敛半径、比值法" })).toHaveCount(0);
 });
 
 test("import page previews ChatGPT answer fields when JSON includes an answer", async ({
@@ -357,7 +356,7 @@ test("import page normalizes ChatGPT Chinese taxonomy values when reachable", as
   ]`);
   await page.getByRole("button", { name: "解析" }).click();
 
-  await expect(page.getByText("预览 1 张错题卡")).toBeVisible();
+  await expect(page.getByText("需要检查 1 张错题卡")).toBeVisible();
   await expect(page.getByText("已自动映射 difficulty = 困难 -> 较难。")).toBeVisible();
   await expect(page.getByText("已自动映射 mastery_status = 已理解但需复习 -> 做对但不稳。")).toBeVisible();
   await expect(page.locator(".katex").first()).toBeVisible();
@@ -410,7 +409,7 @@ test("import preview shows structured choices when JSON includes choices", async
   );
   await page.getByRole("button", { name: "解析" }).click();
 
-  const previewCard = page.locator("section").filter({ hasText: "预览 1 张错题卡" });
+  const previewCard = page.locator("section").filter({ hasText: "需要检查 1 张错题卡" });
 
   await expect(previewCard.getByText("选择题 / 4 个选项")).toBeVisible();
   await expect(previewCard.getByText("若部分和有界", { exact: true })).toBeVisible();

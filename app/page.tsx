@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  buildQuestionQualitySummary,
   selectTodayLiftFocus,
   type AnalyticsQuestion,
   type AnalyticsReviewResult,
   type TodayLiftFocus,
 } from "@/lib/analytics/learning-insights";
+import { buildHomeActionCards, type HomeActionCard } from "@/lib/analytics/home-actions";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +25,7 @@ type HomeStats = {
   weakQuestionCount: number;
   inboxQuestionCount: number;
   focus: TodayLiftFocus;
+  actionCards: HomeActionCard[];
   subjects: SubjectProgress[];
   reviewActivity: Record<string, number>;
 };
@@ -41,6 +44,7 @@ const emptyStats: HomeStats = {
   weakQuestionCount: 0,
   inboxQuestionCount: 0,
   focus: emptyFocus,
+  actionCards: buildHomeActionCards({ focus: emptyFocus, questions: [], reviews: [] }),
   subjects: examSubjects.map((name) => ({ name, total: 0, weak: 0, progress: 0 })),
   reviewActivity: {},
 };
@@ -307,6 +311,51 @@ function RecentQuestions({ focus }: { focus: TodayLiftFocus }) {
   );
 }
 
+const actionToneClass: Record<HomeActionCard["tone"], string> = {
+  blue: "bg-blue-50 text-blue-700 ring-blue-100",
+  green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  amber: "bg-amber-50 text-amber-800 ring-amber-100",
+  red: "bg-red-50 text-red-700 ring-red-100",
+  slate: "bg-slate-50 text-slate-700 ring-slate-100",
+};
+
+function HomeActionPanel({ actions }: { actions: HomeActionCard[] }) {
+  return (
+    <HomePanel>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-slate-900">当前待办</h2>
+          <p className="mt-1 text-xs font-bold text-slate-400">按待整理、薄弱章节和最近作答动态生成。</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+          {actions.length} 项
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3">
+        {actions.map((action) => (
+          <Link
+            key={action.id}
+            href={action.href}
+            className={`block rounded-lg p-4 ring-1 transition hover:-translate-y-0.5 hover:shadow-sm ${actionToneClass[action.tone]}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words text-sm font-black">{action.title}</p>
+                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 opacity-80">
+                  {action.description}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-black">
+                {action.metric}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </HomePanel>
+  );
+}
+
 function WeaknessPanel({ focus, weakQuestionCount }: { focus: TodayLiftFocus; weakQuestionCount: number }) {
   return (
     <HomePanel>
@@ -405,13 +454,7 @@ function HomeDesktopLayout({ stats, message }: { stats: HomeStats; message: stri
                   <HomeContributionHeatmap activity={stats.reviewActivity} />
                 </div>
               </HomePanel>
-              <HomePanel>
-                <h2 className="text-lg font-black text-slate-900">公告栏</h2>
-                <div className="mt-5 space-y-5 text-sm text-slate-600">
-                  <p><span className="rounded bg-blue-50 px-2 py-1 text-blue-600">系统</span> 导入错题后会自动进入待整理题库 <span className="ml-4 rounded bg-red-400 px-2 py-1 text-white">new</span></p>
-                  <p><span className="rounded bg-blue-50 px-2 py-1 text-blue-600">提示</span> 建议优先处理需要核对的题卡 <span className="ml-4 rounded bg-red-400 px-2 py-1 text-white">new</span></p>
-                </div>
-              </HomePanel>
+              <HomeActionPanel actions={stats.actionCards} />
               <HomePanel>
                 <h2 className="text-lg font-black text-slate-900">最近错题</h2>
                 <p className="mt-1 text-xs font-bold text-slate-400">今日提分焦点会优先展示 3 道最该做错题。</p>
@@ -566,6 +609,10 @@ function HomeMobileLayout({ stats, message }: { stats: HomeStats; message: strin
       </section>
 
       <div className="mt-5">
+        <HomeActionPanel actions={stats.actionCards} />
+      </div>
+
+      <div className="mt-5">
         <WeaknessPanel focus={stats.focus} weakQuestionCount={stats.weakQuestionCount} />
       </div>
     </div>
@@ -598,7 +645,7 @@ export default function DashboardPage() {
 
       const currentDay = todayIsoDate();
       const activityStart = `${addDays(currentDay, -89)}T00:00:00.000Z`;
-      const [questionsResult, recentReviewsResult] = await Promise.all([
+      const [questionsResult, recentReviewsResult, dueReviewsResult] = await Promise.all([
         client
           .from("questions")
           .select(
@@ -611,24 +658,36 @@ export default function DashboardPage() {
           .select("question_id,review_result,completed_at")
           .eq("user_id", user.id)
           .gte("completed_at", activityStart),
+        client
+          .from("reviews")
+          .select("question_id,review_result,completed_at")
+          .eq("user_id", user.id)
+          .lte("scheduled_date", currentDay)
+          .is("completed_at", null),
       ]);
 
-      const error = questionsResult.error ?? recentReviewsResult.error;
+      const error = questionsResult.error ?? recentReviewsResult.error ?? dueReviewsResult.error;
       if (error) {
         setMessage(`错题资产更新失败：${error.message}`);
         return;
       }
 
       const questions = (questionsResult.data ?? []) as AnalyticsQuestion[];
-      const reviews = (recentReviewsResult.data ?? []) as AnalyticsReviewResult[];
+      const reviews = [
+        ...((recentReviewsResult.data ?? []) as AnalyticsReviewResult[]),
+        ...((dueReviewsResult.data ?? []) as AnalyticsReviewResult[]),
+      ];
       const focus = selectTodayLiftFocus(questions, reviews, { today: currentDay });
+      const actionCards = buildHomeActionCards({ focus, questions, reviews });
+      const qualitySummary = buildQuestionQualitySummary(questions);
 
       if (isActive) {
         setStats({
           totalQuestions: questions.length,
           weakQuestionCount: questions.filter(isWeakQuestion).length,
-          inboxQuestionCount: focus.inboxIssue ? 1 : 0,
+          inboxQuestionCount: qualitySummary.affectedQuestionCount,
           focus,
+          actionCards,
           subjects: buildSubjectProgress(questions),
           reviewActivity: buildReviewActivity(reviews),
         });

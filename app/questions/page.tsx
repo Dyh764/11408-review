@@ -24,7 +24,12 @@ import {
   getQuestionSourceInfo,
   type QuestionSourceStats,
 } from "@/lib/questions/source-info";
-import { buildQuestionDirectory, type QuestionChapterGroup, type QuestionSubjectDirectory } from "@/lib/taxonomy/question-taxonomy";
+import {
+  buildQuestionDirectory,
+  filterVisibleQuestionDirectory,
+  type QuestionChapterGroup,
+  type QuestionSubjectDirectory,
+} from "@/lib/taxonomy/question-taxonomy";
 import {
   getQuestionTextStatusLabel,
 } from "@/lib/questions/meta-labels";
@@ -309,7 +314,11 @@ export default function QuestionsPage() {
   );
   const activeDirectory =
     directoryMode === "source" && activeSourceKey ? sourceDirectory : directory;
-  const selectedSubject = activeDirectory.find((group) => group.subject === activeSubject) ?? null;
+  const visibleActiveDirectory =
+    directoryMode === "source" && activeSourceKey
+      ? filterVisibleQuestionDirectory(activeDirectory, { hideEmptySubjects: true })
+      : activeDirectory;
+  const selectedSubject = visibleActiveDirectory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
     selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
   const filterPanelProps: FilterPanelProps = {
@@ -683,7 +692,7 @@ export default function QuestionsPage() {
         ) : null}
         {!(directoryMode === "source" && !activeSourceKey) && !selectedSubject ? (
           <SubjectDirectory
-            directory={activeDirectory}
+            directory={visibleActiveDirectory}
             sourceName={
               directoryMode === "source"
                 ? sourceStats.find((source) => source.key === activeSourceKey)?.name

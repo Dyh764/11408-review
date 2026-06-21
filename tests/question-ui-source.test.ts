@@ -22,6 +22,18 @@ test("/questions uses compact text previews without duplicate title or meta", ()
   assert.doesNotMatch(source, />chatgpt_import</);
 });
 
+test("import page previews only issue cards and persists last import undo ids", () => {
+  const source = read("app/import/page.tsx");
+
+  assert.match(source, /LAST_IMPORT_STORAGE_KEY/);
+  assert.match(source, /localStorage\.setItem\(LAST_IMPORT_STORAGE_KEY/);
+  assert.match(source, /localStorage\.getItem\(LAST_IMPORT_STORAGE_KEY/);
+  assert.match(source, /clearImportDraft/);
+  assert.match(source, /previewIssueCards/);
+  assert.match(source, /previewIssueCards\.map/);
+  assert.doesNotMatch(source, /previewCards\.map\(\(item\) => \(\s*<ImportPreviewCard/);
+});
+
 test("/questions uses taxonomy directory browsing before the final question list", () => {
   const source = read("app/questions/page.tsx");
 
