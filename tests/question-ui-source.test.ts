@@ -39,13 +39,20 @@ test("/questions uses taxonomy directory browsing before the final question list
 
   assert.match(source, /buildQuestionDirectory/);
   assert.match(source, /SubjectDirectory/);
+  assert.match(source, /SourceDirectory/);
+  assert.match(source, /SourcePartDirectory/);
   assert.match(source, /ChapterDirectory/);
   assert.match(source, /QuestionDirectory/);
   assert.match(source, /activeSubject/);
+  assert.match(source, /activeSourceKey/);
+  assert.match(source, /activeSourcePart/);
   assert.match(source, /activeChapter/);
   assert.match(source, /科目目录/);
+  assert.match(source, /题源信息/);
   assert.match(source, /返回章节/);
   assert.match(source, /搜索 \/ 筛选/);
+  assert.doesNotMatch(source, /按章节看/);
+  assert.doesNotMatch(source, /按题源看/);
   assert.doesNotMatch(source, /<select[\s\S]*<SubjectDirectory/);
 });
 
@@ -212,8 +219,8 @@ test("/questions/[id] keeps detail information in the requested learning-flow or
   for (const title of [
     "题目",
     "先做题",
+    "答题卡点",
     "查看答案",
-    "我的卡点",
     "正确思路",
     "智能增强",
     "更多信息",
@@ -231,9 +238,13 @@ test("/questions/[id] keeps detail information in the requested learning-flow or
     "detail page should prompt self-solving before answer reveal",
   );
   assert.ok(
-    source.indexOf("查看答案") < source.indexOf("我的卡点"),
-    "answer reveal should appear before notes and solution summaries",
+    source.indexOf('<MobileSection title="先做题"') <
+      source.indexOf('<MobileSection title="答题卡点"'),
+    "stuck-point controls should sit near the answering area",
   );
+  assert.doesNotMatch(source, /<MobileSection title="我的卡点"/);
+  assert.match(source, /stuckPointOptions/);
+  assert.match(source, /toggleStuckPoint/);
 });
 
 test("mobile UI exposes the mature learning-app components", () => {
@@ -519,6 +530,7 @@ test("learning analytics surfaces stay mobile-first across home, review, questio
 test("/practice reuses the review flashcard component for chapter and mistake review", () => {
   const source = read("app/practice/page.tsx");
   const sharedCard = read("components/study/ReviewFlashcard.tsx");
+  const sharedDeck = read("components/study/ReviewFlashcardDeck.tsx");
   const todayReview = read("app/review/page.tsx");
 
   assert.match(source, /专项复盘/);
@@ -527,7 +539,14 @@ test("/practice reuses the review flashcard component for chapter and mistake re
   assert.match(source, /buildPracticeCatalog/);
   assert.match(source, /filterPracticeQuestions/);
   assert.match(source, /ReviewFlashcard/);
-  assert.match(todayReview, /ReviewFlashcard/);
+  assert.match(source, /ReviewFlashcardDeck/);
+  assert.match(todayReview, /ReviewFlashcardDeck/);
+  assert.match(sharedDeck, /activeIndex/);
+  assert.match(sharedDeck, /onTouchStart/);
+  assert.match(sharedDeck, /onTouchEnd/);
+  assert.match(sharedDeck, /ArrowLeft/);
+  assert.match(sharedDeck, /ArrowRight/);
+  assert.match(sharedDeck, /\/ \{reviews\.length\}/);
   assert.match(sharedCard, /ChoiceList/);
   assert.match(sharedCard, /AnswerPanel/);
   assert.match(sharedCard, /canRecordReview/);
@@ -588,23 +607,42 @@ test("408 question detail shows related practice only for 408 and keeps answers 
 
 test("/questions chapter level surfaces rule-based chapter weakness analysis", () => {
   const source = read("app/questions/page.tsx");
+  const questionDirectory = source.slice(source.indexOf("function QuestionDirectory"));
 
   assert.match(source, /analyzeChapterWeakness/);
   assert.match(source, /ChapterWeaknessPanel/);
   assert.match(source, /本章欠缺分析/);
   assert.match(source, /frequent_knowledge_points/);
   assert.match(source, /next_review_suggestions/);
+  assert.ok(
+    questionDirectory.indexOf("chapter.questions.map") < questionDirectory.indexOf("ChapterWeaknessPanel"),
+    "chapter weakness analysis should appear after the question list",
+  );
 });
 
-test("/review supports skipping and explicit next-step actions after recording", () => {
+test("/review uses the shared swipe deck instead of a next-button interstitial", () => {
   const source = read("app/review/page.tsx");
 
   assert.match(source, /handleSkipReview/);
-  assert.match(source, /setLastCompletedReview/);
+  assert.match(source, /ReviewFlashcardDeck/);
   assert.match(source, /跳过本题/);
-  assert.match(source, /下一题/);
   assert.match(source, /返回错题库/);
   assert.match(source, /不记录本次结果/);
+  assert.doesNotMatch(source, /lastCompletedReview/);
+  assert.doesNotMatch(source, /下一题/);
+});
+
+test("question detail saves images through system share when available and uses the current light card UI", () => {
+  const source = read("app/questions/[id]/page.tsx");
+
+  assert.match(source, /保存图片/);
+  assert.match(source, /navigator\.share/);
+  assert.match(source, /new File/);
+  assert.match(source, /分享面板/);
+  assert.match(source, /bg-white p-\[48px\]/);
+  assert.doesNotMatch(source, /紫色错题卡片/);
+  assert.doesNotMatch(source, /#d8ccff/);
+  assert.doesNotMatch(source, /rounded-\[32px\]/);
 });
 
 test("review remains reachable as a secondary route with selectable entry points", () => {

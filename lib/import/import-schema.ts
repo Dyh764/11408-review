@@ -118,7 +118,7 @@ const exam408SubjectSet = new Set<string>(exam408Subjects);
 const exam408ChapterCatalog: Record<(typeof exam408Subjects)[number], string[]> = {
   数据结构: ["绪论", "线性表", "栈和队列", "串", "树与二叉树", "图", "查找", "排序", "待整理 / 未分类"],
   计算机组成原理: ["计算机系统概述", "数据的表示和运算", "存储系统", "指令系统", "中央处理器", "总线", "输入输出系统", "待整理 / 未分类"],
-  操作系统: ["操作系统概述", "进程与线程", "处理机调度", "同步与互斥", "死锁", "内存管理", "文件管理", "输入输出管理", "待整理 / 未分类"],
+  操作系统: ["计算机系统概述", "进程与线程", "内存管理", "文件管理", "输入输出管理", "待整理 / 未分类"],
   计算机网络: ["计算机网络体系结构", "物理层", "数据链路层", "网络层", "传输层", "应用层", "待整理 / 未分类"],
 };
 const relatedPracticeDifficulties = ["简单", "中等", "困难"] as const;
@@ -214,6 +214,11 @@ answer_source`;
 export const exam408ImportPrompt = `请把今天的 408 专业课选择题错题整理成可导入 11408-review 的 Import Protocol v2 JSON 数组。
 只处理数据结构、计算机组成原理、操作系统、计算机网络四科。
 默认题源 source 使用王道408；如果没有明确来源，source.raw 写“未标来源”。
+chapter 只能使用以下大章，不要把小节写成单独大章：
+数据结构：绪论、线性表、栈、队列和数组、串、树与二叉树、图、查找、排序。
+计算机组成原理：计算机系统概述、数据的表示和运算、存储系统、指令系统、中央处理器、总线、输入/输出系统。
+操作系统：计算机系统概述、进程与线程、内存管理、文件管理、输入/输出管理。
+计算机网络：计算机网络体系结构、物理层、数据链路层、网络层、传输层、应用层。
 每题必须输出 subject、chapter、knowledge_point、question_text、choices、standard_answer、answer_explanation、user_note、mistake_types。
 subject 必须是四科之一，不要写成“408”。
 choices 必须是 A/B/C/D 四个选项数组，每项包含 label 和 text。
@@ -542,6 +547,7 @@ function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
     "type",
     "name",
     "section",
+    "part",
     "volume",
     "paper",
     "page",
@@ -558,7 +564,7 @@ function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
     }
 
     if (typeof fieldValue !== "string") {
-      throw new Error("source 格式错误：type、name、section、volume、paper、page、problem_number、raw 必须是字符串。");
+      throw new Error("source 格式错误：type、name、section、part、volume、paper、page、problem_number、raw 必须是字符串。");
     }
 
     sourceInfo[field] = fieldValue.trim();
@@ -878,7 +884,7 @@ function diagnosticSuggestion(type: ImportDiagnosticType, field?: string) {
   }
 
   if (type === "source格式错误") {
-    return "source 可以是标准对象或来源字符串；对象内 type、name、section、volume、paper、page、problem_number、raw 都应是字符串。";
+    return "source 可以是标准对象或来源字符串；对象内 type、name、section、part、volume、paper、page、problem_number、raw 都应是字符串。";
   }
 
   if (type === "choices格式错误") {
@@ -1040,6 +1046,7 @@ function buildCommonFieldDiagnostics(parsed: unknown, input: string) {
           "type",
           "name",
           "section",
+          "part",
           "volume",
           "paper",
           "page",

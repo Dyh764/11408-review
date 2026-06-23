@@ -33,6 +33,7 @@ export type QuestionSourceInfo = {
   type: string;
   name: string;
   section: string;
+  part: string;
   volume: string;
   paper: string;
   page: string;

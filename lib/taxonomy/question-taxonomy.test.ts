@@ -369,3 +369,24 @@ test("408 chapters follow reference catalog aliases instead of raw import text",
     "查找",
   );
 });
+
+test("408 subject directories use the user-provided chapter order only", () => {
+  const directory = buildQuestionDirectory([]);
+
+  assert.deepEqual(
+    directory.find((subject) => subject.subject === "操作系统")?.chapters.map((chapter) => chapter.chapter),
+    ["计算机系统概述", "进程与线程", "内存管理", "文件管理", "输入/输出管理", "待整理 / 未分类"],
+  );
+  assert.deepEqual(
+    directory.find((subject) => subject.subject === "计算机网络")?.chapters.map((chapter) => chapter.chapter),
+    ["计算机网络体系结构", "物理层", "数据链路层", "网络层", "传输层", "应用层", "待整理 / 未分类"],
+  );
+  assert.deepEqual(
+    directory.find((subject) => subject.subject === "计算机组成原理")?.chapters.map((chapter) => chapter.chapter),
+    ["计算机系统概述", "数据的表示和运算", "存储系统", "指令系统", "中央处理器", "总线", "输入/输出系统", "待整理 / 未分类"],
+  );
+  assert.deepEqual(
+    directory.find((subject) => subject.subject === "数据结构")?.chapters.map((chapter) => chapter.chapter),
+    ["绪论", "线性表", "栈、队列和数组", "串", "树与二叉树", "图", "查找", "排序", "待整理 / 未分类"],
+  );
+});

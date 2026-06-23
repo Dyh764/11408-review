@@ -173,6 +173,7 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
             <span>题源类型：{card.source_info.type || "未标来源"}</span>
             <span>题源名称：{card.source_info.name || "未标来源"}</span>
             <span>模块：{card.source_info.section || "无"}</span>
+            <span>部分：{card.source_info.part || "无"}</span>
             <span>卷/套：{card.source_info.paper || card.source_info.volume || "无"}</span>
             <span>页码：{card.source_info.page || "无"}</span>
             <span>题号：{card.source_info.problem_number || "无"}</span>

@@ -55,6 +55,14 @@ const masteryStatuses: MasteryStatus[] = [
 ];
 const textStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_fix"];
 const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"];
+const stuckPointOptions = [
+  "概念混淆",
+  "知识点边界不清",
+  "计算错误",
+  "审题错误",
+  "选项陷阱",
+  "步骤不熟",
+];
 
 type StatusResponse = {
   ai?: {
@@ -199,6 +207,7 @@ export default function QuestionDetailPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingStuckPoints, setIsSavingStuckPoints] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -617,11 +626,29 @@ export default function QuestionDetailPage() {
 
     try {
       const dataUrl = await generateShareCardImage(shareCardRef.current);
+      const imageBlob = await fetch(dataUrl).then((response) => response.blob());
+      const imageFile = new File([imageBlob], `question-card-${question.id}.png`, {
+        type: "image/png",
+      });
+
+      if (
+        typeof navigator.share === "function" &&
+        (!navigator.canShare || navigator.canShare({ files: [imageFile] }))
+      ) {
+        await navigator.share({
+          title: "错题卡片",
+          text: "保存这张错题卡图片。",
+          files: [imageFile],
+        });
+        setMessage("已打开系统分享面板，可选择保存到相册。");
+        return;
+      }
+
       const link = document.createElement("a");
       link.href = dataUrl;
       link.download = `question-card-${question.id}.png`;
       link.click();
-      setMessage("错题分享图片已生成。");
+      setMessage("错题分享图片已生成；当前浏览器不支持分享面板，已改用下载。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "生成分享图片失败。");
     } finally {
@@ -674,12 +701,81 @@ export default function QuestionDetailPage() {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  function toggleStuckPoint(point: string) {
+    setForm((current) => {
+      if (!current) return current;
+      const items = current.mistake_types
+        .split(/[,，;；\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const nextItems = items.includes(point)
+        ? items.filter((item) => item !== point)
+        : [...items, point];
+
+      return { ...current, mistake_types: nextItems.join("，") };
+    });
+  }
+
+  async function handleSaveStuckPoints() {
+    if (!supabase || !question || !form) {
+      setMessage("请先读取错题详情，再保存卡点。");
+      return;
+    }
+
+    setIsSavingStuckPoints(true);
+    setMessage("");
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setMessage("请先登录，再保存卡点。");
+        return;
+      }
+
+      const mistakeTypes = form.mistake_types
+        .split(/[,，;；\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      const { error } = await supabase
+        .from("questions")
+        .update({
+          user_note: form.user_note.trim() || null,
+          mistake_types: Array.from(new Set(mistakeTypes)),
+        })
+        .eq("id", question.id)
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
+
+      if (error) {
+        setMessage(`保存卡点失败：${error.message}`);
+        return;
+      }
+
+      await refreshQuestion();
+      setMessage("答题卡点已保存。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "保存卡点失败。");
+    } finally {
+      setIsSavingStuckPoints(false);
+    }
+  }
+
   const questionDisplay = question
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
   const parsedChoiceAnswer = question ? parseAnswerChoiceLabels(question.standard_answer) : { labels: [], isMultiple: false };
   const canSubmitChoiceAnswer =
     questionDisplay.choices.length > 0 && parsedChoiceAnswer.labels.length > 0 && selectedAnswerLabels.length > 0;
+  const selectedStuckPoints = form
+    ? form.mistake_types
+        .split(/[,，;；\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
   const relatedPracticeQuestions =
     question && question.subject !== "数学" && isExam408Subject(question.subject)
       ? question.related_practice_questions ?? []
@@ -840,6 +936,49 @@ export default function QuestionDetailPage() {
             </SectionCard>
           </MobileSection>
 
+          <MobileSection title="答题卡点" subtitle="做题时直接标记这题卡在哪里，保存后回到题卡统计。">
+            <SectionCard>
+              <div className="flex flex-wrap gap-2">
+                {stuckPointOptions.map((point) => {
+                  const selected = selectedStuckPoints.includes(point);
+
+                  return (
+                    <button
+                      key={point}
+                      type="button"
+                      onClick={() => toggleStuckPoint(point)}
+                      className={`min-h-9 rounded-lg px-3 text-xs font-black ring-1 ${
+                        selected
+                          ? "bg-blue-600 text-white ring-blue-600"
+                          : "bg-white text-slate-700 ring-slate-200"
+                      }`}
+                    >
+                      {point}
+                    </button>
+                  );
+                })}
+              </div>
+              <label className="mt-3 block">
+                <span className="text-sm font-semibold text-slate-800">补充说明</span>
+                <textarea
+                  value={form?.user_note ?? ""}
+                  onChange={(event) => updateForm("user_note", event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
+                  placeholder="例如：我选了 C，正确答案是 B；主要卡在资源共享边界。"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleSaveStuckPoints}
+                disabled={isSavingStuckPoints || !form}
+                className="mt-3 min-h-11 w-full rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-300"
+              >
+                {isSavingStuckPoints ? "保存中..." : "保存卡点"}
+              </button>
+            </SectionCard>
+          </MobileSection>
+
           <MobileSection title="查看答案" subtitle="默认折叠，做完后再展开标准答案、解析和关键步骤。">
             <SectionCard>
               <button
@@ -862,12 +1001,6 @@ export default function QuestionDetailPage() {
                 </div>
               ) : null}
             </SectionCard>
-          </MobileSection>
-
-          <MobileSection title="我的卡点">
-            <MobileCard>
-              <MathText text={question.user_note} fallback="暂无记录。" className="text-slate-700" />
-            </MobileCard>
           </MobileSection>
 
           <MobileSection title="正确思路">
@@ -1000,7 +1133,7 @@ export default function QuestionDetailPage() {
           <MobileSection title="错题分享">
             <MobileCard>
               <p className="text-sm leading-6 text-slate-600">
-                导出单题 JSON，或生成 1080x1350 的紫色错题卡片图，适合保存后分享到微信或小红书。
+                导出单题 JSON，或生成 1080x1350 的浅色错题卡片图。苹果设备会优先打开分享面板，方便保存到相册。
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <button
@@ -1017,7 +1150,7 @@ export default function QuestionDetailPage() {
                   disabled={isSharing}
                   className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-300"
                 >
-                  下载错题卡 PNG
+                  保存图片
                 </button>
               </div>
               {shareCardModel ? (
@@ -1025,15 +1158,15 @@ export default function QuestionDetailPage() {
                   <div
                     ref={shareCardRef}
                     style={{ width: 1080, height: 1350 }}
-                    className="overflow-hidden bg-slate-50 p-[72px] text-slate-950"
+                    className="overflow-hidden bg-white p-[48px] text-slate-950"
                   >
-                    <div className="flex h-full flex-col rounded-[32px] border border-[#d8ccff] bg-white p-[56px] shadow-[0_32px_90px_rgba(79,35,182,0.18)]">
-                      <div className="flex items-start justify-between gap-8">
+                    <div className="flex h-full flex-col rounded-[24px] border border-slate-200 bg-slate-50 p-[48px] shadow-[0_28px_80px_rgba(15,23,42,0.12)]">
+                      <div className="flex items-start justify-between gap-8 border-b border-slate-200 pb-8">
                         <div className="min-w-0">
-                          <p className="text-[34px] font-black leading-tight text-blue-700">
+                          <p className="text-[30px] font-black leading-tight text-blue-700">
                             {shareCardModel.subject}
                           </p>
-                          <p className="mt-4 break-words text-[46px] font-black leading-tight">
+                          <p className="mt-4 break-words text-[44px] font-black leading-tight">
                             {shareCardModel.knowledgePoint}
                           </p>
                         </div>
@@ -1042,16 +1175,14 @@ export default function QuestionDetailPage() {
                         </div>
                       </div>
 
-                      <div className="my-12 h-px bg-slate-200" />
-
-                      <div className="min-h-0 flex-1 overflow-hidden">
+                      <div className="mt-10 min-h-0 flex-1 overflow-hidden rounded-[20px] bg-white p-8 ring-1 ring-slate-200">
                         <MathText
                           text={shareCardModel.questionText}
-                          className="text-[38px] leading-[1.55] text-slate-950"
+                          className="text-[36px] leading-[1.55] text-slate-950"
                         />
                       </div>
 
-                      <div className="mt-10 rounded-[28px] bg-slate-50 p-8">
+                      <div className="mt-8 rounded-[20px] bg-white p-8 ring-1 ring-slate-200">
                         <div className="flex flex-wrap gap-3">
                           {shareCardModel.mistakeTypes.length > 0 ? (
                             shareCardModel.mistakeTypes.map((item) => (

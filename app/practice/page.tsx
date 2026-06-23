@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
+import { ReviewFlashcardDeck } from "@/components/study/ReviewFlashcardDeck";
 import { ReviewFlashcard, type FlashcardReview } from "@/components/study/ReviewFlashcard";
 import {
   SectionHeader,
@@ -136,7 +137,6 @@ export default function PracticePage() {
 
   const catalog = useMemo(() => buildPracticeCatalog(questions), [questions]);
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
-  const activeReview = queue[0] ?? null;
   const progress =
     initialCount > 0 ? Math.round(((completedTotal + skippedCount) / initialCount) * 100) : 0;
 
@@ -427,33 +427,38 @@ export default function PracticePage() {
         </>
       ) : null}
 
-      {activeReview ? (
-        <ReviewFlashcard
-          review={activeReview}
-          today={todayIsoDate()}
-          selectedChoices={selectedChoices[activeReview.id] ?? []}
-          submittedChoice={Boolean(submittedChoices[activeReview.id])}
-          answerRevealed={Boolean(revealedAnswers[activeReview.id])}
-          draftAnswer={draftAnswers[activeReview.id] ?? ""}
-          processing={processingReviewId === activeReview.id}
-          processingLocked={Boolean(processingReviewId)}
-          onToggleChoice={toggleChoice}
-          onSubmitChoice={() => {
-            setSubmittedChoices((current) => ({ ...current, [activeReview.id]: true }));
-            setRevealedAnswers((current) => ({ ...current, [activeReview.id]: true }));
-          }}
-          onRevealAnswer={() =>
-            setRevealedAnswers((current) => ({ ...current, [activeReview.id]: true }))
-          }
-          onDraftAnswer={(value) =>
-            setDraftAnswers((current) => ({ ...current, [activeReview.id]: value }))
-          }
-          onSkip={() => handleSkipReview(activeReview)}
-          onReview={(result) => handleReview(activeReview, result)}
+      {queue.length > 0 ? (
+        <ReviewFlashcardDeck
+          reviews={queue}
+          renderCard={(review) => (
+            <ReviewFlashcard
+              review={review}
+              today={todayIsoDate()}
+              selectedChoices={selectedChoices[review.id] ?? []}
+              submittedChoice={Boolean(submittedChoices[review.id])}
+              answerRevealed={Boolean(revealedAnswers[review.id])}
+              draftAnswer={draftAnswers[review.id] ?? ""}
+              processing={processingReviewId === review.id}
+              processingLocked={Boolean(processingReviewId)}
+              onToggleChoice={toggleChoice}
+              onSubmitChoice={() => {
+                setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
+                setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
+              }}
+              onRevealAnswer={() =>
+                setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
+              }
+              onDraftAnswer={(value) =>
+                setDraftAnswers((current) => ({ ...current, [review.id]: value }))
+              }
+              onSkip={() => handleSkipReview(review)}
+              onReview={(result) => handleReview(review, result)}
+            />
+          )}
         />
       ) : null}
 
-      {activeFilter && !activeReview && initialCount > 0 ? renderSummary() : null}
+      {activeFilter && queue.length === 0 && initialCount > 0 ? renderSummary() : null}
     </MobilePageShell>
   );
 }

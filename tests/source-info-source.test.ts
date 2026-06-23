@@ -31,15 +31,19 @@ test("question queries persist and select source_info separately from ingestion 
   assert.match(importRoute, /source: "chatgpt_import"/);
 });
 
-test("/questions can switch between chapter and source directories", () => {
+test("/questions uses source-first nested asset directories without a parallel chapter/source switch", () => {
   const source = read("app/questions/page.tsx");
 
-  assert.match(source, /directoryMode/);
-  assert.match(source, /按章节看/);
-  assert.match(source, /按题源看/);
   assert.match(source, /buildQuestionSourceStats/);
   assert.match(source, /SourceDirectory/);
+  assert.match(source, /SourcePartDirectory/);
   assert.match(source, /题源信息/);
+  assert.match(source, /基础题/);
+  assert.match(source, /综合题/);
+  assert.match(source, /拓展题/);
+  assert.doesNotMatch(source, /directoryMode/);
+  assert.doesNotMatch(source, /按章节看/);
+  assert.doesNotMatch(source, /按题源看/);
   assert.doesNotMatch(source, /错题率/);
 });
 

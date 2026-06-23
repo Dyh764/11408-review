@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
+import { ReviewFlashcardDeck } from "@/components/study/ReviewFlashcardDeck";
 import { ReviewFlashcard } from "@/components/study/ReviewFlashcard";
 import {
   buildRoundExposureSummary,
@@ -11,7 +12,6 @@ import {
 } from "@/lib/analytics/learning-insights";
 import {
   ProgressBar,
-  SecondaryStudyLink,
   SprintStatCard,
   StudyCard,
   StudyDashboardCard,
@@ -25,13 +25,6 @@ import { buildReviewAdjustmentPlan, shouldCancelPendingHighFrequencyReviews, sho
 import { fetchDueReviews, todayIsoDate, type DueReview } from "@/lib/reviews";
 import { createClient } from "@/lib/supabase/client";
 import type { ReviewResult } from "@/lib/types";
-
-const resultLabels: Record<ReviewResult, string> = {
-  still_wrong: "仍不会",
-  improved: "有进步",
-  mastered: "已掌握",
-  wrong_again: "又错了",
-};
 
 function isOverdue(scheduledDate: string) {
   return scheduledDate < todayIsoDate();
@@ -70,10 +63,6 @@ export default function ReviewPage() {
   const [submittedChoices, setSubmittedChoices] = useState<Record<string, boolean>>({});
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
-  const [lastCompletedReview, setLastCompletedReview] = useState<{
-    result: ReviewResult;
-    remainingCount: number;
-  } | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实今日复习。",
@@ -221,12 +210,10 @@ export default function ReviewPage() {
     setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
     setCompletedReviewItems((current) => [...current, { question: review.questions, result }]);
     setReviews(nextReviews);
-    setLastCompletedReview({ result, remainingCount: nextReviews.length });
     setProcessingReviewId("");
     setMessage("复习结果已写入，并已按规则调整后续复习计划。");
   }
 
-  const activeReview = reviews[0] ?? null;
   const overdueCount = reviews.filter((review) => isOverdue(review.scheduled_date)).length;
   const todayCount = reviews.length - overdueCount;
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
@@ -287,13 +274,7 @@ export default function ReviewPage() {
         ? "已跳过本题，不记录本次结果。"
         : "已跳过本题，不记录本次结果。暂无更多题。",
     );
-    setLastCompletedReview(null);
     cleanupReviewDraft(review.id);
-  }
-
-  function handleNextReview() {
-    setLastCompletedReview(null);
-    setMessage(reviews.length > 0 ? "" : "今日复习完成，暂无更多题。");
   }
 
   function renderSummary() {
@@ -408,30 +389,9 @@ export default function ReviewPage() {
         </MobileSection>
       ) : null}
 
-      {lastCompletedReview ? (
-        <MobileSection>
-          <StudyCard className="bg-emerald-50">
-            <p className="text-sm font-black text-emerald-900">
-              已记录“{resultLabels[lastCompletedReview.result]}”。
-              {lastCompletedReview.remainingCount > 0 ? "可以继续下一题。" : "今日复习完成。"}
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={handleNextReview}
-                className="min-h-12 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white"
-              >
-                下一题
-              </button>
-              <SecondaryStudyLink href="/questions">返回错题库</SecondaryStudyLink>
-            </div>
-          </StudyCard>
-        </MobileSection>
-      ) : null}
+      {!isLoading && reviews.length === 0 && initialReviewCount > 0 ? renderSummary() : null}
 
-      {!isLoading && !activeReview && initialReviewCount > 0 ? renderSummary() : null}
-
-      {!isLoading && !activeReview && initialReviewCount === 0 ? (
+      {!isLoading && reviews.length === 0 && initialReviewCount === 0 ? (
         <MobileSection>
           <EmptyState
             title="今天的复习任务已清空"
@@ -441,30 +401,46 @@ export default function ReviewPage() {
         </MobileSection>
       ) : null}
 
-      {activeReview && !lastCompletedReview ? (
-        <ReviewFlashcard
-          review={activeReview}
-          selectedChoices={selectedChoices[activeReview.id] ?? []}
-          submittedChoice={Boolean(submittedChoices[activeReview.id])}
-          answerRevealed={Boolean(revealedAnswers[activeReview.id])}
-          draftAnswer={draftAnswers[activeReview.id] ?? ""}
-          processing={processingReviewId === activeReview.id}
-          processingLocked={Boolean(processingReviewId)}
-          onToggleChoice={toggleChoice}
-          onSubmitChoice={() => {
-            setSubmittedChoices((current) => ({ ...current, [activeReview.id]: true }));
-            setRevealedAnswers((current) => ({ ...current, [activeReview.id]: true }));
-          }}
-          onRevealAnswer={() =>
-            setRevealedAnswers((current) => ({ ...current, [activeReview.id]: true }))
-          }
-          onDraftAnswer={(value) =>
-            setDraftAnswers((current) => ({ ...current, [activeReview.id]: value }))
-          }
-          onSkip={() => handleSkipReview(activeReview)}
-          onReview={(result) => handleReview(activeReview, result)}
-          today={todayIsoDate()}
+      {reviews.length > 0 ? (
+        <ReviewFlashcardDeck
+          reviews={reviews}
+          renderCard={(review) => (
+            <ReviewFlashcard
+              review={review}
+              selectedChoices={selectedChoices[review.id] ?? []}
+              submittedChoice={Boolean(submittedChoices[review.id])}
+              answerRevealed={Boolean(revealedAnswers[review.id])}
+              draftAnswer={draftAnswers[review.id] ?? ""}
+              processing={processingReviewId === review.id}
+              processingLocked={Boolean(processingReviewId)}
+              onToggleChoice={toggleChoice}
+              onSubmitChoice={() => {
+                setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
+                setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
+              }}
+              onRevealAnswer={() =>
+                setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
+              }
+              onDraftAnswer={(value) =>
+                setDraftAnswers((current) => ({ ...current, [review.id]: value }))
+              }
+              onSkip={() => handleSkipReview(review)}
+              onReview={(result) => handleReview(review, result)}
+              today={todayIsoDate()}
+            />
+          )}
         />
+      ) : null}
+
+      {reviews.length > 0 ? (
+        <MobileSection>
+          <Link
+            href="/questions"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-blue-100 bg-white px-4 text-sm font-semibold text-blue-700 shadow-sm"
+          >
+            返回错题库
+          </Link>
+        </MobileSection>
       ) : null}
 
       <MobileSection>

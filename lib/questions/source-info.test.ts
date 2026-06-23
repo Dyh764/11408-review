@@ -11,6 +11,7 @@ test("normalizeQuestionSourceInfo returns a complete unmarked fallback", () => {
     type: "未标来源",
     name: "未标来源",
     section: "",
+    part: "",
     volume: "",
     paper: "",
     page: "",
@@ -24,9 +25,19 @@ test("normalizeQuestionSourceInfo converts string sources into structured source
 
   assert.equal(source.type, "模拟卷");
   assert.equal(source.name, "李林6套卷");
+  assert.equal(source.part, "");
   assert.equal(source.paper, "第2套");
   assert.equal(source.section, "高等数学");
   assert.equal(source.raw, "李林6套卷-第2套-高数");
+});
+
+test("normalizeQuestionSourceInfo keeps Li Lin 880 source parts for nested browsing", () => {
+  const source = normalizeQuestionSourceInfo("李林880题-综合题-高数");
+
+  assert.equal(source.type, "练习册");
+  assert.equal(source.name, "李林880题");
+  assert.equal(source.part, "综合题");
+  assert.equal(source.section, "高等数学");
 });
 
 test("getQuestionSourceInfo reads source_info and falls back without reusing ingestion source", () => {
@@ -44,14 +55,14 @@ test("buildQuestionSourceStats groups source info without inventing wrong-rate f
   const stats = buildQuestionSourceStats([
     {
       id: "q1",
-      source_info: { type: "练习册", name: "武忠祥严选题", section: "高等数学", raw: "武忠祥" },
+      source_info: { type: "练习册", name: "武忠祥严选题", section: "高等数学", part: "", raw: "武忠祥" },
       chapter: "三重积分",
       mistake_types: ["积分限设置错误"],
       created_at: "2026-06-18T08:00:00.000Z",
     },
     {
       id: "q2",
-      source_info: { type: "练习册", name: "武忠祥严选题", section: "高等数学", raw: "武忠祥" },
+      source_info: { type: "练习册", name: "武忠祥严选题", section: "高等数学", part: "", raw: "武忠祥" },
       chapter: "无穷级数",
       mistake_types: ["换元漏雅可比", "积分限设置错误"],
       created_at: "2026-06-17T08:00:00.000Z",
@@ -67,6 +78,7 @@ test("buildQuestionSourceStats groups source info without inventing wrong-rate f
 
   assert.equal(stats.length, 2);
   assert.equal(stats[0].name, "武忠祥严选题");
+  assert.deepEqual(stats[0].parts, ["未分部分"]);
   assert.equal(stats[0].total_questions, 2);
   assert.equal(stats[0].wrong_questions, 2);
   assert.deepEqual(stats[0].weak_chapters, ["三重积分", "无穷级数"]);

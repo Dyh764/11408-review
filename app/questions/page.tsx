@@ -26,7 +26,6 @@ import {
 } from "@/lib/questions/source-info";
 import {
   buildQuestionDirectory,
-  filterVisibleQuestionDirectory,
   type QuestionChapterGroup,
   type QuestionSubjectDirectory,
 } from "@/lib/taxonomy/question-taxonomy";
@@ -53,7 +52,6 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
 ];
 
 type QuickScope = "all" | "recent" | "weak" | "inbox" | "needs_fix" | "uncategorized";
-type DirectoryMode = "chapter" | "source";
 
 type FilterPanelProps = {
   quickScope: QuickScope;
@@ -89,6 +87,10 @@ function formatSourceDate(value: string | null) {
 function getQuestionSourceKey(question: QuestionWithImage) {
   const sourceInfo = getQuestionSourceInfo(question);
   return `${sourceInfo.type}::${sourceInfo.name}`;
+}
+
+function getQuestionSourcePart(question: QuestionWithImage) {
+  return getQuestionSourceInfo(question).part || "未分部分";
 }
 
 function getQuestionKind(choiceCount: number) {
@@ -158,8 +160,8 @@ export default function QuestionsPage() {
           : "all") as QuickScope)
       : "all",
   );
-  const [directoryMode, setDirectoryMode] = useState<DirectoryMode>("chapter");
   const [activeSourceKey, setActiveSourceKey] = useState("");
+  const [activeSourcePart, setActiveSourcePart] = useState("");
   const [dueTodayIds, setDueTodayIds] = useState<Set<string>>(new Set());
   const [activeSubject, setActiveSubject] = useState("");
   const [activeChapter, setActiveChapter] = useState("");
@@ -297,30 +299,38 @@ export default function QuestionsPage() {
     () => buildQuestionDirectory(filteredQuestions, dueTodayIds),
     [dueTodayIds, filteredQuestions],
   );
-  const sourceStats = useMemo(
-    () => buildQuestionSourceStats(filteredQuestions),
-    [filteredQuestions],
+  const visibleActiveDirectory = directory;
+  const selectedSubject = visibleActiveDirectory.find((group) => group.subject === activeSubject) ?? null;
+  const subjectQuestions = useMemo(
+    () => selectedSubject?.chapters.flatMap((chapter) => chapter.questions) ?? [],
+    [selectedSubject],
   );
+  const sourceStats = useMemo(
+    () => buildQuestionSourceStats(subjectQuestions),
+    [subjectQuestions],
+  );
+  const selectedSource = sourceStats.find((source) => source.key === activeSourceKey) ?? null;
   const sourceQuestions = useMemo(
     () =>
       activeSourceKey
-        ? filteredQuestions.filter((question) => getQuestionSourceKey(question) === activeSourceKey)
-        : filteredQuestions,
-    [activeSourceKey, filteredQuestions],
+        ? subjectQuestions.filter((question) => getQuestionSourceKey(question) === activeSourceKey)
+        : subjectQuestions,
+    [activeSourceKey, subjectQuestions],
+  );
+  const sourcePartQuestions = useMemo(
+    () =>
+      activeSourcePart
+        ? sourceQuestions.filter((question) => getQuestionSourcePart(question) === activeSourcePart)
+        : sourceQuestions,
+    [activeSourcePart, sourceQuestions],
   );
   const sourceDirectory = useMemo(
-    () => buildQuestionDirectory(sourceQuestions, dueTodayIds),
-    [dueTodayIds, sourceQuestions],
+    () => buildQuestionDirectory(sourcePartQuestions, dueTodayIds),
+    [dueTodayIds, sourcePartQuestions],
   );
-  const activeDirectory =
-    directoryMode === "source" && activeSourceKey ? sourceDirectory : directory;
-  const visibleActiveDirectory =
-    directoryMode === "source" && activeSourceKey
-      ? filterVisibleQuestionDirectory(activeDirectory, { hideEmptySubjects: true })
-      : activeDirectory;
-  const selectedSubject = visibleActiveDirectory.find((group) => group.subject === activeSubject) ?? null;
+  const selectedSourceSubject = sourceDirectory.find((group) => group.subject === activeSubject) ?? null;
   const selectedChapter =
-    selectedSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
+    selectedSourceSubject?.chapters.find((chapter) => chapter.chapter === activeChapter) ?? null;
   const filterPanelProps: FilterPanelProps = {
     quickScope,
     masteryStatus,
@@ -332,26 +342,44 @@ export default function QuestionsPage() {
     onQuickScopeChange: (scope) => {
       setQuickScope(scope);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
     onMasteryStatusChange: (status) => {
       setMasteryStatus(status);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
     onTextStatusChange: (status) => {
       setTextStatus(status);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
     onKeywordChange: (value) => {
       setKeyword(value);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
     onKnowledgeKeywordChange: (value) => {
       setKnowledgeKeyword(value);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
     onMistakeTypeChange: (value) => {
       setMistakeType(value);
       setSelectedIds([]);
+      setActiveSourceKey("");
+      setActiveSourcePart("");
+      setActiveChapter("");
     },
   };
 
@@ -641,36 +669,6 @@ export default function QuestionsPage() {
       ) : null}
 
       <MobileSection>
-        <StudyCard>
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-1">
-            {[
-              { key: "chapter", label: "按章节看" },
-              { key: "source", label: "按题源看" },
-            ].map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => {
-                  setDirectoryMode(item.key as DirectoryMode);
-                  setActiveSourceKey("");
-                  setActiveSubject("");
-                  setActiveChapter("");
-                  setSelectedIds([]);
-                }}
-                className={`min-h-10 rounded-md text-sm font-black ${
-                  directoryMode === item.key
-                    ? "bg-white text-blue-700 shadow-sm"
-                    : "text-slate-500"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </StudyCard>
-      </MobileSection>
-
-      <MobileSection>
         <div className="space-y-4">
         {!isLoading && filteredQuestions.length === 0 ? (
           <EmptyState
@@ -679,56 +677,72 @@ export default function QuestionsPage() {
             action={{ href: "/import", label: "导入错题卡" }}
           />
         ) : null}
-        {directoryMode === "source" && !activeSourceKey ? (
+        {!selectedSubject ? (
+          <SubjectDirectory
+            directory={visibleActiveDirectory}
+            onSelectSubject={(subject) => {
+              setActiveSubject(subject);
+              setActiveSourceKey("");
+              setActiveSourcePart("");
+              setActiveChapter("");
+            }}
+          />
+        ) : null}
+        {selectedSubject && !activeSourceKey ? (
           <SourceDirectory
+            subjectName={selectedSubject.subject}
             stats={sourceStats}
-            onSelectSource={(key) => {
-              setActiveSourceKey(key);
+            onBackSubject={() => {
               setActiveSubject("");
+              setActiveSourceKey("");
+              setActiveSourcePart("");
+              setActiveChapter("");
+              setSelectedIds([]);
+            }}
+            onSelectSource={(source) => {
+              setActiveSourceKey(source.key);
+              setActiveSourcePart(source.parts.length === 1 ? source.parts[0] : "");
               setActiveChapter("");
               setSelectedIds([]);
             }}
           />
         ) : null}
-        {!(directoryMode === "source" && !activeSourceKey) && !selectedSubject ? (
-          <SubjectDirectory
-            directory={visibleActiveDirectory}
-            sourceName={
-              directoryMode === "source"
-                ? sourceStats.find((source) => source.key === activeSourceKey)?.name
-                : undefined
-            }
-            onBackSource={
-              directoryMode === "source"
-                ? () => {
-                    setActiveSourceKey("");
-                    setActiveSubject("");
-                    setActiveChapter("");
-                    setSelectedIds([]);
-                  }
-                : undefined
-            }
-            onSelectSubject={(subject) => {
-              setActiveSubject(subject);
+        {selectedSubject && selectedSource && activeSourceKey && !activeSourcePart && selectedSource.parts.length > 1 ? (
+          <SourcePartDirectory
+            source={selectedSource}
+            onBackSource={() => {
+              setActiveSourceKey("");
+              setActiveSourcePart("");
               setActiveChapter("");
+              setSelectedIds([]);
+            }}
+            onSelectPart={(part) => {
+              setActiveSourcePart(part);
+              setActiveChapter("");
+              setSelectedIds([]);
             }}
           />
         ) : null}
-        {selectedSubject && !selectedChapter ? (
+        {selectedSourceSubject && activeSourceKey && (activeSourcePart || (selectedSource?.parts.length ?? 0) <= 1) && !selectedChapter ? (
           <ChapterDirectory
-            subject={selectedSubject}
+            subject={selectedSourceSubject}
             filterPanelProps={filterPanelProps}
             onBack={() => {
-              setActiveSubject("");
+              if (selectedSource && selectedSource.parts.length > 1) {
+                setActiveSourcePart("");
+              } else {
+                setActiveSourceKey("");
+                setActiveSourcePart("");
+              }
               setActiveChapter("");
               setSelectedIds([]);
             }}
             onSelectChapter={setActiveChapter}
           />
         ) : null}
-        {selectedSubject && selectedChapter ? (
+        {selectedSourceSubject && selectedChapter ? (
           <QuestionDirectory
-            subject={selectedSubject}
+            subject={selectedSourceSubject}
             chapter={selectedChapter}
             selectedIds={selectedIds}
             showBatchTools={showBatchTools}
@@ -851,33 +865,17 @@ function FilterPanel({
 
 function SubjectDirectory({
   directory,
-  sourceName,
-  onBackSource,
   onSelectSubject,
 }: {
   directory: QuestionSubjectDirectory<QuestionWithImage>[];
-  sourceName?: string;
-  onBackSource?: () => void;
   onSelectSubject: (subject: string) => void;
 }) {
   return (
     <section>
       <SectionHeader
-        title={sourceName ? `${sourceName} / 科目目录` : "科目目录"}
-        subtitle="默认先从科目入口进入，再看章节和题目。"
-        action={
-          onBackSource ? (
-            <button
-              type="button"
-              onClick={onBackSource}
-              className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
-            >
-              返回题源
-            </button>
-          ) : (
-            <StudyBadge tone="purple">{directory.length} 科目</StudyBadge>
-          )
-        }
+        title="科目目录"
+        subtitle="先选科目，再按题源、部分、章节和具体题目进入。"
+        action={<StudyBadge tone="purple">{directory.length} 科目</StudyBadge>}
       />
       <div className="grid gap-3">
         {directory.map((subject) => (
@@ -915,25 +913,37 @@ function SubjectDirectory({
 }
 
 function SourceDirectory({
+  subjectName,
   stats,
+  onBackSubject,
   onSelectSource,
 }: {
+  subjectName: string;
   stats: QuestionSourceStats[];
-  onSelectSource: (key: string) => void;
+  onBackSubject: () => void;
+  onSelectSource: (source: QuestionSourceStats) => void;
 }) {
   return (
     <section>
       <SectionHeader
-        title="题源信息"
-        subtitle="按题源进入后，再看科目、章节和具体错题。这里只显示错题数量和薄弱点。"
-        action={<StudyBadge tone="purple">{stats.length} 个题源</StudyBadge>}
+        title={`${subjectName} / 题源信息`}
+        subtitle="按题源进入后，再看基础题、综合题、拓展题等部分和章节。"
+        action={
+          <button
+            type="button"
+            onClick={onBackSubject}
+            className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
+          >
+            返回科目
+          </button>
+        }
       />
       <div className="grid gap-3">
         {stats.map((source) => (
           <button
             key={source.key}
             type="button"
-            onClick={() => onSelectSource(source.key)}
+            onClick={() => onSelectSource(source)}
             className="text-left"
           >
             <StudyCard>
@@ -950,6 +960,7 @@ function SourceDirectory({
               </div>
               <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600">
                 <p>总题数：{source.total_questions}</p>
+                <p>题源部分：{source.parts.length ? source.parts.join("、") : "未分部分"}</p>
                 <p>主要章节：{source.weak_chapters.length ? source.weak_chapters.join("、") : "待整理"}</p>
                 <p>
                   高频错因：
@@ -957,6 +968,57 @@ function SourceDirectory({
                     ? source.frequent_mistake_types.join("、")
                     : "待整理"}
                 </p>
+              </div>
+            </StudyCard>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SourcePartDirectory({
+  source,
+  onBackSource,
+  onSelectPart,
+}: {
+  source: QuestionSourceStats;
+  onBackSource: () => void;
+  onSelectPart: (part: string) => void;
+}) {
+  const orderedParts = ["基础题", "综合题", "拓展题"];
+  const visibleParts = [
+    ...orderedParts.filter((part) => source.parts.includes(part)),
+    ...source.parts.filter((part) => !orderedParts.includes(part)),
+  ];
+
+  return (
+    <section>
+      <SectionHeader
+        title={`${source.name} / 题源部分`}
+        subtitle="李林880题按基础题、综合题、拓展题继续拆分。"
+        action={
+          <button
+            type="button"
+            onClick={onBackSource}
+            className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
+          >
+            返回题源
+          </button>
+        }
+      />
+      <div className="grid gap-3">
+        {visibleParts.map((part) => (
+          <button
+            key={part}
+            type="button"
+            onClick={() => onSelectPart(part)}
+            className="text-left"
+          >
+            <StudyCard>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-lg font-black text-slate-950">{part}</p>
+                <StudyBadge tone="cyan">{source.name}</StudyBadge>
               </div>
             </StudyCard>
           </button>
@@ -992,7 +1054,7 @@ function ChapterDirectory({
             onClick={onBack}
             className="min-h-9 rounded-lg border border-blue-100 bg-white px-3 text-xs font-black text-blue-700"
           >
-            返回科目
+            返回上一级
           </button>
         }
       />
@@ -1104,7 +1166,6 @@ function QuestionDirectory({
           默认按困难优先排序，同难度内优先显示需要处理和高风险题。
         </p>
       </div>
-      {chapterWeakness ? <ChapterWeaknessPanel analysis={chapterWeakness} /> : null}
       {selectedIds.length > 0 ? (
         <StudyCard className="mb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1232,6 +1293,7 @@ function QuestionDirectory({
           );
         })}
       </div>
+      {chapterWeakness ? <ChapterWeaknessPanel analysis={chapterWeakness} /> : null}
     </section>
   );
 }

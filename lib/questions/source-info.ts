@@ -4,6 +4,7 @@ export const unmarkedSourceInfo: QuestionSourceInfo = {
   type: "未标来源",
   name: "未标来源",
   section: "",
+  part: "",
   volume: "",
   paper: "",
   page: "",
@@ -27,6 +28,7 @@ export type QuestionSourceStats = {
   type: string;
   name: string;
   section: string;
+  parts: string[];
   total_questions: number;
   wrong_questions: number;
   weak_chapters: string[];
@@ -67,6 +69,7 @@ function inferName(raw: string) {
   if (!raw) return "未标来源";
   const normalized = raw.replace(/\s+/g, "");
 
+  if (/李林.*880|李林八百八十/.test(normalized)) return "李林880题";
   if (/武忠祥/.test(normalized)) return "武忠祥严选题";
   if (/张宇.*1000/.test(normalized)) return "张宇1000题";
   if (/李林.*6|李林六/.test(normalized)) return "李林6套卷";
@@ -75,6 +78,15 @@ function inferName(raw: string) {
   if (/ChatGPT|AI/i.test(normalized)) return "ChatGPT 生成题";
 
   return raw.split(/[-_—\s]/).filter(Boolean)[0] || raw;
+}
+
+function inferPart(raw: string) {
+  const normalized = raw.replace(/\s+/g, "");
+
+  if (/基础题|基础篇|基础部分/.test(normalized)) return "基础题";
+  if (/综合题|综合篇|综合部分|综合体/.test(normalized)) return "综合题";
+  if (/拓展题|拓展篇|提高题|提高篇/.test(normalized)) return "拓展题";
+  return "";
 }
 
 function inferPaper(raw: string) {
@@ -88,6 +100,7 @@ export function normalizeQuestionSourceInfo(input: SourceInfoInput): QuestionSou
       type: inferType(raw),
       name: inferName(raw),
       section: inferSection(raw),
+      part: inferPart(raw),
       volume: "",
       paper: inferPaper(raw),
       page: "",
@@ -105,6 +118,7 @@ export function normalizeQuestionSourceInfo(input: SourceInfoInput): QuestionSou
     type: clean(input.type) || inferType(raw),
     name: clean(input.name) || inferName(raw),
     section: clean(input.section) || inferSection(raw),
+    part: clean(input.part) || inferPart(raw),
     volume: clean(input.volume),
     paper: clean(input.paper) || inferPaper(raw),
     page: clean(input.page),
@@ -160,6 +174,7 @@ export function buildQuestionSourceStats(
       type: firstSource.type,
       name: firstSource.name,
       section: firstSource.section,
+      parts: topValues(items.map((item) => getQuestionSourceInfo(item).part || "未分部分")),
       total_questions: items.length,
       wrong_questions: items.length,
       weak_chapters: topValues(items.map((item) => item.chapter ?? "待整理 / 未分类")),
