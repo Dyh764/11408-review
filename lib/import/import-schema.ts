@@ -118,8 +118,18 @@ const exam408SubjectSet = new Set<string>(exam408Subjects);
 const exam408ChapterCatalog: Record<(typeof exam408Subjects)[number], string[]> = {
   数据结构: ["绪论", "线性表", "栈和队列", "串", "树与二叉树", "图", "查找", "排序", "待整理 / 未分类"],
   计算机组成原理: ["计算机系统概述", "数据的表示和运算", "存储系统", "指令系统", "中央处理器", "总线", "输入输出系统", "待整理 / 未分类"],
-  操作系统: ["计算机系统概述", "进程与线程", "内存管理", "文件管理", "输入输出管理", "待整理 / 未分类"],
+  操作系统: ["操作系统概述", "进程与线程", "处理机调度", "同步与互斥", "死锁", "内存管理", "文件管理", "输入输出管理", "待整理 / 未分类"],
   计算机网络: ["计算机网络体系结构", "物理层", "数据链路层", "网络层", "传输层", "应用层", "待整理 / 未分类"],
+};
+
+const exam408ChapterAliases: Partial<Record<(typeof exam408Subjects)[number], Record<string, string>>> = {
+  操作系统: {
+    计算机系统概述: "操作系统概述",
+    "输入/输出管理": "输入输出管理",
+  },
+  计算机组成原理: {
+    "输入/输出系统": "输入输出系统",
+  },
 };
 const relatedPracticeDifficulties = ["简单", "中等", "困难"] as const;
 const answerLabels = ["A", "B", "C", "D"] as const;
@@ -217,7 +227,7 @@ export const exam408ImportPrompt = `请把今天的 408 专业课选择题错题
 chapter 只能使用以下大章，不要把小节写成单独大章：
 数据结构：绪论、线性表、栈、队列和数组、串、树与二叉树、图、查找、排序。
 计算机组成原理：计算机系统概述、数据的表示和运算、存储系统、指令系统、中央处理器、总线、输入/输出系统。
-操作系统：计算机系统概述、进程与线程、内存管理、文件管理、输入/输出管理。
+操作系统：操作系统概述、进程与线程、处理机调度、同步与互斥、死锁、内存管理、文件管理、输入输出管理。
 计算机网络：计算机网络体系结构、物理层、数据链路层、网络层、传输层、应用层。
 每题必须输出 subject、chapter、knowledge_point、question_text、choices、standard_answer、answer_explanation、user_note、mistake_types。
 subject 必须是四科之一，不要写成“408”。
@@ -516,7 +526,8 @@ function normalizeChapterForSubject(rawSubject: unknown, rawChapter: string) {
       return rawChapter || undefined;
     }
 
-    return chapters.includes(rawChapter) ? rawChapter : "待整理 / 未分类";
+    const normalizedChapter = exam408ChapterAliases[subject as (typeof exam408Subjects)[number]]?.[rawChapter] ?? rawChapter;
+    return chapters.includes(normalizedChapter) ? normalizedChapter : "待整理 / 未分类";
   }
 
   if (!rawChapter) {

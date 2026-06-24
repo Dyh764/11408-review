@@ -21,6 +21,7 @@ const baseQuestion: TaxonomyQuestion = {
   needs_manual_check: false,
   review_priority: "medium",
   question_text: null,
+  answer_explanation: null,
 };
 
 test("math subject is split into common exam subjects by chapter or knowledge point", () => {
@@ -339,7 +340,7 @@ test("408 chapters follow reference catalog aliases instead of raw import text",
       chapter: "2.2 CPU 调度",
       knowledge_point: "时间片轮转",
     }),
-    "进程与线程",
+    "处理机调度",
   );
   assert.equal(
     getDisplayChapter({
@@ -375,7 +376,17 @@ test("408 subject directories use the user-provided chapter order only", () => {
 
   assert.deepEqual(
     directory.find((subject) => subject.subject === "操作系统")?.chapters.map((chapter) => chapter.chapter),
-    ["计算机系统概述", "进程与线程", "内存管理", "文件管理", "输入/输出管理", "待整理 / 未分类"],
+    [
+      "操作系统概述",
+      "进程与线程",
+      "处理机调度",
+      "同步与互斥",
+      "死锁",
+      "内存管理",
+      "文件管理",
+      "输入输出管理",
+      "待整理 / 未分类",
+    ],
   );
   assert.deepEqual(
     directory.find((subject) => subject.subject === "计算机网络")?.chapters.map((chapter) => chapter.chapter),
@@ -389,4 +400,31 @@ test("408 subject directories use the user-provided chapter order only", () => {
     directory.find((subject) => subject.subject === "数据结构")?.chapters.map((chapter) => chapter.chapter),
     ["绪论", "线性表", "栈、队列和数组", "串", "树与二叉树", "图", "查找", "排序", "待整理 / 未分类"],
   );
+});
+
+test("operating system uncategorized questions are classified by detailed keywords", () => {
+  const cases: Array<[string, string]> = [
+    ["微内核和宏内核的区别体现操作系统结构设计。", "操作系统概述"],
+    ["系统调用通过陷入从用户态进入核心态。", "操作系统概述"],
+    ["中断、异常和访管指令属于操作系统接口机制。", "操作系统概述"],
+    ["操作系统特征包括并发、共享、虚拟和异步。", "操作系统概述"],
+    ["时间片轮转和多级反馈队列用于进程调度。", "处理机调度"],
+    ["PV操作、信号量和临界区用于同步与互斥。", "同步与互斥"],
+    ["银行家算法通过安全序列避免死锁。", "死锁"],
+    ["页表、TLB、虚拟内存和页面置换都属于内存管理。", "内存管理"],
+    ["文件系统、inode 和目录结构属于文件管理。", "文件管理"],
+    ["DMA、SPOOLing 和磁盘调度属于输入输出管理。", "输入输出管理"],
+  ];
+
+  for (const [text, chapter] of cases) {
+    assert.equal(
+      getDisplayChapter({
+        ...baseQuestion,
+        subject: "操作系统",
+        chapter: "待整理 / 未分类",
+        question_text: text,
+      }),
+      chapter,
+    );
+  }
 });

@@ -457,7 +457,7 @@ test("questions page removes the organize inbox card when reachable", async ({ p
   }
 
   await expect(page.getByText("整理收件箱")).toHaveCount(0);
-  await expect(page.getByText(/按章节看|还没有导入错题卡/).first()).toBeVisible();
+  await expect(page.getByText(/科目目录|还没有导入错题卡/).first()).toBeVisible();
 });
 
 test("import page keeps compact guidance above the paste flow on mobile", async ({ page }) => {

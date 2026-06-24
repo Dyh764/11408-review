@@ -157,6 +157,23 @@ test("/questions/[id] renders the question directly and keeps metadata collapsed
   assert.doesNotMatch(source, /<details[^>]*open/);
 });
 
+test("/questions/[id] answers choices inside the main question card without duplicating options", () => {
+  const source = read("app/questions/[id]/page.tsx");
+  const choiceListMatches = source.match(/choices=\{questionDisplay\.choices\}/g) ?? [];
+  const questionSection = source.slice(
+    source.indexOf('<MobileSection title="题目"'),
+    source.indexOf('<MobileSection title="答题卡点"'),
+  );
+
+  assert.equal(choiceListMatches.length, 1);
+  assert.match(questionSection, /mode=\{choicePracticeResult \? "reviewed" : "answering"\}/);
+  assert.match(questionSection, /onToggleChoice=\{\(label\) => handleToggleChoice/);
+  assert.match(questionSection, /onClick=\{handleSubmitChoicePractice\}/);
+  assert.match(source, /questionDisplay\.choices\.length === 0 \? \(/);
+  assert.match(source, /回答正确/);
+  assert.match(source, /回答错误，正确答案/);
+});
+
 test("/review records non-choice results only after answer reveal", () => {
   const source = read("components/study/ReviewFlashcard.tsx");
   const reviewPage = read("app/review/page.tsx");
@@ -800,6 +817,8 @@ test("import page confirms import from the top action panel and supports undoing
   assert.match(source, /body: JSON\.stringify\(\{ ids: lastImportSuccesses\.map/);
   assert.match(source, /查看最近导入/);
   assert.match(source, /撤销本次导入/);
+  assert.match(source, /导入成功/);
+  assert.match(source, /去错题库查看/);
   assert.doesNotMatch(bottomPreview, /确认导入/);
   assert.doesNotMatch(bottomPreview, /导入到待整理/);
 });

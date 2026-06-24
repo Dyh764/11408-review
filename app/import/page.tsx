@@ -216,6 +216,8 @@ function ImportActionPanel({
   repairNotices,
   canImport,
   isImporting,
+  successCount,
+  failureCount,
   onImport,
   onInboxImport,
 }: {
@@ -226,9 +228,13 @@ function ImportActionPanel({
   repairNotices: string[];
   canImport: boolean;
   isImporting: boolean;
+  successCount?: number;
+  failureCount?: number;
   onImport: () => void;
   onInboxImport: () => void;
 }) {
+  const hasImportSuccess = typeof successCount === "number" && successCount > 0;
+
   return (
     <MobileSection title="顶部确认">
       <SectionCard subtitle="解析后可直接在这里确认导入，不用翻到预览列表底部。">
@@ -269,6 +275,17 @@ function ImportActionPanel({
             导入到待整理
           </button>
         </div>
+        {hasImportSuccess ? (
+          <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100">
+            <p className="font-black">导入成功：已写入 {successCount} 道错题。</p>
+            {failureCount && failureCount > 0 ? (
+              <p className="mt-1 text-amber-800">另有 {failureCount} 条未导入，请查看下方失败明细。</p>
+            ) : null}
+            <Link href="/questions" className="mt-2 inline-flex font-black text-emerald-800 underline underline-offset-4">
+              去错题库查看
+            </Link>
+          </div>
+        ) : null}
       </SectionCard>
     </MobileSection>
   );
@@ -636,6 +653,8 @@ export default function ImportPage() {
           repairNotices={visibleRepairNotices}
           canImport={canImport}
           isImporting={isImporting}
+          successCount={apiResult?.successCount}
+          failureCount={apiResult?.failureCount}
           onImport={() => handleImport("normal")}
           onInboxImport={() => handleImport("inbox")}
         />

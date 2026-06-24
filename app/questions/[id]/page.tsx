@@ -876,17 +876,7 @@ export default function QuestionDetailPage() {
               />
 
               {questionDisplay.choices.length > 0 ? (
-                <div className="mt-4">
-                  <ChoiceList choices={questionDisplay.choices} />
-                </div>
-              ) : null}
-            </MobileCard>
-          </MobileSection>
-
-          <MobileSection title="先做题">
-            <SectionCard>
-              {questionDisplay.choices.length > 0 ? (
-                <div className="space-y-3">
+                <div className="mt-4 space-y-3">
                   <ChoiceList
                     choices={questionDisplay.choices}
                     mode={choicePracticeResult ? "reviewed" : "answering"}
@@ -910,8 +900,8 @@ export default function QuestionDetailPage() {
                       }`}
                     >
                       {choicePracticeResult.correct
-                        ? "答对了，已记录为掌握。"
-                        : "答错了，已记录为需要继续复盘。"}
+                        ? "回答正确"
+                        : `回答错误，正确答案：${choicePracticeResult.correctLabels.join("、")}`}
                     </p>
                   ) : null}
                   <button
@@ -923,18 +913,22 @@ export default function QuestionDetailPage() {
                     {isSubmittingPractice ? "提交中..." : "提交答案"}
                   </button>
                 </div>
-              ) : (
-                <>
-                  <p className="text-sm font-semibold leading-6 text-slate-900">
-                    先自己做一遍，做完后再看答案。
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
-                    这一步只保留题目和必要信息，避免答案提前干扰回忆。
-                  </p>
-                </>
-              )}
-            </SectionCard>
+              ) : null}
+            </MobileCard>
           </MobileSection>
+
+          {questionDisplay.choices.length === 0 ? (
+            <MobileSection title="先做题">
+              <SectionCard>
+                <p className="text-sm font-semibold leading-6 text-slate-900">
+                  先自己做一遍，做完后再看答案。
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  这一步只保留题目和必要信息，避免答案提前干扰回忆。
+                </p>
+              </SectionCard>
+            </MobileSection>
+          ) : null}
 
           <MobileSection title="答题卡点" subtitle="做题时直接标记这题卡在哪里，保存后回到题卡统计。">
             <SectionCard>
