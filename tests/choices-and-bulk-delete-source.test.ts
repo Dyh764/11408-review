@@ -36,6 +36,18 @@ test("import schema accepts choices and persists them during import", () => {
   assert.match(route, /choices: card\.choices/);
 });
 
+test("import route batches question inserts, review plans, and knowledge stat refreshes", () => {
+  const route = read("app/api/import/route.ts");
+  const knowledgeStats = read("lib/knowledge-stats.ts");
+
+  assert.match(route, /pendingInserts/);
+  assert.match(route, /\.from\("questions"\)\s*\n\s*\.insert\(pendingInserts\.map/);
+  assert.match(route, /reviewPlans\.flatMap/);
+  assert.match(route, /\.from\("reviews"\)\s*\n\s*\.upsert\(reviewRows/);
+  assert.match(route, /updateKnowledgeStatsForQuestionIds/);
+  assert.match(knowledgeStats, /export async function updateKnowledgeStatsForQuestionIds/);
+});
+
 test("related practice questions use a minimal jsonb migration and flow through import and question queries", () => {
   const migrationPath = "supabase/migrations/008_add_related_practice_questions.sql";
 

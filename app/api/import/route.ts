@@ -10,7 +10,7 @@ import {
   parseImportWithDiagnostics,
   type ImportQuestionCard,
 } from "@/lib/import/import-schema";
-import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
+import { updateKnowledgeStatsForQuestionIds } from "@/lib/knowledge-stats";
 import { buildInitialReviewPlan } from "@/lib/review-scheduler";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,6 +25,12 @@ type ImportSuccess = {
   reviewCount: number;
   warning?: string;
   inbox?: boolean;
+};
+
+type PendingImport = {
+  index: number;
+  card: ImportQuestionCard;
+  inbox: boolean;
 };
 
 function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
@@ -97,6 +103,7 @@ export async function POST(request: Request) {
     message: error.message,
   }));
   const successes: ImportSuccess[] = [];
+  const pendingInserts: PendingImport[] = [];
 
   for (const parsedCard of parsed.cards) {
     const rowQuality = qualityByIndex.get(parsedCard.index);
@@ -123,56 +130,95 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("questions")
-      .insert(buildQuestionInsert(card, user.id))
-      .select("id")
-      .single();
-
-    if (insertError || !inserted) {
-      failures.push({
-        index: originalIndex,
-        message: insertError?.message ?? "错题写入失败。",
-      });
-      continue;
-    }
-
-    const questionId = String(inserted.id);
-    const reviewPlan = buildInitialReviewPlan({
-      userId: user.id,
-      questionId,
-      masteryStatus: card.mastery_status,
+    pendingInserts.push({
+      index: originalIndex,
+      card,
+      inbox: shouldUseInbox,
     });
-    let warning = "";
+  }
 
-    if (reviewPlan.length > 0) {
-      const { error: reviewError } = await supabase
-        .from("reviews")
-        .upsert(reviewPlan, { onConflict: "question_id,scheduled_date" });
+  if (pendingInserts.length > 0) {
+    const { data: insertedRows, error: insertError } = await supabase
+      .from("questions")
+      .insert(pendingInserts.map((pending) => buildQuestionInsert(pending.card, user.id)))
+      .select("id");
 
-      if (reviewError) {
-        warning = `错题已保存，但复习计划生成失败：${reviewError.message}`;
+    if (insertError || !insertedRows) {
+      for (const pending of pendingInserts) {
+        failures.push({
+          index: pending.index,
+          message: insertError?.message ?? "错题写入失败。",
+        });
       }
-    }
+    } else {
+      const insertedQuestions = insertedRows as Array<{ id: string }>;
+      const importedQuestions = pendingInserts
+        .map((pending, position) => {
+          const row = insertedQuestions[position];
 
-    if (!warning) {
+          if (!row?.id) {
+            failures.push({
+              index: pending.index,
+              message: "错题已提交，但服务端没有返回题目 ID，请刷新错题库确认。",
+            });
+            return null;
+          }
+
+          return {
+            pending,
+            questionId: String(row.id),
+          };
+        })
+        .filter((item): item is { pending: PendingImport; questionId: string } => Boolean(item));
+
+      const reviewPlans = importedQuestions.map(({ pending, questionId }) => ({
+        index: pending.index,
+        inbox: pending.inbox,
+        questionId,
+        rows: buildInitialReviewPlan({
+          userId: user.id,
+          questionId,
+          masteryStatus: pending.card.mastery_status,
+        }),
+      }));
+      const reviewRows = reviewPlans.flatMap((plan) => plan.rows);
+      let reviewWarning = "";
+      let statsWarning = "";
+
+      if (reviewRows.length > 0) {
+        const { error: reviewError } = await supabase
+          .from("reviews")
+          .upsert(reviewRows, { onConflict: "question_id,scheduled_date" });
+
+        if (reviewError) {
+          reviewWarning = `错题已保存，但复习计划生成失败：${reviewError.message}`;
+        }
+      }
+
       try {
-        await updateKnowledgeStatsForQuestionId(supabase, questionId);
+        await updateKnowledgeStatsForQuestionIds(
+          supabase,
+          importedQuestions.map((item) => item.questionId),
+        );
       } catch (error) {
-        warning =
+        statsWarning =
           error instanceof Error
             ? `错题已保存，但薄弱点统计更新失败：${error.message}`
             : "错题已保存，但薄弱点统计更新失败。";
       }
-    }
 
-    successes.push({
-      index: originalIndex,
-      questionId,
-      reviewCount: warning ? 0 : reviewPlan.length,
-      warning: warning || undefined,
-      inbox: shouldUseInbox,
-    });
+      for (const plan of reviewPlans) {
+        const warning = reviewWarning || statsWarning || undefined;
+
+        successes.push({
+          index: plan.index,
+          questionId: plan.questionId,
+          reviewCount: reviewWarning ? 0 : plan.rows.length,
+          warning,
+          inbox: plan.inbox,
+        });
+      }
+    }
   }
 
   return NextResponse.json({

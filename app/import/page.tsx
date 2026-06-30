@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import Link from "next/link";
 import { MobileCard, MobilePageShell, MobileSection, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
@@ -218,6 +218,7 @@ function ImportActionPanel({
   isImporting,
   successCount,
   failureCount,
+  resultRef,
   onImport,
   onInboxImport,
 }: {
@@ -230,6 +231,7 @@ function ImportActionPanel({
   isImporting: boolean;
   successCount?: number;
   failureCount?: number;
+  resultRef: RefObject<HTMLDivElement | null>;
   onImport: () => void;
   onInboxImport: () => void;
 }) {
@@ -276,7 +278,10 @@ function ImportActionPanel({
           </button>
         </div>
         {hasImportSuccess ? (
-          <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100">
+          <div
+            ref={resultRef}
+            className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100"
+          >
             <p className="font-black">导入成功：已写入 {successCount} 道错题。</p>
             {failureCount && failureCount > 0 ? (
               <p className="mt-1 text-amber-800">另有 {failureCount} 条未导入，请查看下方失败明细。</p>
@@ -293,6 +298,7 @@ function ImportActionPanel({
 
 export default function ImportPage() {
   const initialLastImportSuccesses = useMemo(() => readCachedLastImportSuccesses(), []);
+  const importResultRef = useRef<HTMLDivElement | null>(null);
   const [jsonText, setJsonText] = useState("");
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
   const [importDiagnostics, setImportDiagnostics] = useState<ImportDiagnostic[]>([]);
@@ -338,6 +344,12 @@ export default function ImportPage() {
   const canImport = previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
   const visibleRepairNotices =
     parseRepairNotices.length > 0 ? parseRepairNotices : (parsed.repairNotices ?? []);
+
+  useEffect(() => {
+    if (apiResult && typeof apiResult.successCount === "number") {
+      importResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [apiResult]);
 
   function persistLastImportSuccesses(successes: ImportSuccess[]) {
     setLastImportSuccesses(successes);
@@ -655,6 +667,7 @@ export default function ImportPage() {
           isImporting={isImporting}
           successCount={apiResult?.successCount}
           failureCount={apiResult?.failureCount}
+          resultRef={importResultRef}
           onImport={() => handleImport("normal")}
           onInboxImport={() => handleImport("inbox")}
         />

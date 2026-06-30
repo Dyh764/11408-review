@@ -142,3 +142,48 @@ export async function updateKnowledgeStatsForQuestionId(
     throw upsertError;
   }
 }
+
+export async function updateKnowledgeStatsForQuestionIds(
+  supabase: SupabaseClient,
+  questionIds: string[],
+) {
+  const uniqueQuestionIds = Array.from(new Set(questionIds.filter(Boolean)));
+
+  if (uniqueQuestionIds.length === 0) {
+    return;
+  }
+
+  const { data: questions, error } = await supabase
+    .from("questions")
+    .select("id, user_id, subject, chapter, knowledge_point, mastery_status, deleted_at")
+    .in("id", uniqueQuestionIds);
+
+  if (error) {
+    throw error;
+  }
+
+  const representativeIds = new Map<string, string>();
+
+  for (const question of (questions ?? []) as QuestionStatSource[]) {
+    if (question.deleted_at) {
+      continue;
+    }
+
+    const key = [
+      question.user_id,
+      question.subject,
+      question.chapter ?? "",
+      normalizePoint(question.knowledge_point),
+    ].join("\u0000");
+
+    if (!representativeIds.has(key)) {
+      representativeIds.set(key, question.id);
+    }
+  }
+
+  await Promise.all(
+    Array.from(representativeIds.values()).map((questionId) =>
+      updateKnowledgeStatsForQuestionId(supabase, questionId),
+    ),
+  );
+}

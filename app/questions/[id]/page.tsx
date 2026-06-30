@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
@@ -11,29 +11,15 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
-import {
-  getAnswerStatusLabel,
-  getAnswerStatusTone,
-} from "@/lib/questions/answer-labels";
+import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import { parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
-import {
-  getQuestionSourceLabel,
-  getQuestionTextStatusLabel,
-  getQuestionTextStatusTone,
-} from "@/lib/questions/meta-labels";
+import { getQuestionTextStatusLabel } from "@/lib/questions/meta-labels";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
 import {
   buildQuestionUpdatePayload,
   type QuestionEditForm,
 } from "@/lib/questions/edit-question";
-import {
-  buildAiEnhancementSummary,
-  type AiEnhancementSummary,
-  type AiEnhancementSnapshot,
-} from "@/lib/questions/ai-enhancement-summary";
 import { createClient } from "@/lib/supabase/client";
-import { buildShareCardImageModel } from "@/lib/share/question-card";
-import { generateShareCardImage } from "@/lib/share/share-card-image";
 import type {
   AnswerStatus,
   Difficulty,
@@ -55,51 +41,12 @@ const masteryStatuses: MasteryStatus[] = [
 ];
 const textStatuses: QuestionTextStatus[] = ["ai_unverified", "verified", "needs_fix"];
 const answerStatuses: AnswerStatus[] = ["ai_unverified", "verified", "needs_fix"];
-const stuckPointOptions = [
-  "概念混淆",
-  "知识点边界不清",
-  "计算错误",
-  "审题错误",
-  "选项陷阱",
-  "步骤不熟",
-];
-
-type StatusResponse = {
-  ai?: {
-    provider: "gemini" | "deepseek" | "none";
-    configured: boolean;
-    label: string;
-    model: string;
-  };
-  deepseek?: {
-    configured: boolean;
-    label: string;
-    model: string;
-  };
-};
 
 type ChoicePracticeResult = {
   correct: boolean;
   correctLabels: string[];
   reviewResult: "mastered" | "wrong_again";
 };
-
-function DetailField({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null;
-}) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold text-slate-500">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-semibold text-slate-900">
-        {value?.trim() || "待补充"}
-      </dd>
-    </div>
-  );
-}
 
 function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
   return {
@@ -197,19 +144,14 @@ function RelatedPracticeSection({
 export default function QuestionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const shareCardRef = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState<QuestionWithImage | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看真实错题详情。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isDeepSeekEnhancing, setIsDeepSeekEnhancing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSavingStuckPoints, setIsSavingStuckPoints] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -217,23 +159,7 @@ export default function QuestionDetailPage() {
   const [selectedAnswerLabels, setSelectedAnswerLabels] = useState<string[]>([]);
   const [choicePracticeResult, setChoicePracticeResult] = useState<ChoicePracticeResult | null>(null);
   const [isSubmittingPractice, setIsSubmittingPractice] = useState(false);
-  const [deepSeekStatus, setDeepSeekStatus] = useState<StatusResponse["deepseek"] | null>(null);
-  const [aiStatus, setAiStatus] = useState<StatusResponse["ai"] | null>(null);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
-  const [aiEnhancementSummary, setAiEnhancementSummary] = useState<AiEnhancementSummary | null>(null);
-
-  useEffect(() => {
-    fetch("/api/settings/status")
-      .then((response) => response.json())
-      .then((data: StatusResponse) => {
-        setDeepSeekStatus(data.deepseek ?? null);
-        setAiStatus(data.ai ?? null);
-      })
-      .catch(() => {
-        setDeepSeekStatus(null);
-        setAiStatus(null);
-      });
-  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -280,175 +206,6 @@ export default function QuestionDetailPage() {
     setQuestion(item);
     setForm(formFromQuestion(item));
     return item;
-  }
-
-  async function handleAnalyze() {
-    let allowOverwriteQuestionText = false;
-    if (question?.question_text_status === "verified") {
-      const shouldContinue = window.confirm(
-        "这道题已经人工核对，重新分析可能覆盖部分 AI 字段，是否继续？",
-      );
-      if (!shouldContinue) {
-        return;
-      }
-      allowOverwriteQuestionText = window.confirm("是否允许覆盖题目文字？默认取消会保留人工核对题干。");
-    }
-
-    setIsAnalyzing(true);
-    setMessage("");
-
-    try {
-      const response = await fetch(`/api/questions/${params.id}/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ allowOverwriteQuestionText }),
-      });
-      const result: unknown = await response.json();
-
-      if (!response.ok) {
-        const errorMessage =
-          typeof result === "object" &&
-          result !== null &&
-          "error" in result &&
-          typeof result.error === "string"
-            ? result.error
-            : "分析失败。";
-        setMessage(errorMessage);
-        return;
-      }
-
-      const source =
-        typeof result === "object" &&
-        result !== null &&
-        "source" in result &&
-        typeof result.source === "string"
-          ? result.source
-          : "unknown";
-      const resultMessage =
-        typeof result === "object" &&
-        result !== null &&
-        "message" in result &&
-        typeof result.message === "string"
-          ? result.message
-          : "分析完成。";
-
-      await refreshQuestion();
-      setMessage(`分析来源：${source}。${resultMessage}`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "分析失败。");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
-  async function handleDeepSeekEnhance() {
-    if (!question) {
-      setMessage("请先读取错题详情。");
-      return;
-    }
-
-    if (!aiStatus?.configured) {
-      setMessage(aiStatus?.label ?? "AI 学习分析未启用（可选）。");
-      return;
-    }
-
-    const shouldContinue = window.confirm(
-      "AI 只会优化知识点、错因、思路和一句话提醒，不会覆盖题目文字和用户备注。是否继续？",
-    );
-
-    if (!shouldContinue) {
-      return;
-    }
-
-    setIsDeepSeekEnhancing(true);
-    setMessage("");
-    setAiEnhancementSummary(null);
-    const beforeSnapshot: AiEnhancementSnapshot = {
-      chapter: question.chapter,
-      knowledge_point: question.knowledge_point,
-      mistake_types: question.mistake_types,
-      solution_summary: question.solution_summary,
-      one_sentence_tip: question.one_sentence_tip,
-      review_priority: question.review_priority,
-      confidence: question.confidence,
-      needs_manual_check: question.needs_manual_check,
-    };
-
-    try {
-      const response = await fetch(`/api/questions/${params.id}/deepseek-enhance`, {
-        method: "POST",
-      });
-      const result: unknown = await response.json();
-
-      if (!response.ok) {
-        const errorMessage =
-          typeof result === "object" &&
-          result !== null &&
-          "error" in result &&
-          typeof result.error === "string"
-            ? result.error
-            : "AI 优化失败。";
-        setMessage(errorMessage);
-        return;
-      }
-
-      const updatedQuestion = await refreshQuestion();
-      if (updatedQuestion) {
-        setAiEnhancementSummary(buildAiEnhancementSummary(beforeSnapshot, updatedQuestion));
-      }
-      setMessage("AI 优化完成，题目文字和用户备注已保留。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "AI 优化失败。");
-    } finally {
-      setIsDeepSeekEnhancing(false);
-    }
-  }
-
-  async function handleQuestionStatusUpdate(payload: {
-    question_text_status?: QuestionTextStatus;
-    answer_status?: AnswerStatus;
-  }) {
-    if (!question) {
-      return;
-    }
-
-    setMessage("");
-
-    try {
-      const response = await fetch(`/api/questions/${question.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json().catch(() => ({}))) as { error?: string };
-
-      if (!response.ok) {
-        setMessage(result.error ?? "更新核对状态失败。");
-        return;
-      }
-
-      await refreshQuestion();
-      setMessage("核对状态已更新。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "更新核对状态失败。");
-    }
-  }
-
-  function handleMarkQuestionVerified() {
-    handleQuestionStatusUpdate({ question_text_status: "verified" });
-  }
-
-  function handleMarkAnswerVerified() {
-    handleQuestionStatusUpdate({ answer_status: "verified" });
-  }
-
-  function handleMarkNeedsFix() {
-    handleQuestionStatusUpdate({
-      question_text_status: "needs_fix",
-      answer_status: "needs_fix",
-    });
   }
 
   function handleToggleChoice(label: string, isMultiple: boolean) {
@@ -589,73 +346,6 @@ export default function QuestionDetailPage() {
     }
   }
 
-  async function handleCopyShareJson() {
-    if (!question) {
-      return;
-    }
-
-    setIsSharing(true);
-    setMessage("");
-
-    try {
-      const response = await fetch(`/api/questions/${question.id}/share-card`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        setMessage(typeof result.error === "string" ? result.error : "生成分享 JSON 失败。");
-        return;
-      }
-
-      await navigator.clipboard.writeText(JSON.stringify(result.card, null, 2));
-      setMessage("错题分享 JSON 已复制。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "生成分享 JSON 失败。");
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
-  async function handleDownloadShareImage() {
-    if (!question || !shareCardRef.current) {
-      setMessage("分享卡片还没有准备好。");
-      return;
-    }
-
-    setIsSharing(true);
-    setMessage("");
-
-    try {
-      const dataUrl = await generateShareCardImage(shareCardRef.current);
-      const imageBlob = await fetch(dataUrl).then((response) => response.blob());
-      const imageFile = new File([imageBlob], `question-card-${question.id}.png`, {
-        type: "image/png",
-      });
-
-      if (
-        typeof navigator.share === "function" &&
-        (!navigator.canShare || navigator.canShare({ files: [imageFile] }))
-      ) {
-        await navigator.share({
-          title: "错题卡片",
-          text: "保存这张错题卡图片。",
-          files: [imageFile],
-        });
-        setMessage("已打开系统分享面板，可选择保存到相册。");
-        return;
-      }
-
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = `question-card-${question.id}.png`;
-      link.click();
-      setMessage("错题分享图片已生成；当前浏览器不支持分享面板，已改用下载。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "生成分享图片失败。");
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
   async function handleDeleteQuestion() {
     if (!question) {
       return;
@@ -701,98 +391,16 @@ export default function QuestionDetailPage() {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
 
-  function toggleStuckPoint(point: string) {
-    setForm((current) => {
-      if (!current) return current;
-      const items = current.mistake_types
-        .split(/[,，;；\n]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-      const nextItems = items.includes(point)
-        ? items.filter((item) => item !== point)
-        : [...items, point];
-
-      return { ...current, mistake_types: nextItems.join("，") };
-    });
-  }
-
-  async function handleSaveStuckPoints() {
-    if (!supabase || !question || !form) {
-      setMessage("请先读取错题详情，再保存卡点。");
-      return;
-    }
-
-    setIsSavingStuckPoints(true);
-    setMessage("");
-
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        setMessage("请先登录，再保存卡点。");
-        return;
-      }
-
-      const mistakeTypes = form.mistake_types
-        .split(/[,，;；\n]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
-      const { error } = await supabase
-        .from("questions")
-        .update({
-          user_note: form.user_note.trim() || null,
-          mistake_types: Array.from(new Set(mistakeTypes)),
-        })
-        .eq("id", question.id)
-        .eq("user_id", user.id)
-        .is("deleted_at", null);
-
-      if (error) {
-        setMessage(`保存卡点失败：${error.message}`);
-        return;
-      }
-
-      await refreshQuestion();
-      setMessage("答题卡点已保存。");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "保存卡点失败。");
-    } finally {
-      setIsSavingStuckPoints(false);
-    }
-  }
-
   const questionDisplay = question
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
   const parsedChoiceAnswer = question ? parseAnswerChoiceLabels(question.standard_answer) : { labels: [], isMultiple: false };
   const canSubmitChoiceAnswer =
     questionDisplay.choices.length > 0 && parsedChoiceAnswer.labels.length > 0 && selectedAnswerLabels.length > 0;
-  const selectedStuckPoints = form
-    ? form.mistake_types
-        .split(/[,，;；\n]/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : [];
   const relatedPracticeQuestions =
     question && question.subject !== "数学" && isExam408Subject(question.subject)
       ? question.related_practice_questions ?? []
       : [];
-  const shareCardModel = question
-    ? buildShareCardImageModel({
-        subject: question.subject,
-        chapter: question.chapter,
-        knowledge_point: question.knowledge_point,
-        difficulty: question.difficulty,
-        question_text: questionDisplay.questionText || question.question_text,
-        mistake_types: question.mistake_types,
-        one_sentence_tip: question.one_sentence_tip,
-        standard_answer: question.standard_answer,
-        answer_explanation: question.answer_explanation,
-      })
-    : null;
 
   return (
     <MobilePageShell>
@@ -930,49 +538,6 @@ export default function QuestionDetailPage() {
             </MobileSection>
           ) : null}
 
-          <MobileSection title="答题卡点" subtitle="做题时直接标记这题卡在哪里，保存后回到题卡统计。">
-            <SectionCard>
-              <div className="flex flex-wrap gap-2">
-                {stuckPointOptions.map((point) => {
-                  const selected = selectedStuckPoints.includes(point);
-
-                  return (
-                    <button
-                      key={point}
-                      type="button"
-                      onClick={() => toggleStuckPoint(point)}
-                      className={`min-h-9 rounded-lg px-3 text-xs font-black ring-1 ${
-                        selected
-                          ? "bg-blue-600 text-white ring-blue-600"
-                          : "bg-white text-slate-700 ring-slate-200"
-                      }`}
-                    >
-                      {point}
-                    </button>
-                  );
-                })}
-              </div>
-              <label className="mt-3 block">
-                <span className="text-sm font-semibold text-slate-800">补充说明</span>
-                <textarea
-                  value={form?.user_note ?? ""}
-                  onChange={(event) => updateForm("user_note", event.target.value)}
-                  rows={3}
-                  className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
-                  placeholder="例如：我选了 C，正确答案是 B；主要卡在资源共享边界。"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleSaveStuckPoints}
-                disabled={isSavingStuckPoints || !form}
-                className="mt-3 min-h-11 w-full rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-300"
-              >
-                {isSavingStuckPoints ? "保存中..." : "保存卡点"}
-              </button>
-            </SectionCard>
-          </MobileSection>
-
           <MobileSection title="查看答案" subtitle="默认折叠，做完后再展开标准答案、解析和关键步骤。">
             <SectionCard>
               <button
@@ -997,212 +562,8 @@ export default function QuestionDetailPage() {
             </SectionCard>
           </MobileSection>
 
-          <MobileSection title="正确思路">
-            <MobileCard>
-              <dl className="space-y-4 text-sm">
-                <div>
-                  <dt className="font-semibold text-slate-800">思路摘要</dt>
-                  <dd className="mt-1 text-slate-600">
-                    <MathText text={question.solution_summary} fallback="待补充" />
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-slate-800">错因</dt>
-                  <dd className="mt-1 break-words text-slate-600">
-                    {question.mistake_types?.filter(Boolean).join("、") || "待补充"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-semibold text-slate-800">一句话提醒</dt>
-                  <dd className="mt-1 text-slate-600">
-                    <MathText text={question.one_sentence_tip} fallback="待补充" />
-                  </dd>
-                </div>
-              </dl>
-            </MobileCard>
-          </MobileSection>
-
           {/* 查看答案与解析 */}
           <RelatedPracticeSection questions={relatedPracticeQuestions} />
-
-          <MobileSection title="智能增强">
-            <MobileCard>
-              <p className="text-sm leading-6 text-slate-600">
-                当前使用 {aiStatus?.provider === "gemini" ? "Gemini" : aiStatus?.provider === "deepseek" ? "DeepSeek" : "未启用"}。AI 只优化知识点、错因、思路和一句话提醒，不会覆盖题目文字和用户备注。
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className="min-h-10 rounded-lg bg-white px-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 disabled:text-slate-400"
-                >
-                  {isAnalyzing ? "分析中..." : question.analyzed_at ? "重新分析" : "AI 自动分析"}
-                </button>
-                {aiStatus?.configured ? (
-                  <button
-                    type="button"
-                    onClick={handleDeepSeekEnhance}
-                    disabled={isDeepSeekEnhancing}
-                    className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700 ring-1 ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
-                  >
-                    {isDeepSeekEnhancing ? "优化中..." : "AI 优化题卡"}
-                  </button>
-                ) : (
-                  <p className="text-xs leading-5 text-slate-500">
-                    {aiStatus?.label ?? deepSeekStatus?.label ?? "AI 学习分析未启用（可选）"}，不影响当前复习。
-                  </p>
-                )}
-              </div>
-              {aiEnhancementSummary ? (
-                <div className="mt-4 rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-900 ring-1 ring-blue-100">
-                  <p className="font-semibold">{aiEnhancementSummary.title}</p>
-                  {aiEnhancementSummary.items.length > 0 ? (
-                    <ul className="mt-2 grid gap-1">
-                      {aiEnhancementSummary.items.map((item) => (
-                        <li key={item}>- {item}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              ) : null}
-            </MobileCard>
-          </MobileSection>
-
-          <MobileSection title="更多信息">
-            <details className="rounded-lg border border-slate-100 bg-white p-4 text-sm shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-              <summary className="cursor-pointer list-none font-semibold text-slate-800">
-                查看掌握状态、核对状态和来源
-              </summary>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-                <DetailField label="掌握状态" value={question.mastery_status} />
-                <DetailField
-                  label="题目状态"
-                  value={getQuestionTextStatusLabel(question.question_text_status)}
-                />
-                <DetailField
-                  label="答案状态"
-                  value={question.standard_answer ? "已录入答案" : "还没有答案"}
-                />
-                <DetailField label="来源" value={getQuestionSourceLabel(question.source)} />
-              </dl>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <StatusPill
-                  label={getAnswerStatusLabel(question.answer_status)}
-                  tone={getAnswerStatusTone(question.answer_status)}
-                />
-                <StatusPill
-                  label={getQuestionTextStatusLabel(question.question_text_status)}
-                  tone={getQuestionTextStatusTone(question.question_text_status)}
-                />
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={handleMarkQuestionVerified}
-                  disabled={question.question_text_status === "verified"}
-                  className="min-h-11 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 disabled:text-slate-400"
-                >
-                  标记题目已核对
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMarkAnswerVerified}
-                  disabled={question.answer_status === "verified"}
-                  className="min-h-11 rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-700 disabled:text-slate-400"
-                >
-                  标记答案已核对
-                </button>
-                <button
-                  type="button"
-                  onClick={handleMarkNeedsFix}
-                  className="min-h-11 rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-100"
-                >
-                  标记需要修正
-                </button>
-              </div>
-            </details>
-          </MobileSection>
-
-          <MobileSection title="错题分享">
-            <MobileCard>
-              <p className="text-sm leading-6 text-slate-600">
-                导出单题 JSON，或生成 1080x1350 的浅色错题卡片图。苹果设备会优先打开分享面板，方便保存到相册。
-              </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={handleCopyShareJson}
-                  disabled={isSharing}
-                  className="min-h-12 rounded-lg bg-blue-50 px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
-                >
-                  复制分享 JSON
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadShareImage}
-                  disabled={isSharing}
-                  className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-300"
-                >
-                  保存图片
-                </button>
-              </div>
-              {shareCardModel ? (
-                <div className="pointer-events-none fixed -left-[2000px] top-0" aria-hidden="true">
-                  <div
-                    ref={shareCardRef}
-                    style={{ width: 1080, height: 1350 }}
-                    className="overflow-hidden bg-white p-[48px] text-slate-950"
-                  >
-                    <div className="flex h-full flex-col rounded-[24px] border border-slate-200 bg-slate-50 p-[48px] shadow-[0_28px_80px_rgba(15,23,42,0.12)]">
-                      <div className="flex items-start justify-between gap-8 border-b border-slate-200 pb-8">
-                        <div className="min-w-0">
-                          <p className="text-[30px] font-black leading-tight text-blue-700">
-                            {shareCardModel.subject}
-                          </p>
-                          <p className="mt-4 break-words text-[44px] font-black leading-tight">
-                            {shareCardModel.knowledgePoint}
-                          </p>
-                        </div>
-                        <div className="shrink-0 rounded-full bg-blue-50 px-8 py-4 text-[28px] font-black text-blue-700">
-                          {shareCardModel.difficulty}
-                        </div>
-                      </div>
-
-                      <div className="mt-10 min-h-0 flex-1 overflow-hidden rounded-[20px] bg-white p-8 ring-1 ring-slate-200">
-                        <MathText
-                          text={shareCardModel.questionText}
-                          className="text-[36px] leading-[1.55] text-slate-950"
-                        />
-                      </div>
-
-                      <div className="mt-8 rounded-[20px] bg-white p-8 ring-1 ring-slate-200">
-                        <div className="flex flex-wrap gap-3">
-                          {shareCardModel.mistakeTypes.length > 0 ? (
-                            shareCardModel.mistakeTypes.map((item) => (
-                              <span
-                                key={item}
-                                className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-blue-700 ring-1 ring-slate-200"
-                              >
-                                {item}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="rounded-full bg-white px-5 py-3 text-[24px] font-black text-blue-700 ring-1 ring-slate-200">
-                              待整理错因
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-6 break-words text-[30px] font-bold leading-[1.45] text-slate-950">
-                          {shareCardModel.oneSentenceTip}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </MobileCard>
-          </MobileSection>
 
           <MobileSection title="更多操作">
             <MobileCard>

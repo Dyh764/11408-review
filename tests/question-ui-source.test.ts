@@ -145,16 +145,15 @@ test("question titles and topic labels use MathText so imported formulas do not 
   assert.match(detail, /text=\{item\.rigor_check\}/);
 });
 
-test("/questions/[id] renders the question directly and keeps metadata collapsed", () => {
+test("/questions/[id] renders the question directly without the old metadata drawer", () => {
   const source = read("app/questions/[id]/page.tsx");
 
   assert.doesNotMatch(source, /TextQuestionPreview/);
   assert.doesNotMatch(source, /文字错题卡/);
   assert.doesNotMatch(source, /<MobileSection title="[^"]*基础信息/);
   assert.doesNotMatch(source, /<MobileSection title="[^"]*学习状态/);
-  assert.match(source, /<details/);
-  assert.match(source, /<summary/);
-  assert.doesNotMatch(source, /<details[^>]*open/);
+  assert.doesNotMatch(source, /查看掌握状态、核对状态和来源/);
+  assert.doesNotMatch(source, /<MobileSection title="更多信息"/);
 });
 
 test("/questions/[id] answers choices inside the main question card without duplicating options", () => {
@@ -162,7 +161,7 @@ test("/questions/[id] answers choices inside the main question card without dupl
   const choiceListMatches = source.match(/choices=\{questionDisplay\.choices\}/g) ?? [];
   const questionSection = source.slice(
     source.indexOf('<MobileSection title="题目"'),
-    source.indexOf('<MobileSection title="答题卡点"'),
+    source.indexOf('<MobileSection title="查看答案"'),
   );
 
   assert.equal(choiceListMatches.length, 1);
@@ -230,20 +229,15 @@ test("/review keeps answer hints hidden until answer reveal", () => {
   assert.match(answerPanel, /one_sentence_tip/);
 });
 
-test("/questions/[id] keeps detail information in the requested learning-flow order", () => {
+test("/questions/[id] keeps a simplified detail flow with answer reveal only", () => {
   const source = read("app/questions/[id]/page.tsx");
 
-  for (const title of [
-    "题目",
-    "先做题",
-    "答题卡点",
-    "查看答案",
-    "正确思路",
-    "智能增强",
-    "更多信息",
-    "更多操作",
-  ]) {
+  for (const title of ["题目", "先做题", "查看答案", "更多操作"]) {
     assert.match(source, new RegExp(title));
+  }
+
+  for (const title of ["答题卡点", "正确思路", "智能增强", "更多信息", "错题分享"]) {
+    assert.doesNotMatch(source, new RegExp(`<MobileSection title="${title}"`));
   }
 
   assert.ok(
@@ -254,14 +248,9 @@ test("/questions/[id] keeps detail information in the requested learning-flow or
     source.indexOf("先做题") < source.indexOf("查看答案"),
     "detail page should prompt self-solving before answer reveal",
   );
-  assert.ok(
-    source.indexOf('<MobileSection title="先做题"') <
-      source.indexOf('<MobileSection title="答题卡点"'),
-    "stuck-point controls should sit near the answering area",
-  );
   assert.doesNotMatch(source, /<MobileSection title="我的卡点"/);
-  assert.match(source, /stuckPointOptions/);
-  assert.match(source, /toggleStuckPoint/);
+  assert.doesNotMatch(source, /stuckPointOptions/);
+  assert.doesNotMatch(source, /toggleStuckPoint/);
 });
 
 test("mobile UI exposes the mature learning-app components", () => {
@@ -649,14 +638,14 @@ test("/review uses the shared swipe deck instead of a next-button interstitial",
   assert.doesNotMatch(source, /下一题/);
 });
 
-test("question detail saves images through system share when available and uses the current light card UI", () => {
+test("question detail hides the visible share section and its client-only actions", () => {
   const source = read("app/questions/[id]/page.tsx");
 
-  assert.match(source, /保存图片/);
-  assert.match(source, /navigator\.share/);
-  assert.match(source, /new File/);
-  assert.match(source, /分享面板/);
-  assert.match(source, /bg-white p-\[48px\]/);
+  assert.doesNotMatch(source, /<MobileSection title="错题分享"/);
+  assert.doesNotMatch(source, /navigator\.share/);
+  assert.doesNotMatch(source, /new File/);
+  assert.doesNotMatch(source, /分享面板/);
+  assert.doesNotMatch(source, /bg-white p-\[48px\]/);
   assert.doesNotMatch(source, /紫色错题卡片/);
   assert.doesNotMatch(source, /#d8ccff/);
   assert.doesNotMatch(source, /rounded-\[32px\]/);
@@ -678,19 +667,19 @@ test("review remains reachable as a secondary route with selectable entry points
   assert.match(review, /startQuestionId/);
 });
 
-test("/questions/[id] shows AI enhancement change summaries and manual verification actions", () => {
+test("/questions/[id] hides AI enhancement and manual verification actions from the visible flow", () => {
   const source = read("app/questions/[id]/page.tsx");
   const route = read("app/api/questions/[id]/route.ts");
   const summary = read("lib/questions/ai-enhancement-summary.ts");
 
-  assert.match(source, /buildAiEnhancementSummary/);
-  assert.match(source, /aiEnhancementSummary/);
+  assert.doesNotMatch(source, /buildAiEnhancementSummary/);
+  assert.doesNotMatch(source, /aiEnhancementSummary/);
   assert.match(summary, /AI 已检查题卡，未发现需要明显修改的字段。/);
-  assert.match(source, /标记题目已核对/);
-  assert.match(source, /标记答案已核对/);
-  assert.match(source, /标记需要修正/);
-  assert.match(source, /handleMarkQuestionVerified/);
-  assert.match(source, /handleMarkAnswerVerified/);
+  assert.doesNotMatch(source, /标记题目已核对/);
+  assert.doesNotMatch(source, /标记答案已核对/);
+  assert.doesNotMatch(source, /标记需要修正/);
+  assert.doesNotMatch(source, /handleMarkQuestionVerified/);
+  assert.doesNotMatch(source, /handleMarkAnswerVerified/);
   assert.match(route, /export async function PATCH/);
   assert.match(route, /question_text_status/);
   assert.match(route, /answer_status/);
@@ -772,7 +761,7 @@ test("primary learning copy routes users to import or practice instead of upload
   assert.match(questions, /导入 ChatGPT 错题卡|导入错题卡/);
 });
 
-test("v3 questions page exposes asset filters and share entry without changing review routes", () => {
+test("v3 questions page exposes asset filters without restoring detail share actions", () => {
   const source = read("app/questions/page.tsx");
   const detail = read("app/questions/[id]/page.tsx");
 
@@ -781,8 +770,8 @@ test("v3 questions page exposes asset filters and share entry without changing r
   assert.match(source, /quickScope === "recent"/);
   assert.match(source, /quickScope === "weak"/);
   assert.match(source, /quickScope === "inbox"/);
-  assert.match(detail, /share-card/);
-  assert.match(detail, /generateShareCardImage/);
+  assert.doesNotMatch(detail, /share-card/);
+  assert.doesNotMatch(detail, /generateShareCardImage/);
 });
 
 test("/questions keeps question rows visible when due-review loading fails", () => {
@@ -818,6 +807,8 @@ test("import page confirms import from the top action panel and supports undoing
   assert.match(source, /查看最近导入/);
   assert.match(source, /撤销本次导入/);
   assert.match(source, /导入成功/);
+  assert.match(source, /importResultRef/);
+  assert.match(source, /scrollIntoView/);
   assert.match(source, /去错题库查看/);
   assert.doesNotMatch(bottomPreview, /确认导入/);
   assert.doesNotMatch(bottomPreview, /导入到待整理/);
