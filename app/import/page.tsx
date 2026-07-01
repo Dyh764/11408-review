@@ -8,6 +8,12 @@ import { MathText } from "@/components/mobile/MathText";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { supabaseBucket } from "@/lib/env";
+import {
+  compressImage,
+  getImageExtension,
+  isSupportedImageType,
+} from "@/lib/image/compress-image";
 import {
   getImportQualityReport,
   type ImportQualityRow,
@@ -23,6 +29,7 @@ import {
   type ImportParsedCard,
   type ImportRowError,
 } from "@/lib/import/import-schema";
+import { createClient } from "@/lib/supabase/client";
 
 type ImportApiResult = {
   error?: string;
@@ -42,6 +49,24 @@ type ImportSuccess = {
 };
 
 const LAST_IMPORT_STORAGE_KEY = "11408-review:last-import-successes";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeUploadedImagePaths(
+  cards: ImportParsedCard[],
+  uploadedByIndex: Map<number, string>,
+) {
+  return JSON.stringify(
+    cards.map((item) => ({
+      ...(isRecord(item.raw) ? item.raw : item.card),
+      image_path: uploadedByIndex.get(item.index) ?? item.card.image_path ?? undefined,
+    })),
+    null,
+    2,
+  );
+}
 
 function readCachedLastImportSuccesses() {
   if (typeof window === "undefined") {
@@ -92,7 +117,17 @@ function ImportDiagnosticCard({ diagnostic }: { diagnostic: ImportDiagnostic }) 
   );
 }
 
-function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?: ImportQualityRow }) {
+function ImportPreviewCard({
+  item,
+  quality,
+  selectedImageFile,
+  onSelectImage,
+}: {
+  item: ImportParsedCard;
+  quality?: ImportQualityRow;
+  selectedImageFile?: File;
+  onSelectImage: (index: number, file: File | null) => void;
+}) {
   const { card } = item;
   const hasAnswer = Boolean(card.standard_answer?.trim());
   const hasChoices = card.choices.length > 0;
@@ -166,6 +201,33 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
           <ChoiceList choices={card.choices} compact />
         </div>
       ) : null}
+      <div className="mt-3 rounded-lg bg-blue-50/60 p-3 ring-1 ring-blue-100">
+        <label className="block">
+          <span className="text-xs font-black text-blue-700">绑定原题图片</span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => onSelectImage(item.index, event.target.files?.[0] ?? null)}
+            className="mt-2 block w-full text-xs text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-xs file:font-black file:text-blue-700"
+          />
+        </label>
+        <p className="mt-2 text-xs leading-5 text-slate-600">
+          {selectedImageFile
+            ? `已选择：${selectedImageFile.name}`
+            : card.image_path
+              ? "已存在原图路径；重新选择会替换为本地图片。"
+              : "可把截图绑定到这道题，确认导入时自动上传。"}
+        </p>
+        {selectedImageFile ? (
+          <button
+            type="button"
+            onClick={() => onSelectImage(item.index, null)}
+            className="mt-2 min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100"
+          >
+            移除本题图片
+          </button>
+        ) : null}
+      </div>
       <dl className="mt-3 space-y-2 text-sm">
         <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
           <dt className="font-semibold text-slate-800">题源信息</dt>
@@ -204,6 +266,58 @@ function ImportPreviewCard({ item, quality }: { item: ImportParsedCard; quality?
           </dd>
         </div>
       </dl>
+    </MobileCard>
+  );
+}
+
+function ImportImageBindingCard({
+  item,
+  selectedImageFile,
+  onSelectImage,
+}: {
+  item: ImportParsedCard;
+  selectedImageFile?: File;
+  onSelectImage: (index: number, file: File | null) => void;
+}) {
+  const { card } = item;
+
+  return (
+    <MobileCard>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-slate-950">
+            第 {item.index} 条 · {card.knowledge_point || card.chapter || "待整理题目"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            {card.image_path ? "已存在原图路径；重新选择会替换为本地图片。" : "可把截图绑定到这道题。"}
+          </p>
+        </div>
+        <StatusPill
+          label={selectedImageFile ? "已选本地图片" : card.image_path ? "已有原图" : "未绑定原图"}
+          tone={selectedImageFile || card.image_path ? "blue" : "amber"}
+        />
+      </div>
+      <label className="mt-3 block rounded-lg bg-blue-50/60 p-3 ring-1 ring-blue-100">
+        <span className="text-xs font-black text-blue-700">绑定原题图片</span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(event) => onSelectImage(item.index, event.target.files?.[0] ?? null)}
+          className="mt-2 block w-full text-xs text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-xs file:font-black file:text-blue-700"
+        />
+      </label>
+      {selectedImageFile ? (
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs leading-5 text-slate-600">已选择：{selectedImageFile.name}</p>
+          <button
+            type="button"
+            onClick={() => onSelectImage(item.index, null)}
+            className="min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100"
+          >
+            移除本题图片
+          </button>
+        </div>
+      ) : null}
     </MobileCard>
   );
 }
@@ -297,9 +411,11 @@ function ImportActionPanel({
 }
 
 export default function ImportPage() {
+  const supabase = useMemo(() => createClient(), []);
   const initialLastImportSuccesses = useMemo(() => readCachedLastImportSuccesses(), []);
   const importResultRef = useRef<HTMLDivElement | null>(null);
   const [jsonText, setJsonText] = useState("");
+  const [selectedImageFiles, setSelectedImageFiles] = useState<Record<number, File>>({});
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
   const [importDiagnostics, setImportDiagnostics] = useState<ImportDiagnostic[]>([]);
   const [parseNotice, setParseNotice] = useState("");
@@ -371,6 +487,7 @@ export default function ImportPage() {
     setParseRepairNotices([]);
     setApiResult(null);
     setCopyStatus("");
+    setSelectedImageFiles({});
   }
 
   function clearImportDraft() {
@@ -418,26 +535,126 @@ export default function ImportPage() {
     copyTextToClipboard(importExampleJson);
   }
 
+  function handleSelectCardImage(index: number, file: File | null) {
+    if (!file) {
+      setSelectedImageFiles((current) => {
+        const next = { ...current };
+        delete next[index];
+        return next;
+      });
+      return;
+    }
+
+    if (!isSupportedImageType(file.type)) {
+      setParseErrors([{ index, message: "仅支持 jpg、jpeg、png、webp 图片。" }]);
+      return;
+    }
+
+    setParseErrors([]);
+    setSelectedImageFiles((current) => ({ ...current, [index]: file }));
+  }
+
+  async function cleanupUploadedImages(paths: string[]) {
+    if (!supabase || paths.length === 0) {
+      return;
+    }
+
+    await supabase.storage.from(supabaseBucket).remove(paths);
+  }
+
+  async function uploadImportImages(cards: ImportParsedCard[]) {
+    const imageEntries = cards
+      .map((item) => ({ item, file: selectedImageFiles[item.index] }))
+      .filter((entry): entry is { item: ImportParsedCard; file: File } => Boolean(entry.file));
+    const uploadedByIndex = new Map<number, string>();
+    const uploadedPaths: string[] = [];
+
+    if (imageEntries.length === 0) {
+      return { uploadedByIndex, uploadedPaths };
+    }
+
+    if (!supabase) {
+      throw new Error("请先配置 Supabase 环境变量，再导入本地图片。");
+    }
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      throw new Error("请先登录，再导入本地图片。");
+    }
+
+    try {
+      for (const { item, file } of imageEntries) {
+        const compressed = await compressImage(file);
+        const questionId = crypto.randomUUID();
+        const ext = getImageExtension(compressed.file);
+        const imagePath = `users/${user.id}/questions/${questionId}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from(supabaseBucket).upload(imagePath, compressed.file, {
+          contentType: compressed.file.type || file.type,
+          upsert: false,
+        });
+
+        if (uploadError) {
+          throw new Error(`第 ${item.index} 条图片上传失败：${uploadError.message}`);
+        }
+
+        uploadedByIndex.set(item.index, imagePath);
+        uploadedPaths.push(imagePath);
+      }
+    } catch (error) {
+      await cleanupUploadedImages(uploadedPaths);
+      throw error;
+    }
+
+    return { uploadedByIndex, uploadedPaths };
+  }
+
   async function handleImport(importMode: "normal" | "inbox" = "normal") {
     setIsImporting(true);
     setApiResult(null);
     setUndoStatus("");
+    let uploadedPaths: string[] = [];
+    let uploadedByIndex = new Map<number, string>();
 
     try {
+      const uploadResult = await uploadImportImages(previewCards);
+      uploadedByIndex = uploadResult.uploadedByIndex;
+      uploadedPaths = uploadResult.uploadedPaths;
+      const importJsonText =
+        uploadedByIndex.size > 0 ? mergeUploadedImagePaths(previewCards, uploadedByIndex) : jsonText;
+
+      if (uploadedByIndex.size > 0) {
+        setJsonText(importJsonText);
+      }
+
       const response = await fetch("/api/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonText, importMode }),
+        body: JSON.stringify({ jsonText: importJsonText, importMode }),
       });
       const result = (await response.json()) as ImportApiResult;
+      const successfulIndexes = new Set((result.successes ?? []).map((success) => success.index));
+      const orphanedUploads = Array.from(uploadedByIndex)
+        .filter(([index]) => !successfulIndexes.has(index))
+        .map(([, imagePath]) => imagePath);
 
       setApiResult(result);
       setImportDiagnostics(result.diagnostics ?? []);
       persistLastImportSuccesses(response.ok ? (result.successes ?? []) : []);
+      if (response.ok) {
+        await cleanupUploadedImages(orphanedUploads);
+        setSelectedImageFiles({});
+      } else {
+        await cleanupUploadedImages(uploadedPaths);
+      }
       if (!response.ok && result.error) {
         setParseErrors([{ index: 0, message: result.error }]);
       }
     } catch (error) {
+      await cleanupUploadedImages(uploadedPaths);
       setApiResult({
         error: error instanceof Error ? error.message : "导入失败，请稍后重试。",
       });
@@ -690,16 +907,38 @@ export default function ImportPage() {
               <StatCard label="需要核对" value={previewStats.needsCheck} />
             </div>
           </div>
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">原图绑定</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              给带表格、图形或截图的题逐条绑定本地图片，确认导入时会自动上传。
+            </p>
+            <div className="mt-3 grid gap-3">
+              {previewCards.map((item) => (
+                <ImportImageBindingCard
+                  key={item.index}
+                  item={item}
+                  selectedImageFile={selectedImageFiles[item.index]}
+                  onSelectImage={handleSelectCardImage}
+                />
+              ))}
+            </div>
+          </div>
           <h2 className="text-base font-semibold text-slate-950">
             需要检查 {previewIssueCards.length} 张错题卡
           </h2>
           {previewIssueCards.length === 0 ? (
             <p className="rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
-              本次解析没有发现需要预览的问题题卡，干净题可直接从顶部确认导入。
+              本次解析没有发现需要预览的问题题卡，干净题可直接用顶部按钮导入。
             </p>
           ) : null}
           {previewIssueCards.map((item) => (
-            <ImportPreviewCard key={item.index} item={item} quality={qualityByIndex.get(item.index)} />
+            <ImportPreviewCard
+              key={item.index}
+              item={item}
+              quality={qualityByIndex.get(item.index)}
+              selectedImageFile={selectedImageFiles[item.index]}
+              onSelectImage={handleSelectCardImage}
+            />
           ))}
           {qualityReport.seriousCount > 0 ? (
             <p className="rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-700 ring-1 ring-red-100">

@@ -94,7 +94,7 @@ export function ReviewFlashcard({
   processing: boolean;
   processingLocked: boolean;
   onToggleChoice: (reviewId: string, label: string, isMultiple: boolean) => void;
-  onSubmitChoice: () => void;
+  onSubmitChoice: (result?: ReviewResult) => void;
   onRevealAnswer: () => void;
   onDraftAnswer: (value: string) => void;
   onSkip: () => void;
@@ -110,6 +110,8 @@ export function ReviewFlashcard({
   const choiceIsCorrect =
     answerChoices.labels.length > 0 &&
     areChoiceAnswersEqual(selectedChoices, answerChoices.labels);
+  const submittedChoiceResult: ReviewResult | undefined =
+    answerChoices.labels.length > 0 ? (choiceIsCorrect ? "mastered" : "wrong_again") : undefined;
   const canRecordReview = hasAnswer
     ? isChoiceQuestion
       ? submittedChoice && answerRevealed
@@ -217,7 +219,7 @@ export function ReviewFlashcard({
             isChoiceQuestion && !answerRevealed ? (
               <button
                 type="button"
-                onClick={onSubmitChoice}
+                onClick={() => onSubmitChoice(submittedChoiceResult)}
                 disabled={selectedChoices.length === 0 && answerChoices.labels.length > 0}
                 className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
               >

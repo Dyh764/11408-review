@@ -12,7 +12,7 @@ import { StatusPill } from "@/components/status-pill";
 import { todayIsoDate } from "@/lib/dates";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
-import { parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
+import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { getQuestionTextStatusLabel } from "@/lib/questions/meta-labels";
 import { fetchCurrentUserQuestion, type QuestionWithImage } from "@/lib/questions";
 import {
@@ -47,6 +47,25 @@ type ChoicePracticeResult = {
   correctLabels: string[];
   reviewResult: "mastered" | "wrong_again";
 };
+
+function buildLocalChoicePracticeResult(
+  standardAnswer: string | null,
+  selectedLabels: string[],
+): ChoicePracticeResult | null {
+  const correctLabels = parseAnswerChoiceLabels(standardAnswer).labels;
+
+  if (correctLabels.length === 0) {
+    return null;
+  }
+
+  const correct = areChoiceAnswersEqual(selectedLabels, correctLabels);
+
+  return {
+    correct,
+    correctLabels,
+    reviewResult: correct ? "mastered" : "wrong_again",
+  };
+}
 
 function formFromQuestion(question: QuestionWithImage): QuestionEditForm {
   return {
@@ -229,8 +248,17 @@ export default function QuestionDetailPage() {
       return;
     }
 
+    const localResult = buildLocalChoicePracticeResult(question.standard_answer, selectedAnswerLabels);
+
+    if (!localResult) {
+      setMessage("这道选择题的标准答案暂未识别，先核对答案后再提交作答。");
+      return;
+    }
+
+    setChoicePracticeResult(localResult);
+    setIsAnswerVisible(true);
     setIsSubmittingPractice(true);
-    setMessage("");
+    setMessage(localResult.correct ? "回答正确，正在后台记录。" : "回答错误，正在后台记录。");
 
     try {
       const response = await fetch(`/api/questions/${question.id}/practice-result`, {
@@ -243,7 +271,7 @@ export default function QuestionDetailPage() {
       };
 
       if (!response.ok || typeof result.correct !== "boolean" || !Array.isArray(result.correctLabels)) {
-        setMessage(result.error ?? "提交答案失败。");
+        setMessage(`后台记录失败：${result.error ?? "提交答案失败。"}`);
         return;
       }
 
@@ -256,7 +284,7 @@ export default function QuestionDetailPage() {
       await refreshQuestion();
       setMessage(result.correct ? "作答正确，已记录为掌握。" : "作答错误，已提高后续复盘优先级。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "提交答案失败。");
+      setMessage(`后台记录失败：${error instanceof Error ? error.message : "提交答案失败。"}`);
     } finally {
       setIsSubmittingPractice(false);
     }

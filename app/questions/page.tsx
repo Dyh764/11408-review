@@ -129,6 +129,16 @@ function isExam408DisplaySubject(subject: string) {
   return ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(subject);
 }
 
+function getExam408ChoiceCount(subject: QuestionSubjectDirectory<QuestionWithImage>) {
+  if (!isExam408DisplaySubject(subject.subject)) {
+    return 0;
+  }
+
+  return subject.chapters
+    .flatMap((chapter) => chapter.questions)
+    .filter((question) => (question.choices?.length ?? 0) > 0).length;
+}
+
 function formatSupabaseError(error: unknown, fallback: string) {
   if (error instanceof Error) {
     return error.message;
@@ -606,30 +616,11 @@ export default function QuestionsPage() {
   }
 
   return (
-    <MobilePageShell className="bg-slate-50">
+    <MobilePageShell className="bg-slate-50 md:mx-auto md:max-w-[1240px] md:px-8 md:py-8">
       <StudyPageHeader
         title="错题库目录"
         subtitle="按科目、章节、题目三层浏览。数学题会拆到高数、线代和概率统计，找题更快。"
       />
-
-      <MobileSection>
-        <StudyCard>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-black text-slate-950">专项复盘</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                按章节或错因主动开一轮闪卡，不影响今日复习入口。
-              </p>
-            </div>
-            <Link
-              href="/practice"
-              className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-blue-600 px-3 text-xs font-black text-white"
-            >
-              去复盘
-            </Link>
-          </div>
-        </StudyCard>
-      </MobileSection>
 
       {questions.length > 0 ? (
         <MobileSection>
@@ -669,7 +660,7 @@ export default function QuestionsPage() {
       ) : null}
 
       <MobileSection>
-        <div className="space-y-4">
+        <div className="space-y-4 md:grid md:grid-cols-[minmax(0,1fr)] md:gap-5 md:space-y-0">
         {!isLoading && filteredQuestions.length === 0 ? (
           <EmptyState
             title="还没有符合条件的错题"
@@ -878,24 +869,36 @@ function SubjectDirectory({
         action={<StudyBadge tone="purple">{directory.length} 科目</StudyBadge>}
       />
       <div className="grid gap-3">
-        {directory.map((subject) => (
-          <button
-            key={subject.subject}
-            type="button"
-            onClick={() => onSelectSubject(subject.subject)}
-            className="text-left"
-          >
-            <StudyCard>
+        {directory.map((subject) => {
+          const choiceCount = getExam408ChoiceCount(subject);
+          const canStartPractice = isExam408DisplaySubject(subject.subject);
+
+          return (
+            <StudyCard key={subject.subject}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onSelectSubject(subject.subject)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <p className="text-lg font-black text-slate-950">{subject.subject}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
                     今日待复习 {subject.dueTodayCount} · 困难 {subject.hardCount} · 需处理 {subject.needsAttentionCount}
                   </p>
+                </button>
+                <div className="grid shrink-0 justify-items-end gap-2">
+                  <StudyBadge tone={subject.needsAttentionCount > 0 ? "amber" : "green"}>
+                    {subject.totalCount} 题
+                  </StudyBadge>
+                  {canStartPractice ? (
+                    <Link
+                      href={`/practice?mode=exam408-choice&subject=${encodeURIComponent(subject.subject)}`}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-black text-white"
+                    >
+                      刷题模式{choiceCount > 0 ? ` ${choiceCount}` : ""}
+                    </Link>
+                  ) : null}
                 </div>
-                <StudyBadge tone={subject.needsAttentionCount > 0 ? "amber" : "green"}>
-                  {subject.totalCount} 题
-                </StudyBadge>
               </div>
               <div className="mt-3">
                 <ProgressBar
@@ -905,8 +908,8 @@ function SubjectDirectory({
                 />
               </div>
             </StudyCard>
-          </button>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -1136,7 +1139,15 @@ function QuestionDirectory({
         title={chapter.chapter}
         subtitle={`${subject.subject} · ${chapter.totalCount} 题`}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {isExam408DisplaySubject(subject.subject) ? (
+              <Link
+                href={`/practice?mode=exam408-choice&subject=${encodeURIComponent(subject.subject)}&chapter=${encodeURIComponent(chapter.chapter)}`}
+                className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 text-xs font-black text-white"
+              >
+                刷题模式
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={onToggleBatchTools}

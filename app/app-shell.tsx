@@ -15,7 +15,7 @@ const desktopNavItems = [
 
 function DesktopAppNav({ pathname }: { pathname: string }) {
   return (
-    <nav aria-label="桌面主导航" className="hidden border-b border-slate-100 bg-white px-8 py-5 lg:block">
+    <nav aria-label="桌面主导航" className="hidden border-b border-slate-100 bg-white px-8 py-5 md:block">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-8">
         <Link href="/" className="flex items-center gap-3">
           <span className="relative h-12 w-12" aria-hidden="true">
@@ -81,12 +81,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-slate-950">
       <DesktopAppNav pathname={pathname} />
-      <div className="mx-auto min-h-screen w-full max-w-[520px] bg-[#f8fafc] lg:max-w-[1500px] lg:bg-transparent">
-        <main className="min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-10">
+      <div className="mx-auto min-h-screen w-full max-w-[520px] bg-[#f8fafc] md:max-w-[1500px] md:bg-transparent">
+        <main className="min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10">
           {children}
         </main>
       </div>
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <BottomNav />
       </div>
     </div>

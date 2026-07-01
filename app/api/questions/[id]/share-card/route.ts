@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data, error } = await supabase
     .from("questions")
     .select(
-      "id,subject,chapter,knowledge_point,difficulty,question_text,mistake_types,one_sentence_tip,standard_answer,answer_explanation",
+      "id,subject,chapter,knowledge_point,difficulty,question_text,choices,mistake_types,one_sentence_tip,standard_answer,answer_explanation",
     )
     .eq("id", id)
     .eq("user_id", user.id)

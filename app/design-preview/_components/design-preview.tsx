@@ -609,11 +609,11 @@ function DesktopLayout({ variant }: { variant: Variant }) {
   return (
     <div
       data-testid={`desktop-preview-${variant.key}`}
-      className={cx("hidden min-h-screen px-8 py-6 lg:block", variant.desktopShellClass)}
+      className={cx("hidden min-h-screen px-6 py-6 lg:block xl:px-8", variant.desktopShellClass)}
     >
       <nav
         aria-label="桌面预览导航"
-        className={cx("mx-auto flex max-w-[1440px] items-center justify-between rounded-lg border px-5 py-3", variant.navClass)}
+        className={cx("mx-auto flex max-w-[1320px] items-center justify-between rounded-lg border px-5 py-3", variant.navClass)}
       >
         <div>
           <p className={cx("text-xs font-black", variant.accentClass)}>408 真题系统</p>
@@ -628,9 +628,9 @@ function DesktopLayout({ variant }: { variant: Variant }) {
         </div>
       </nav>
 
-      <main className="mx-auto mt-6 grid max-w-[1440px] gap-5">
+      <main className="mx-auto mt-6 grid max-w-[1320px] gap-5">
         <section className={cx("rounded-lg border p-6", variant.heroClass)}>
-          <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div>
               <p className={cx("text-xs font-black", variant.accentClass)}>{variant.name}</p>
               <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-normal">
@@ -827,9 +827,13 @@ export function DesignPreviewIndex() {
 
 export function DesignPreviewPage({ variantKey }: { variantKey: VariantKey }) {
   const variant = variants[variantKey];
+  const previewStyle =
+    variant.key === "c"
+      ? { fontFamily: '"SimSun", "宋体", "Songti SC", "STSong", serif' }
+      : undefined;
 
   return (
-    <div className={cx("min-h-screen overflow-x-hidden", variant.pageClass)}>
+    <div className={cx("min-h-screen overflow-x-hidden", variant.pageClass)} style={previewStyle}>
       <div className="fixed left-6 top-[5.75rem] z-30 hidden lg:block">
         <Link
           href="/design-preview"

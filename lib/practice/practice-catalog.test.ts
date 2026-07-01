@@ -85,3 +85,70 @@ test("filterPracticeQuestions narrows by chapter or mistake type and sorts by pr
     ["blank"],
   );
 });
+
+test("filterPracticeQuestions builds a four-course choice-only round", () => {
+  const questions = [
+    { ...baseQuestion, id: "math-choice", subject: "数学", choices: [{ label: "A", text: "1" }], priority_score: 100 },
+    { ...baseQuestion, id: "ds-choice", subject: "数据结构", choices: [{ label: "A", text: "1" }], priority_score: 60 },
+    { ...baseQuestion, id: "os-text", subject: "操作系统", choices: [], priority_score: 90 },
+    { ...baseQuestion, id: "net-choice", subject: "计算机网络", choices: [{ label: "A", text: "1" }], priority_score: 80 },
+    { ...baseQuestion, id: "co-choice", subject: "计算机组成原理", choices: [{ label: "A", text: "1" }], priority_score: 70 },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, { type: "exam408-choice" }).map((question) => question.id),
+    ["net-choice", "co-choice", "ds-choice"],
+  );
+  assert.deepEqual(
+    filterPracticeQuestions(questions, { type: "exam408-choice", subject: "数据结构" }).map(
+      (question) => question.id,
+    ),
+    ["ds-choice"],
+  );
+});
+
+test("filterPracticeQuestions narrows a four-course choice round to one chapter", () => {
+  const questions = [
+    {
+      ...baseQuestion,
+      id: "os-intro-high",
+      subject: "操作系统",
+      chapter: "操作系统概述",
+      choices: [{ label: "A", text: "1" }],
+      priority_score: 80,
+    },
+    {
+      ...baseQuestion,
+      id: "os-intro-low",
+      subject: "操作系统",
+      chapter: "操作系统概述",
+      choices: [{ label: "A", text: "1" }],
+      priority_score: 20,
+    },
+    {
+      ...baseQuestion,
+      id: "os-process",
+      subject: "操作系统",
+      chapter: "进程与线程",
+      choices: [{ label: "A", text: "1" }],
+      priority_score: 100,
+    },
+    {
+      ...baseQuestion,
+      id: "network-intro",
+      subject: "计算机网络",
+      chapter: "操作系统概述",
+      choices: [{ label: "A", text: "1" }],
+      priority_score: 90,
+    },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, {
+      type: "exam408-choice",
+      subject: "操作系统",
+      chapter: "操作系统概述",
+    }).map((question) => question.id),
+    ["os-intro-high", "os-intro-low"],
+  );
+});

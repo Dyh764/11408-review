@@ -1,5 +1,6 @@
 import type {
   AnswerStatus,
+  ChoiceOption,
   Difficulty,
   MasteryStatus,
   QuestionTextStatus,
@@ -19,6 +20,7 @@ export type PracticeQuestion = {
   needs_manual_check: boolean;
   review_priority: ReviewPriority | string | null;
   mistake_types: string[] | null;
+  choices?: ChoiceOption[] | null;
   priority_score?: number | null;
   created_at?: string | null;
 };
@@ -39,7 +41,8 @@ export type PracticeMistakeOption = {
 export type PracticeFilter =
   | { type: "chapter"; subject: string; chapter: string }
   | { type: "mistake"; mistakeType: string }
-  | { type: "topic"; topic: string };
+  | { type: "topic"; topic: string }
+  | { type: "exam408-choice"; subject?: string; chapter?: string };
 
 const untaggedMistakeType = "未标注错因";
 
@@ -76,6 +79,13 @@ function chapterLabel(question: PracticeQuestion) {
 function mistakeLabels(question: PracticeQuestion) {
   const labels = question.mistake_types?.map((item) => item.trim()).filter(Boolean) ?? [];
   return labels.length > 0 ? labels : [untaggedMistakeType];
+}
+
+function isExam408ChoiceQuestion(question: PracticeQuestion) {
+  return (
+    ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(question.subject) &&
+    (question.choices?.length ?? 0) > 0
+  );
 }
 
 export function buildPracticeCatalog(questions: PracticeQuestion[]) {
@@ -131,6 +141,14 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
       if (filter.type === "topic") {
         const topic = filter.topic.trim();
         return question.knowledge_point?.trim() === topic || chapterLabel(question) === topic;
+      }
+
+      if (filter.type === "exam408-choice") {
+        return (
+          isExam408ChoiceQuestion(question) &&
+          (!filter.subject || question.subject === filter.subject) &&
+          (!filter.chapter || chapterLabel(question) === filter.chapter)
+        );
       }
 
       return mistakeLabels(question).includes(filter.mistakeType);

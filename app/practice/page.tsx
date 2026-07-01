@@ -88,6 +88,21 @@ export default function PracticePage() {
       ? new URLSearchParams(window.location.search).get("topic")?.trim() ?? ""
       : "",
   );
+  const [modeParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("mode")?.trim() ?? ""
+      : "",
+  );
+  const [subjectParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("subject")?.trim() ?? ""
+      : "",
+  );
+  const [chapterParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("chapter")?.trim() ?? ""
+      : "",
+  );
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看专项复盘。",
   );
@@ -104,7 +119,22 @@ export default function PracticePage() {
       .then((items) => {
         if (isActive) {
           setQuestions(items);
-          if (topicParam) {
+          if (modeParam === "exam408-choice") {
+            const choiceFilter: PracticeFilter = {
+              type: "exam408-choice",
+              subject: subjectParam || undefined,
+              chapter: chapterParam || undefined,
+            };
+            const selected = filterPracticeQuestions(items, choiceFilter).map(makePracticeReview);
+            const scopeName = chapterParam || subjectParam || "四门专业课";
+
+            setActiveFilter(choiceFilter);
+            setQueue(selected);
+            setInitialCount(selected.length);
+            setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
+            setSkippedCount(0);
+            setMessage(selected.length === 0 ? `${scopeName}暂时没有可刷的选择题。` : "");
+          } else if (topicParam) {
             const topicFilter: PracticeFilter = { type: "topic", topic: topicParam };
             const selected = filterPracticeQuestions(items, topicFilter).map(makePracticeReview);
 
@@ -133,7 +163,7 @@ export default function PracticePage() {
     return () => {
       isActive = false;
     };
-  }, [supabase, topicParam]);
+  }, [supabase, chapterParam, modeParam, subjectParam, topicParam]);
 
   const catalog = useMemo(() => buildPracticeCatalog(questions), [questions]);
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
@@ -198,17 +228,30 @@ export default function PracticePage() {
     cleanupReviewDraft(review.id);
   }
 
-  async function handleReview(review: FlashcardReview, result: ReviewResult) {
+  function completeReviewLocally(review: FlashcardReview, result: ReviewResult, nextMessage: string) {
+    setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
+    setQueue((current) => current.filter((item) => item.id !== review.id));
+    cleanupReviewDraft(review.id);
+    setMessage(nextMessage);
+  }
+
+  async function persistReviewResult(
+    review: FlashcardReview,
+    result: ReviewResult,
+    options: { lock: boolean; failurePrefix: string },
+  ) {
     if (!supabase) {
       setMessage("请配置 Supabase 环境变量后再记录复盘结果。");
-      return;
+      return false;
     }
 
-    if (processingReviewId) {
-      return;
+    if (options.lock && processingReviewId) {
+      return false;
     }
 
-    setProcessingReviewId(review.id);
+    if (options.lock) {
+      setProcessingReviewId(review.id);
+    }
 
     const {
       data: { user },
@@ -216,9 +259,11 @@ export default function PracticePage() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      setProcessingReviewId("");
+      if (options.lock) {
+        setProcessingReviewId("");
+      }
       setMessage("请先登录，再记录专项复盘。");
-      return;
+      return false;
     }
 
     const completedAt = new Date().toISOString();
@@ -237,9 +282,11 @@ export default function PracticePage() {
       );
 
     if (upsertError) {
-      setProcessingReviewId("");
-      setMessage(`专项复盘写入失败：${upsertError.message}`);
-      return;
+      if (options.lock) {
+        setProcessingReviewId("");
+      }
+      setMessage(`${options.failurePrefix}${upsertError.message}`);
+      return false;
     }
 
     const { data: existingRows, error: existingError } = await supabase
@@ -284,11 +331,41 @@ export default function PracticePage() {
       // 专项复盘结果已经写入；统计失败只提示，不阻断本轮继续。
     }
 
-    setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
-    setQueue((current) => current.filter((item) => item.id !== review.id));
-    cleanupReviewDraft(review.id);
-    setProcessingReviewId("");
-    setMessage("专项复盘结果已记录。");
+    if (options.lock) {
+      setProcessingReviewId("");
+    }
+
+    return true;
+  }
+
+  async function handleReview(review: FlashcardReview, result: ReviewResult) {
+    const saved = await persistReviewResult(review, result, {
+      lock: true,
+      failurePrefix: "专项复盘写入失败：",
+    });
+
+    if (saved) {
+      completeReviewLocally(review, result, "专项复盘结果已记录。");
+    }
+  }
+
+  function handleChoiceSubmitAndNext(review: FlashcardReview, result?: ReviewResult) {
+    setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
+    setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
+
+    if (!result) {
+      return;
+    }
+
+    completeReviewLocally(
+      review,
+      result,
+      result === "mastered" ? "回答正确，已进入下一题。" : "回答错误，已进入下一题。",
+    );
+    void persistReviewResult(review, result, {
+      lock: false,
+      failurePrefix: "后台记录失败：",
+    });
   }
 
   function renderSummary() {
@@ -441,10 +518,7 @@ export default function PracticePage() {
               processing={processingReviewId === review.id}
               processingLocked={Boolean(processingReviewId)}
               onToggleChoice={toggleChoice}
-              onSubmitChoice={() => {
-                setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
-                setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
-              }}
+              onSubmitChoice={(result) => handleChoiceSubmitAndNext(review, result)}
               onRevealAnswer={() =>
                 setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
               }

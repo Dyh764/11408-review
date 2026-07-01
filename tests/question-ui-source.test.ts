@@ -34,6 +34,21 @@ test("import page previews only issue cards and persists last import undo ids", 
   assert.doesNotMatch(source, /previewCards\.map\(\(item\) => \(\s*<ImportPreviewCard/);
 });
 
+test("import page can bind local images to parsed cards before importing", () => {
+  const source = read("app/import/page.tsx");
+
+  assert.match(source, /createClient/);
+  assert.match(source, /compressImage/);
+  assert.match(source, /getImageExtension/);
+  assert.match(source, /selectedImageFiles/);
+  assert.match(source, /handleSelectCardImage/);
+  assert.match(source, /uploadImportImages/);
+  assert.match(source, /supabase\.storage\.from\(supabaseBucket\)\.upload/);
+  assert.match(source, /supabase\.storage\.from\(supabaseBucket\)\.remove/);
+  assert.match(source, /image_path: uploadedByIndex\.get\(item\.index\)/);
+  assert.match(source, /绑定原题图片/);
+});
+
 test("/questions uses taxonomy directory browsing before the final question list", () => {
   const source = read("app/questions/page.tsx");
 
@@ -414,8 +429,8 @@ test("non-home routes keep a desktop navigation shell instead of forcing phone w
   assert.match(shell, /function DesktopAppNav/);
   assert.match(shell, /aria-label="桌面主导航"/);
   assert.match(shell, /max-w-\[1500px\]/);
-  assert.match(shell, /lg:block/);
-  assert.match(shell, /lg:hidden/);
+  assert.match(shell, /md:block/);
+  assert.match(shell, /md:hidden/);
   assert.doesNotMatch(shell, /return \(\s*<div className="phone-shell">/);
 });
 
@@ -494,7 +509,9 @@ test("/questions exposes focused practice and inbox entries without expanding bo
   assert.match(questions, /待整理/);
   assert.match(questions, /需要修正/);
   assert.match(questions, /未分类/);
-  assert.match(questions, /href="\/practice"/);
+  assert.match(questions, /刷题模式/);
+  assert.match(questions, /mode=exam408-choice&subject=/);
+  assert.doesNotMatch(questions, /四门选择题/);
   assert.match(bottomNav, /grid-cols-5/);
   assert.match(bottomNav, /href: "\/practice"/);
   assert.doesNotMatch(bottomNav, /href: "\/upload"/);
@@ -556,6 +573,53 @@ test("/practice reuses the review flashcard component for chapter and mistake re
   assert.match(sharedCard, /ChoiceList/);
   assert.match(sharedCard, /AnswerPanel/);
   assert.match(sharedCard, /canRecordReview/);
+});
+
+test("/practice supports a four-course choice-only round", () => {
+  const source = read("app/practice/page.tsx");
+  const catalog = read("lib/practice/practice-catalog.ts");
+  const questions = read("app/questions/page.tsx");
+
+  assert.match(source, /modeParam/);
+  assert.match(source, /subjectParam/);
+  assert.match(source, /chapterParam/);
+  assert.match(source, /exam408-choice/);
+  assert.doesNotMatch(source, /四门专业课选择题/);
+  assert.match(catalog, /type: "exam408-choice"/);
+  assert.match(catalog, /chapter\?: string/);
+  assert.match(catalog, /choices\?:/);
+  assert.match(catalog, /isExam408ChoiceQuestion/);
+  assert.match(catalog, /filter\.chapter/);
+  assert.match(questions, /href=\{`\/practice\?mode=exam408-choice&subject=\$\{encodeURIComponent\(subject\.subject\)\}`\}/);
+  assert.match(questions, /href=\{`\/practice\?mode=exam408-choice&subject=\$\{encodeURIComponent\(subject\.subject\)\}&chapter=\$\{encodeURIComponent\(chapter\.chapter\)\}`\}/);
+  assert.match(questions, /刷题模式/);
+  assert.doesNotMatch(questions, /四门选择题/);
+});
+
+test("share-card API includes structured choices for local save and future PNG cards", () => {
+  const route = read("app/api/questions/[id]/share-card/route.ts");
+  const share = read("lib/share/question-card.ts");
+
+  assert.match(route, /choices/);
+  assert.match(share, /choices\?: ChoiceOption\[\] \| null/);
+  assert.match(share, /choices: ChoiceOption\[\]/);
+  assert.match(share, /normalizeChoices/);
+  assert.match(share, /choices: normalizeChoices\(question\.choices\)/);
+});
+
+test("/questions/[id] reveals choice results before waiting for the record API", () => {
+  const source = read("app/questions/[id]/page.tsx");
+  const submitStart = source.indexOf("async function handleSubmitChoicePractice");
+  const submitEnd = source.indexOf("async function handleSaveEdit");
+  const submitBlock = source.slice(submitStart, submitEnd);
+
+  assert.match(source, /buildLocalChoicePracticeResult/);
+  assert.ok(
+    submitBlock.indexOf("setChoicePracticeResult(localResult)") <
+      submitBlock.indexOf("await fetch(`/api/questions/${question.id}/practice-result`"),
+    "choice result should render before waiting for the API",
+  );
+  assert.match(submitBlock, /后台记录失败/);
 });
 
 test("daily motivation remains secondary and keeps cached server routing", () => {
