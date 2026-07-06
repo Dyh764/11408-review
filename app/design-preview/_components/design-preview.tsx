@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 type VariantKey = "a" | "b" | "c";
 
@@ -29,7 +30,7 @@ const variants: Record<VariantKey, Variant> = {
     key: "a",
     name: "方案 A",
     title: "方案 A：接近 408os 的浅色 dashboard",
-    description: "浅色、克制、信息密度高，重点模拟 408 真题系统的学习概览与多栏 dashboard。",
+    description: "浅色、克制、信息密度高，重点模拟 408 错题复盘的学习概览与多栏 dashboard。",
     route: "/design-preview/a",
     recommendation: "适合正式功能页落地，尤其适合错题库、章节目录和报告页。",
     pageClass: "bg-[#eef7f3] text-slate-950",
@@ -279,20 +280,16 @@ function FeatureGrid({ variant }: { variant: Variant }) {
 }
 
 function ExamLogo({ compact = false }: { compact?: boolean }) {
+  return <BrandLogo size={compact ? "md" : "lg"} compact={false} />;
+}
+
+function PreviewBrandLogo({ variant, compact = false }: { variant: Variant; compact?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative h-9 w-12 shrink-0">
-        <span className="absolute left-0 top-2 h-5 w-5 rotate-45 rounded-[3px] bg-[#12c6a3]" />
-        <span className="absolute left-4 top-0 h-5 w-5 rotate-45 rounded-[3px] bg-[#22d3a6]" />
-        <span className="absolute left-4 top-4 h-5 w-5 rotate-45 rounded-[3px] bg-[#0ea5e9]" />
-      </div>
-      <div>
-        <p className={cx("font-black tracking-normal text-slate-950", compact ? "text-xl" : "text-3xl")}>
-          408真题系统
-        </p>
-        {compact ? null : <p className="mt-0.5 text-xs font-bold text-slate-400">计算机考研智能备考平台</p>}
-      </div>
-    </div>
+    <BrandLogo
+      size={compact ? "sm" : "md"}
+      compact={false}
+      tone={variant.key === "b" ? "inverse" : "default"}
+    />
   );
 }
 
@@ -615,10 +612,7 @@ function DesktopLayout({ variant }: { variant: Variant }) {
         aria-label="桌面预览导航"
         className={cx("mx-auto flex max-w-[1320px] items-center justify-between rounded-lg border px-5 py-3", variant.navClass)}
       >
-        <div>
-          <p className={cx("text-xs font-black", variant.accentClass)}>408 真题系统</p>
-          <p className="text-lg font-black tracking-normal">考试训练平台 Dashboard</p>
-        </div>
+        <PreviewBrandLogo variant={variant} />
         <div className="flex items-center gap-2 text-sm font-bold">
           {["总览", "真题", "错题", "导入", "报告"].map((item, index) => (
             <span key={item} className={cx("rounded-lg px-3 py-2", index === 0 ? variant.primaryClass : "bg-white/10")}>
@@ -634,7 +628,7 @@ function DesktopLayout({ variant }: { variant: Variant }) {
             <div>
               <p className={cx("text-xs font-black", variant.accentClass)}>{variant.name}</p>
               <h1 className="mt-3 max-w-3xl text-4xl font-black tracking-normal">
-                408 真题系统 / 考试平台风静态预览
+                408 错题复盘 / 考试平台风静态预览
               </h1>
               <p className={cx("mt-3 max-w-2xl text-sm leading-6", variant.key === "b" ? "text-white/72" : variant.mutedClass)}>
                 同一套错题资产，桌面端展示多栏 dashboard，手机端切换成独立单列卡片流。
@@ -708,7 +702,7 @@ function MobileLayout({ variant }: { variant: Variant }) {
       <header className={cx("rounded-lg border p-4", variant.heroClass)}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className={cx("text-xs font-black", variant.accentClass)}>408 真题系统</p>
+            <PreviewBrandLogo variant={variant} compact />
             <h1 className="mt-2 text-2xl font-black tracking-normal">今日错题训练</h1>
             <p className={cx("mt-2 text-sm leading-6", variant.key === "b" ? "text-white/72" : variant.mutedClass)}>
               顶部只保留核心状态，下面按做题顺序展示入口。
@@ -795,8 +789,9 @@ export function DesignPreviewIndex() {
   return (
     <div className="min-h-screen bg-[#eef7f3] px-5 py-6 text-slate-950 md:px-8">
       <main className="mx-auto max-w-5xl">
-        <p className="text-xs font-black text-emerald-700">第一阶段静态 UI mock</p>
-        <h1 className="mt-2 text-3xl font-black tracking-normal">3 套 408 真题系统 / 考试平台风方案</h1>
+        <BrandLogo size="md" />
+        <p className="mt-6 text-xs font-black text-emerald-700">第一阶段静态 UI mock</p>
+        <h1 className="mt-2 text-3xl font-black tracking-normal">3 套 408 错题复盘 / 考试平台风方案</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
           每套方案都在同一路由内提供 desktop 预览和 390px mobile 预览，正式业务页不会被替换。
         </p>

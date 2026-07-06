@@ -325,10 +325,11 @@ test("scheme C moves closer to the 408os light exam dashboard reference", () => 
   const source = read("app/design-preview/_components/design-preview.tsx");
 
   assert.match(source, /function ExamLogo/);
+  assert.match(source, /BrandLogo/);
   assert.match(source, /function ContributionHeatmap/);
   assert.match(source, /function SchemeCDashboard/);
   assert.match(source, /function SchemeCMobile/);
-  assert.match(source, /408真题系统/);
+  assert.doesNotMatch(source, /408真题系统/);
   assert.match(source, /首页面板/);
   assert.match(source, /真题总览/);
   assert.match(source, /真题分析/);

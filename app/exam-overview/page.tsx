@@ -132,7 +132,7 @@ export default function ExamOverviewPage() {
   return (
     <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
-        eyebrow="408 真题系统"
+        eyebrow="408 错题复盘"
         title="真题总览"
         subtitle="按科目、章节、题源和年份线索汇总现有题库；没有新增表，数据直接来自你的错题卡。"
       />

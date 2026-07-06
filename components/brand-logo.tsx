@@ -11,6 +11,7 @@ type BrandMarkProps = {
 type BrandLogoProps = BrandMarkProps & {
   href?: string;
   compact?: boolean;
+  tone?: "default" | "inverse";
 };
 
 const markSizeClass = {
@@ -37,16 +38,18 @@ export function BrandMark({ size = "md", className = "" }: BrandMarkProps) {
   );
 }
 
-export function BrandLogo({ href, compact = false, size = "md", className = "" }: BrandLogoProps) {
+export function BrandLogo({ href, compact = false, size = "md", tone = "default", className = "" }: BrandLogoProps) {
+  const titleClass = tone === "inverse" ? "text-white" : "text-slate-950";
+  const subtitleClass = tone === "inverse" ? "text-emerald-200" : "text-emerald-600";
   const content = (
     <span className={`inline-flex min-w-0 items-center gap-3 ${className}`}>
       <BrandMark size={size} />
       {!compact ? (
         <span className="min-w-0">
-          <span className="block truncate text-xl font-black tracking-normal text-slate-950 md:text-2xl">
+          <span className={`block truncate text-xl font-black tracking-normal md:text-2xl ${titleClass}`}>
             408 错题复盘系统
           </span>
-          <span className="mt-0.5 block truncate text-xs font-black tracking-normal text-emerald-600 md:text-sm">
+          <span className={`mt-0.5 block truncate text-xs font-black tracking-normal md:text-sm ${subtitleClass}`}>
             11408-review
           </span>
         </span>
