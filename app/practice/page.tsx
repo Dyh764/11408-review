@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
+import { LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
 import { ReviewFlashcardDeck } from "@/components/study/ReviewFlashcardDeck";
 import { ReviewFlashcard, type FlashcardReview } from "@/components/study/ReviewFlashcard";
@@ -17,7 +17,6 @@ import {
 import { updateKnowledgeStatsForQuestionId } from "@/lib/knowledge-stats";
 import { getDailyMotivation } from "@/lib/motivation";
 import {
-  buildPracticeCatalog,
   filterPracticeQuestions,
   type PracticeFilter,
 } from "@/lib/practice/practice-catalog";
@@ -26,6 +25,8 @@ import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questio
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { ReviewResult } from "@/lib/types";
+
+const exam408SubjectOptions = ["数据结构", "计算机组成原理", "操作系统", "计算机网络"] as const;
 
 function makePracticeReview(question: QuestionWithImage): FlashcardReview {
   const today = todayIsoDate();
@@ -104,7 +105,7 @@ export default function PracticePage() {
       : "",
   );
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看专项复盘。",
+    supabase ? "" : "请配置 Supabase 环境变量后查看 408 刷题数据。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
@@ -145,13 +146,13 @@ export default function PracticePage() {
             setSkippedCount(0);
             setMessage(selected.length === 0 ? "这个范围暂时没有错题。" : "");
           } else {
-            setMessage(items.length === 0 ? "还没有可复盘的错题。" : "");
+            setMessage(items.length === 0 ? "还没有可刷的 408 选择题。" : "");
           }
         }
       })
       .catch((error) => {
         if (isActive) {
-          setMessage(error instanceof Error ? error.message : "读取专项复盘失败。");
+          setMessage(error instanceof Error ? error.message : "读取 408 刷题数据失败。");
         }
       })
       .finally(() => {
@@ -165,7 +166,18 @@ export default function PracticePage() {
     };
   }, [supabase, chapterParam, modeParam, subjectParam, topicParam]);
 
-  const catalog = useMemo(() => buildPracticeCatalog(questions), [questions]);
+  const exam408ChoiceTotal = useMemo(
+    () => filterPracticeQuestions(questions, { type: "exam408-choice" }).length,
+    [questions],
+  );
+  const exam408SubjectCounts = useMemo(
+    () =>
+      exam408SubjectOptions.map((subject) => ({
+        subject,
+        count: filterPracticeQuestions(questions, { type: "exam408-choice", subject }).length,
+      })),
+    [questions],
+  );
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
   const progress =
     initialCount > 0 ? Math.round(((completedTotal + skippedCount) / initialCount) * 100) : 0;
@@ -178,7 +190,11 @@ export default function PracticePage() {
     setInitialCount(selected.length);
     setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
     setSkippedCount(0);
-    setMessage(selected.length === 0 ? "这个范围暂时没有错题。" : "");
+    setRevealedAnswers({});
+    setSelectedChoices({});
+    setSubmittedChoices({});
+    setDraftAnswers({});
+    setMessage(selected.length === 0 ? "这个范围暂时没有可刷的 408 选择题。" : "");
   }
 
   function toggleChoice(reviewId: string, label: string, isMultiple: boolean) {
@@ -241,7 +257,7 @@ export default function PracticePage() {
     options: { lock: boolean; failurePrefix: string },
   ) {
     if (!supabase) {
-      setMessage("请配置 Supabase 环境变量后再记录复盘结果。");
+      setMessage("请配置 Supabase 环境变量后再记录刷题结果。");
       return false;
     }
 
@@ -262,7 +278,7 @@ export default function PracticePage() {
       if (options.lock) {
         setProcessingReviewId("");
       }
-      setMessage("请先登录，再记录专项复盘。");
+      setMessage("请先登录，再记录刷题结果。");
       return false;
     }
 
@@ -328,7 +344,7 @@ export default function PracticePage() {
     try {
       await updateKnowledgeStatsForQuestionId(supabase, review.question_id);
     } catch {
-      // 专项复盘结果已经写入；统计失败只提示，不阻断本轮继续。
+      // 刷题结果已经写入；统计失败只提示，不阻断本轮继续。
     }
 
     if (options.lock) {
@@ -341,11 +357,11 @@ export default function PracticePage() {
   async function handleReview(review: FlashcardReview, result: ReviewResult) {
     const saved = await persistReviewResult(review, result, {
       lock: true,
-      failurePrefix: "专项复盘写入失败：",
+      failurePrefix: "刷题记录写入失败：",
     });
 
     if (saved) {
-      completeReviewLocally(review, result, "专项复盘结果已记录。");
+      completeReviewLocally(review, result, "刷题结果已记录。");
     }
   }
 
@@ -354,25 +370,94 @@ export default function PracticePage() {
     setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
 
     if (!result) {
+      setMessage("已显示答案；这道题暂时无法自动判断，请手动记录结果。");
       return;
     }
 
-    completeReviewLocally(
-      review,
-      result,
-      result === "mastered" ? "回答正确，已进入下一题。" : "回答错误，已进入下一题。",
-    );
+    setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
+    setMessage(result === "mastered" ? "回答正确，查看解析后点下一题。" : "回答错误，查看解析后点下一题。");
     void persistReviewResult(review, result, {
       lock: false,
       failurePrefix: "后台记录失败：",
     });
   }
 
+  function handleChoiceFeedbackNext(review: FlashcardReview) {
+    setQueue((current) => current.filter((item) => item.id !== review.id));
+    cleanupReviewDraft(review.id);
+    setMessage("");
+  }
+
+  function renderDefaultPracticeEntry() {
+    return (
+      <>
+        <MobileSection>
+          <StudyDashboardCard>
+            <p className="text-sm font-bold text-white/75">408 选择题刷题</p>
+            <p className="mt-2 text-3xl font-black tracking-normal">当前可刷 {exam408ChoiceTotal} 题</p>
+            <p className="mt-3 text-sm leading-6 text-white/80">
+              默认只进入四门专业课选择题，提交后先看对错和解析，再进入下一题。
+            </p>
+            <button
+              type="button"
+              onClick={() => resetRound({ type: "exam408-choice" })}
+              disabled={exam408ChoiceTotal === 0}
+              className="mt-5 min-h-12 w-full rounded-lg bg-white px-4 text-sm font-black text-blue-700 disabled:bg-white/20 disabled:text-white/50"
+            >
+              开始全部 408 选择题
+            </button>
+          </StudyDashboardCard>
+        </MobileSection>
+
+        <MobileSection>
+          <SectionHeader title="按科目刷题" subtitle="入口只统计已经拆出 A/B/C/D 选项的 408 选择题。" />
+          <div className="grid gap-3">
+            {exam408SubjectCounts.map((option) => (
+              <button
+                key={option.subject}
+                type="button"
+                onClick={() => resetRound({ type: "exam408-choice", subject: option.subject })}
+                disabled={option.count === 0}
+                className="text-left disabled:opacity-55"
+              >
+                <StudyCard>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-base font-black text-slate-950">{option.subject}</p>
+                    <StudyBadge tone={option.count > 0 ? "green" : "amber"}>
+                      {option.count > 0 ? `${option.count} 题` : "暂无可刷"}
+                    </StudyBadge>
+                  </div>
+                </StudyCard>
+              </button>
+            ))}
+          </div>
+        </MobileSection>
+
+        {exam408ChoiceTotal === 0 ? (
+          <MobileSection>
+            <StudyCard>
+              <p className="text-sm font-black text-slate-950">先导入 408 选择题</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                当前没有可刷的 408 选择题。导入时请让 JSON 包含 subject、choices 和 standard_answer，导入后这里会自动出现刷题入口。
+              </p>
+              <Link
+                href="/import"
+                className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-4 text-sm font-black text-white"
+              >
+                去导入
+              </Link>
+            </StudyCard>
+          </MobileSection>
+        ) : null}
+      </>
+    );
+  }
+
   function renderSummary() {
     return (
       <MobileSection>
         <StudyDashboardCard>
-          <p className="text-sm font-bold text-white/75">专项复盘完成</p>
+          <p className="text-sm font-bold text-white/75">本轮刷题完成</p>
           <p className="mt-2 text-3xl font-black tracking-normal">本轮完成 {completedTotal} 题</p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-white/12 p-3">
@@ -417,21 +502,21 @@ export default function PracticePage() {
   return (
     <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
-        title="专项复盘"
-        subtitle="主动挑一个章节或一类错因，开一轮更聚焦的闪卡复盘。"
+        title="408 选择题刷题"
+        subtitle="按四门专业课连续刷题，提交后立即看对错和解析，再进入下一题。"
       />
 
       <MobileSection>
         <div className="grid grid-cols-3 gap-3">
-          <SprintStatCard label="章节" value={catalog.chapterOptions.length} helper="可选范围" />
-          <SprintStatCard label="错因" value={catalog.mistakeOptions.length} helper="分类入口" />
+          <SprintStatCard label="408" value={exam408ChoiceTotal} helper="可刷选择题" />
+          <SprintStatCard label="科目" value={exam408SubjectCounts.filter((item) => item.count > 0).length} helper="可刷范围" />
           <SprintStatCard label="进度" value={`${progress}%`} helper="本轮完成" tone="purple" />
         </div>
       </MobileSection>
 
       {isLoading ? (
         <MobileSection>
-          <LoadingState label="正在读取专项复盘..." />
+          <LoadingState label="正在读取 408 刷题数据..." />
         </MobileSection>
       ) : null}
 
@@ -443,70 +528,12 @@ export default function PracticePage() {
         </MobileSection>
       ) : null}
 
-      {!isLoading && questions.length === 0 ? (
-        <MobileSection>
-          <EmptyState
-            title="还没有可复盘的错题"
-            description="先导入 ChatGPT 错题卡，再按章节和错因专项复盘。"
-            action={{ href: "/import", label: "导入错题卡" }}
-          />
-        </MobileSection>
-      ) : null}
-
-      {!activeFilter && questions.length > 0 ? (
-        <>
-          <MobileSection>
-            <SectionHeader title="章节复盘" subtitle="只复习所选章节内的错题，按优先级排序。" />
-            <div className="grid gap-3">
-              {catalog.chapterOptions.map((option) => (
-                <button
-                  key={`${option.subject}-${option.chapter}`}
-                  type="button"
-                  onClick={() =>
-                    resetRound({ type: "chapter", subject: option.subject, chapter: option.chapter })
-                  }
-                  className="text-left"
-                >
-                  <StudyCard>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-black text-slate-950">{option.chapter}</p>
-                        <p className="mt-1 text-xs text-slate-500">{option.subject}</p>
-                      </div>
-                      <StudyBadge tone={option.needsAttentionCount > 0 ? "amber" : "green"}>
-                        {option.count} 题
-                      </StudyBadge>
-                    </div>
-                  </StudyCard>
-                </button>
-              ))}
-            </div>
-          </MobileSection>
-
-          <MobileSection>
-            <SectionHeader title="错因复盘" subtitle="按概念、计算、审题等错因聚焦处理。" />
-            <div className="grid grid-cols-2 gap-3">
-              {catalog.mistakeOptions.map((option) => (
-                <button
-                  key={option.mistakeType}
-                  type="button"
-                  onClick={() => resetRound({ type: "mistake", mistakeType: option.mistakeType })}
-                  className="text-left"
-                >
-                  <StudyCard>
-                    <p className="font-black text-slate-950">{option.mistakeType}</p>
-                    <p className="mt-2 text-xs text-slate-500">{option.count} 题</p>
-                  </StudyCard>
-                </button>
-              ))}
-            </div>
-          </MobileSection>
-        </>
-      ) : null}
+      {!activeFilter && !isLoading ? renderDefaultPracticeEntry() : null}
 
       {queue.length > 0 ? (
         <ReviewFlashcardDeck
           reviews={queue}
+          isNavigationLocked={(review) => Boolean(submittedChoices[review.id])}
           renderCard={(review) => (
             <ReviewFlashcard
               review={review}
@@ -519,6 +546,7 @@ export default function PracticePage() {
               processingLocked={Boolean(processingReviewId)}
               onToggleChoice={toggleChoice}
               onSubmitChoice={(result) => handleChoiceSubmitAndNext(review, result)}
+              onNextAfterFeedback={() => handleChoiceFeedbackNext(review)}
               onRevealAnswer={() =>
                 setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
               }

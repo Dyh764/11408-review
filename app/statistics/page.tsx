@@ -23,6 +23,46 @@ const statEntrypoints = [
     title: "专项复盘统计",
     description: "从章节和错因维度发起复盘，复用现有复习记录逻辑。",
   },
+  {
+    href: "/exam-overview",
+    title: "真题总览统计",
+    description: "按科目、章节、题源和年份线索查看现有 408 题库覆盖。",
+  },
+  {
+    href: "/memory-cards",
+    title: "记忆卡片统计",
+    description: "进入有答案解析的题卡，按不熟题和待核对题做回忆式复习。",
+  },
+  {
+    href: "/notes",
+    title: "学习笔记统计",
+    description: "汇总个人备注、正确思路和错因标签，用于复盘前快速回看。",
+  },
+  {
+    href: "/collections",
+    title: "收藏夹统计",
+    description: "按不熟题本、待整理、已掌握和 408 选择题自动归类，复用现有题卡状态。",
+  },
+  {
+    href: "/ranking",
+    title: "学习排行榜",
+    description: "按科目和章节查看当前账号的通关率、刷题量和掌握榜。",
+  },
+  {
+    href: "/algorithms",
+    title: "算法专题统计",
+    description: "按排序、查找、树图和操作系统算法聚合 408 算法错题。",
+  },
+  {
+    href: "/study-mode",
+    title: "学习模式统计",
+    description: "把快速刷题、记忆卡片、收藏夹、算法专题和学习完成回看集中成一个入口。",
+  },
+  {
+    href: "/study-complete",
+    title: "学习完成统计",
+    description: "查看本轮总结、分组完成度和下一轮复盘入口，完成记录不做伪造。",
+  },
 ];
 
 export default function StatisticsPage() {

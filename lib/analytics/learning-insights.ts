@@ -12,6 +12,8 @@ export type AnalyticsQuestion = {
   subject: string;
   chapter: string | null;
   knowledge_point: string | null;
+  source?: string | null;
+  source_info?: { type?: string; name?: string; raw?: string } | string | null;
   question_text?: string | null;
   choices?: ChoiceOption[] | null;
   standard_answer?: string | null;

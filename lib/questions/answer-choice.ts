@@ -5,24 +5,39 @@ export type ParsedAnswerChoices = {
 
 const allowedLabels = new Set(["A", "B", "C", "D"]);
 
+function normalizeLabels(value: string) {
+  return Array.from(
+    new Set(
+      [...value.toUpperCase().matchAll(/[A-D]/g)]
+        .map((match) => match[0])
+        .filter((label) => allowedLabels.has(label)),
+    ),
+  );
+}
+
 export function parseAnswerChoiceLabels(answer?: string | null): ParsedAnswerChoices {
-  if (!answer?.trim()) {
+  const source = answer?.trim();
+
+  if (!source) {
     return { labels: [], isMultiple: false };
   }
 
-  const answerPart = answer.match(/答案\s*[：:]\s*([A-Da-d][A-Da-d\s,，、和与]*)/)?.[1];
+  const directAnswer = source.match(
+    /^[（(]?\s*([A-Da-d](?:\s*[,，、/]\s*[A-Da-d]|\s+[A-Da-d])*)\s*[）)]?[。.]?$/,
+  )?.[1];
+  const prefixedAnswer = source.match(
+    /(?:标准答案|正确答案|参考答案|答案|answer|correct answer)\s*(?:是|为|[:：])?\s*([A-Da-d](?:\s*(?:[,，、/]|和|与|and)?\s*[A-Da-d])*)/i,
+  )?.[1];
+  const selectedAnswer = source.match(
+    /(?:本题|此题)?\s*(?:应选|选择|选)\s*([A-Da-d](?:\s*(?:[,，、/]|和|与|and)?\s*[A-Da-d])*)/,
+  )?.[1];
+  const answerPart = directAnswer ?? prefixedAnswer ?? selectedAnswer;
 
   if (!answerPart) {
     return { labels: [], isMultiple: false };
   }
 
-  const labels = Array.from(
-    new Set(
-      [...answerPart.toUpperCase().matchAll(/[A-D]/g)]
-        .map((match) => match[0])
-        .filter((label) => allowedLabels.has(label)),
-    ),
-  );
+  const labels = normalizeLabels(answerPart);
 
   return {
     labels,

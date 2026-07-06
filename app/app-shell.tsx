@@ -10,6 +10,7 @@ const desktopNavItems = [
   { href: "/questions", label: "错题总览" },
   { href: "/reports", label: "错题分析" },
   { href: "/knowledge-map", label: "知识图谱" },
+  { href: "/memory-cards", label: "记忆卡片" },
   { href: "/statistics", label: "数据统计" },
 ];
 
@@ -47,10 +48,10 @@ function DesktopAppNav({ pathname }: { pathname: string }) {
           })}
         </div>
         <Link
-          href="/settings"
+          href="/profile"
           className="flex items-center gap-3 text-sm font-bold text-slate-500 hover:text-slate-900"
         >
-          <span className="grid h-10 w-10 place-items-center rounded-full bg-slate-100">光</span>
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-slate-100">档</span>
           <span className="text-slate-700">学习档案</span>
         </Link>
       </div>

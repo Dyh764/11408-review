@@ -892,7 +892,11 @@ export default function ImportPage() {
 
       {previewCards.length > 0 ? (
         <MobileSection>
-          <div className="space-y-4">
+          <details className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+            <summary className="cursor-pointer list-none text-sm font-black text-blue-700">
+              高级检查
+            </summary>
+          <div className="mt-3 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-950">导入前质检</h2>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -946,6 +950,7 @@ export default function ImportPage() {
             </p>
           ) : null}
           </div>
+          </details>
         </MobileSection>
       ) : null}
 

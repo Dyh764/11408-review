@@ -8,7 +8,7 @@ const navItems = [
   { href: "/questions", label: "错题", icon: "▣" },
   { href: "/import", label: "导入", icon: "+" },
   { href: "/practice", label: "练习", icon: "✓" },
-  { href: "/settings", label: "我的", icon: "•" },
+  { href: "/profile", label: "我的", icon: "•" },
 ];
 
 export function BottomNav() {

@@ -1,7 +1,23 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const protectedRoutes = ["/upload", "/import", "/questions", "/reports"];
-const utilityRoutes = ["/settings", "/sprint", "/practice", "/knowledge-map", "/statistics"];
+const utilityRoutes = [
+  "/settings",
+  "/profile",
+  "/sprint",
+  "/practice",
+  "/knowledge-map",
+  "/exam-overview",
+  "/memory-cards",
+  "/notes",
+  "/collections",
+  "/ranking",
+  "/algorithms",
+  "/algorithms/sort",
+  "/study-mode",
+  "/study-complete",
+  "/statistics",
+];
 
 async function expectPageHasNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => {
@@ -31,6 +47,7 @@ async function expectDesktopNav(page: Page) {
   await expect(desktopNav.getByRole("link", { name: "错题总览" })).toHaveAttribute("href", "/questions");
   await expect(desktopNav.getByRole("link", { name: "错题分析" })).toHaveAttribute("href", "/reports");
   await expect(desktopNav.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(desktopNav.getByRole("link", { name: "记忆卡片" })).toHaveAttribute("href", "/memory-cards");
   await expect(desktopNav.getByRole("link", { name: "数据统计" })).toHaveAttribute("href", "/statistics");
 }
 
@@ -50,6 +67,14 @@ async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
   }
 }
 
+async function openImportAdvancedCheck(page: Page) {
+  const advancedSummary = page.locator("summary").filter({ hasText: "高级检查" });
+
+  await expect(advancedSummary).toBeVisible();
+  await expect(page.locator("details[open]").filter({ hasText: "高级检查" })).toHaveCount(0);
+  await advancedSummary.click();
+}
+
 test("home page is accessible and exposes the responsive 408 dashboard", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const response = await page.goto("/");
@@ -63,6 +88,7 @@ test("home page is accessible and exposes the responsive 408 dashboard", async (
   await expect(page.getByText("功能区").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(page.getByLabel("桌面首页导航").getByRole("link", { name: "记忆卡片" })).toHaveAttribute("href", "/memory-cards");
   await expect(page.getByRole("link", { name: "数据统计" })).toHaveAttribute("href", "/statistics");
   await expectPageHasNoHorizontalOverflow(page);
 });
@@ -76,6 +102,7 @@ test("desktop inner routes use the shared desktop navigation shell", async ({ pa
   await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("link", { name: "错题总览" })).toHaveAttribute("href", "/questions");
   await expect(page.getByRole("link", { name: "知识图谱" })).toHaveAttribute("href", "/knowledge-map");
+  await expect(page.getByRole("link", { name: "记忆卡片" })).toHaveAttribute("href", "/memory-cards");
   await expect(page.getByRole("link", { name: "首页", exact: true })).toHaveCount(0);
   await expectPageHasNoHorizontalOverflow(page);
 });
@@ -152,8 +179,9 @@ test("import page can parse example JSON into preview cards when reachable", asy
   await page.getByRole("button", { name: "插入示例 JSON" }).click();
   await page.getByRole("button", { name: "解析" }).click();
 
+  await openImportAdvancedCheck(page);
   await expect(page.getByText("需要检查 0 张错题卡")).toBeVisible();
-  await expect(page.getByText("本次解析没有发现需要预览的问题题卡，干净题可直接从顶部确认导入。")).toBeVisible();
+  await expect(page.getByText("本次解析没有发现需要预览的问题题卡，干净题可直接用顶部按钮导入。")).toBeVisible();
   await expect(page.getByText("文字错题卡")).toHaveCount(0);
   await expect(page.getByText("文字题卡预览")).toHaveCount(0);
   await expect(page.locator("article").filter({ hasText: "幂级数收敛半径、比值法" })).toHaveCount(0);
@@ -202,6 +230,7 @@ test("import page previews ChatGPT answer fields when JSON includes an answer", 
   );
   await page.getByRole("button", { name: "解析" }).click();
 
+  await openImportAdvancedCheck(page);
   await expect(page.getByText("包含答案")).toHaveCount(2);
   await expect(page.getByText("难度：中等")).toBeVisible();
   await expect(page.getByText("标准答案预览")).toBeVisible();
@@ -253,6 +282,7 @@ test("import preview renders LaTeX formulas with KaTeX when reachable", async ({
   );
   await page.getByRole("button", { name: "解析" }).click();
 
+  await openImportAdvancedCheck(page);
   await expect(page.locator(".katex").first()).toBeVisible();
   await expectPageHasNoHorizontalOverflow(page);
 });
@@ -295,6 +325,7 @@ test("import page repairs single-backslash LaTeX and keeps KaTeX preview working
 
   await expect(page.getByText("已自动修复中文引号或 LaTeX 反斜杠格式，请继续检查预览。")).toBeVisible();
   await expect(page.getByText("检测到 LaTeX 单反斜杠：已尝试转义。")).toBeVisible();
+  await openImportAdvancedCheck(page);
   await expect(page.getByText("检测到 difficulty = 较难：建议自动映射为 困难。")).toBeVisible();
   await expect(page.locator(".katex").first()).toBeVisible();
   await expectPageHasNoHorizontalOverflow(page);
@@ -356,6 +387,7 @@ test("import page normalizes ChatGPT Chinese taxonomy values when reachable", as
   ]`);
   await page.getByRole("button", { name: "解析" }).click();
 
+  await openImportAdvancedCheck(page);
   await expect(page.getByText("需要检查 1 张错题卡")).toBeVisible();
   await expect(page.getByText("已自动映射 difficulty = 困难 -> 较难。")).toBeVisible();
   await expect(page.getByText("已自动映射 mastery_status = 已理解但需复习 -> 做对但不稳。")).toBeVisible();
@@ -409,6 +441,7 @@ test("import preview shows structured choices when JSON includes choices", async
   );
   await page.getByRole("button", { name: "解析" }).click();
 
+  await openImportAdvancedCheck(page);
   const previewCard = page.locator("section").filter({ hasText: "需要检查 1 张错题卡" });
 
   await expect(previewCard.getByText("选择题 / 4 个选项")).toBeVisible();
@@ -559,11 +592,11 @@ test("home page keeps optional DeepSeek out of the primary asset cockpit", async
   if (await page.getByTestId("home-mobile-dashboard").isVisible()) {
     await expect(page.getByText("数学错题资产管理")).toBeVisible();
     await expect(page.getByText("核心模块")).toBeVisible();
-    await expect(page.getByRole("link", { name: /错题分享 进入单题详情/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /最近错题 进入最近导入/ })).toBeVisible();
   } else {
     await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
     await expect(page.getByText("功能区").first()).toBeVisible();
-    await expect(page.getByRole("link", { name: "错题分享" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "最近错题" })).toBeVisible();
   }
   await expect(page.getByText("现在应该点这里")).toHaveCount(0);
   await expect(page.getByText("主流程入口保留，低频功能不抢首屏。")).toHaveCount(0);
@@ -624,8 +657,18 @@ test("mobile viewport has no obvious horizontal scroll and keeps bottom nav visi
     "/",
     "/import",
     "/settings",
+    "/profile",
     "/sprint",
     "/practice",
+    "/exam-overview",
+    "/memory-cards",
+    "/notes",
+    "/collections",
+    "/ranking",
+    "/algorithms",
+    "/algorithms/sort",
+    "/study-mode",
+    "/study-complete",
     "/questions",
     "/upload",
     "/review",

@@ -80,6 +80,7 @@ export function ReviewFlashcard({
   processingLocked,
   onToggleChoice,
   onSubmitChoice,
+  onNextAfterFeedback,
   onRevealAnswer,
   onDraftAnswer,
   onSkip,
@@ -95,6 +96,7 @@ export function ReviewFlashcard({
   processingLocked: boolean;
   onToggleChoice: (reviewId: string, label: string, isMultiple: boolean) => void;
   onSubmitChoice: (result?: ReviewResult) => void;
+  onNextAfterFeedback?: () => void;
   onRevealAnswer: () => void;
   onDraftAnswer: (value: string) => void;
   onSkip: () => void;
@@ -114,9 +116,11 @@ export function ReviewFlashcard({
     answerChoices.labels.length > 0 ? (choiceIsCorrect ? "mastered" : "wrong_again") : undefined;
   const canRecordReview = hasAnswer
     ? isChoiceQuestion
-      ? submittedChoice && answerRevealed
+      ? submittedChoice && answerRevealed && (!onNextAfterFeedback || answerChoices.labels.length === 0)
       : !isChoiceQuestion && answerRevealed
     : true;
+  const canMoveToNextChoice =
+    Boolean(onNextAfterFeedback) && isChoiceQuestion && submittedChoice && answerRevealed && answerChoices.labels.length > 0;
   const priority = explainReviewPriorityScore(review, today);
   const badges = buildQuestionBadges(review.questions, {
     reviewStatus: isOverdue(review.scheduled_date, today) ? "overdue" : "due_today",
@@ -241,7 +245,7 @@ export function ReviewFlashcard({
           <button
             type="button"
             onClick={onSkip}
-            disabled={processingLocked}
+            disabled={processingLocked || submittedChoice}
             className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
           >
             跳过本题
@@ -295,6 +299,15 @@ export function ReviewFlashcard({
               ))}
             </div>
           </div>
+        ) : null}
+        {canMoveToNextChoice ? (
+          <button
+            type="button"
+            onClick={onNextAfterFeedback}
+            className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
+          >
+            下一题
+          </button>
         ) : null}
       </StudyCard>
     </MobileSection>
