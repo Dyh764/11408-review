@@ -9,6 +9,7 @@ import {
   type AnalyticsReviewResult,
   type TodayLiftFocus,
 } from "@/lib/analytics/learning-insights";
+import { BrandLogo } from "@/components/brand-logo";
 import { buildHomeActionCards, type HomeActionCard } from "@/lib/analytics/home-actions";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
@@ -204,22 +205,7 @@ function buildReviewActivity(reviews: AnalyticsReviewResult[]) {
 }
 
 function HomeExamLogo({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className={compact ? "relative h-9 w-9" : "relative h-12 w-12"} aria-hidden="true">
-        <span className="absolute left-0 top-3 h-5 w-8 rotate-45 rounded bg-[#10b981]" />
-        <span className="absolute left-4 top-1 h-5 w-8 rotate-45 rounded bg-[#22d3ee]" />
-      </div>
-      <div>
-        <p className={compact ? "text-xl font-black tracking-normal text-slate-950" : "text-3xl font-black tracking-normal text-slate-950"}>
-          408 错题训练系统
-        </p>
-        {!compact ? (
-          <p className="mt-1 text-sm font-black text-slate-400">计算机考研错题复盘平台</p>
-        ) : null}
-      </div>
-    </div>
-  );
+  return <BrandLogo size={compact ? "md" : "lg"} compact={false} />;
 }
 
 function HomePanel({

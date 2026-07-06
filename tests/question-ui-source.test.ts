@@ -388,7 +388,7 @@ test("home page applies the selected 408 exam platform layout without external i
   assert.match(home, /错题分析/);
   assert.match(home, /知识图谱/);
   assert.match(home, /数据统计/);
-  assert.match(home, /408 错题训练系统/);
+  assert.match(home, /BrandLogo/);
   assert.match(home, /做题贡献（最近90天）/);
   assert.match(home, /数学 \+ 408 掌握进度/);
   assert.match(home, /本章欠缺分析/);
@@ -653,6 +653,33 @@ test("408 platform exposes study completion as a real route-backed feature", () 
   assert.match(studyComplete, /记忆卡片/);
   assert.match(studyComplete, /收藏夹/);
   assert.match(studyComplete, /不伪造完成记录/);
+});
+
+test("brand system uses the selected A logo across mobile and desktop shells", () => {
+  const brandLogo = read("components/brand-logo.tsx");
+  const appShell = read("app/app-shell.tsx");
+  const bottomNav = read("components/bottom-nav.tsx");
+  const studyUi = read("components/study/study-ui.tsx");
+  const pageHeader = read("components/page-header.tsx");
+  const home = read("app/page.tsx");
+  const profile = read("app/profile/page.tsx");
+  const manifest = read("public/manifest.json");
+  const icon = read("public/icon.svg");
+
+  assert.match(brandLogo, /\/brand\/408-review-logo-a\.png/);
+  assert.match(brandLogo, /export function BrandMark/);
+  assert.match(brandLogo, /export function BrandLogo/);
+  assert.match(brandLogo, /408 错题复盘系统/);
+  assert.match(appShell, /<BrandLogo href="\/" size="lg"/);
+  assert.match(appShell, /<BrandMark size="sm" className="rounded-full"/);
+  assert.match(bottomNav, /<BrandMark size="sm"/);
+  assert.match(studyUi, /<BrandMark size="sm"/);
+  assert.match(pageHeader, /<BrandMark size="sm"/);
+  assert.match(home, /<BrandLogo size=\{compact \? "md" : "lg"\}/);
+  assert.match(profile, /<BrandMark size="sm"/);
+  assert.match(manifest, /408 错题复盘系统/);
+  assert.match(manifest, /#10b981/);
+  assert.match(icon, /#10b981/);
 });
 
 test("import page explains JSON import with aggregate preview stats", () => {

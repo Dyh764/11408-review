@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { BrandMark } from "@/components/brand-logo";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 
@@ -269,12 +270,15 @@ function ProfileContent() {
       <div className="mx-auto grid max-w-[1180px] gap-4">
         <header className="rounded-[22px] border border-slate-100 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)] md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="flex min-w-0 items-start gap-3">
+              <BrandMark size="sm" />
+              <div className="min-w-0">
               <p className="text-xs font-black text-[#10b981]">11408 学习记录</p>
               <h1 className="mt-2 text-3xl font-black tracking-normal text-slate-950">学习档案</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                 汇总当前错题库、复盘完成记录、薄弱章节和最近复盘。数据全部来自本地账号下的真实题卡与复习记录。
               </p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link href="/questions" className="inline-flex min-h-10 items-center rounded-lg bg-[#10b981] px-4 text-sm font-black text-white">

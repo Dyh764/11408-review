@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandMark } from "@/components/brand-logo";
 
 const navItems = [
-  { href: "/", label: "首页", icon: "⌂" },
+  { href: "/", label: "首页", icon: "brand" },
   { href: "/questions", label: "错题", icon: "▣" },
   { href: "/import", label: "导入", icon: "+" },
   { href: "/practice", label: "练习", icon: "✓" },
@@ -31,9 +32,13 @@ export function BottomNav() {
                   : "bg-white text-slate-500 ring-1 ring-slate-100 hover:bg-slate-50"
               }`}
             >
-              <span className="text-lg leading-none" aria-hidden="true">
-                {item.icon}
-              </span>
+              {item.icon === "brand" ? (
+                <BrandMark size="sm" className={isActive ? "ring-white/40" : ""} />
+              ) : (
+                <span className="text-lg leading-none" aria-hidden="true">
+                  {item.icon}
+                </span>
+              )}
               <span className="mt-1">{item.label}</span>
             </Link>
           );

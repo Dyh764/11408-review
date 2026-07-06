@@ -4,9 +4,9 @@ import "./globals.css";
 import { AppShell } from "./app-shell";
 
 export const metadata: Metadata = {
-  title: "11408 错题复盘助手",
-  applicationName: "11408 错题复盘助手",
-  description: "手机优先的 11408 错题导入、复习和薄弱点分析工具。",
+  title: "408 错题复盘系统",
+  applicationName: "408 错题复盘系统",
+  description: "手机和电脑统一的 408 错题导入、刷题解析、复盘和薄弱点分析系统。",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon.svg",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "11408 错题复盘助手",
+    title: "408 错题复盘系统",
     statusBarStyle: "default",
   },
 };

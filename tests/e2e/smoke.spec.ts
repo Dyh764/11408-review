@@ -83,7 +83,7 @@ test("home page is accessible and exposes the responsive 408 dashboard", async (
   await expect(page.getByTestId("home-desktop-dashboard")).toBeVisible();
   await expect(page.getByTestId("home-mobile-dashboard")).toBeHidden();
   await expect(page.getByRole("navigation", { name: "桌面首页导航" })).toBeVisible();
-  await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
+  await expect(page.getByText("408 错题复盘系统").first()).toBeVisible();
   await expect(page.getByText("数学 + 408 掌握进度").first()).toBeVisible();
   await expect(page.getByText("功能区").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "首页面板" })).toHaveAttribute("href", "/");
@@ -594,7 +594,7 @@ test("home page keeps optional DeepSeek out of the primary asset cockpit", async
     await expect(page.getByText("核心模块")).toBeVisible();
     await expect(page.getByRole("link", { name: /最近错题 进入最近导入/ })).toBeVisible();
   } else {
-    await expect(page.getByText("408 错题训练系统").first()).toBeVisible();
+    await expect(page.getByText("408 错题复盘系统").first()).toBeVisible();
     await expect(page.getByText("功能区").first()).toBeVisible();
     await expect(page.getByRole("link", { name: "最近错题" })).toBeVisible();
   }
