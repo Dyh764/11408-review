@@ -533,7 +533,6 @@ export default function PracticePage() {
       {queue.length > 0 ? (
         <ReviewFlashcardDeck
           reviews={queue}
-          isNavigationLocked={(review) => Boolean(submittedChoices[review.id])}
           renderCard={(review) => (
             <ReviewFlashcard
               review={review}

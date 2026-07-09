@@ -65,7 +65,7 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
   const isDragging = dragStartX !== null;
   const dragDirectionLabel =
     navigationLocked
-      ? "先看完解析，再用卡片内的下一题继续"
+      ? "当前卡片暂时不能切换"
       : Math.abs(dragOffsetX) >= swipeThreshold
       ? dragOffsetX > 0
         ? "松手回到上一题"

@@ -88,6 +88,40 @@ function isExam408ChoiceQuestion(question: PracticeQuestion) {
   );
 }
 
+function questionCreatedTime(question: PracticeQuestion) {
+  const value = question.created_at?.trim();
+
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function sortPracticeQuestions<T extends PracticeQuestion>(questions: T[]) {
+  const fallbackSorted = sortQuestionsForChapterList(questions);
+
+  return fallbackSorted
+    .map((question, index) => ({ question, index, createdTime: questionCreatedTime(question) }))
+    .sort((a, b) => {
+      if (a.createdTime !== null && b.createdTime !== null && a.createdTime !== b.createdTime) {
+        return a.createdTime - b.createdTime;
+      }
+
+      if (a.createdTime !== null && b.createdTime === null) {
+        return -1;
+      }
+
+      if (a.createdTime === null && b.createdTime !== null) {
+        return 1;
+      }
+
+      return a.index - b.index;
+    })
+    .map((entry) => entry.question);
+}
+
 export function buildPracticeCatalog(questions: PracticeQuestion[]) {
   const chapterMap = new Map<string, PracticeChapterOption>();
   const mistakeMap = new Map<string, number>();
@@ -132,7 +166,7 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
   questions: T[],
   filter: PracticeFilter,
 ) {
-  return sortQuestionsForChapterList(
+  return sortPracticeQuestions(
     questions.filter((question) => {
       if (filter.type === "chapter") {
         return question.subject === filter.subject && chapterLabel(question) === filter.chapter;

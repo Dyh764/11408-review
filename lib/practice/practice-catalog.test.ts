@@ -107,6 +107,41 @@ test("filterPracticeQuestions builds a four-course choice-only round", () => {
   );
 });
 
+test("filterPracticeQuestions orders practice rounds from oldest to newest question time", () => {
+  const questions = [
+    {
+      ...baseQuestion,
+      id: "newest",
+      subject: "数据结构",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-03T00:00:00.000Z",
+      priority_score: 100,
+    },
+    {
+      ...baseQuestion,
+      id: "oldest",
+      subject: "数据结构",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-01T00:00:00.000Z",
+      priority_score: 10,
+    },
+    {
+      ...baseQuestion,
+      id: "middle",
+      subject: "数据结构",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-02T00:00:00.000Z",
+      priority_score: 50,
+    },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, { type: "exam408-choice", subject: "数据结构" })
+      .map((question) => question.id),
+    ["oldest", "middle", "newest"],
+  );
+});
+
 test("filterPracticeQuestions narrows a four-course choice round to one chapter", () => {
   const questions = [
     {
