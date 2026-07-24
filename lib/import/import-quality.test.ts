@@ -11,6 +11,8 @@ import type {
 
 function cardFromRow(row: Record<string, unknown>): ImportQuestionCard {
   return {
+    image_code: row.image_code as string,
+    image_path: row.image_path as string,
     subject: (row.subject as ImportQuestionCard["subject"]) ?? "数学",
     chapter: typeof row.chapter === "string" && row.chapter ? row.chapter : undefined,
     knowledge_point:
@@ -193,4 +195,50 @@ test("import quality report shows automatic enum mapping notes", () => {
   assert.ok(labels.includes("已自动映射 mastery_status = 已理解但需复习 -> 做对但不稳。"));
   assert.ok(labels.includes("已自动映射 review_priority = 高 -> high。"));
   assert.ok(labels.includes("已自动映射 confidence = 高 -> high。"));
+});
+
+test("image-dependent cards without an original image are routed to inbox without blocking import", () => {
+  const parsed = parseSingle({
+    ...validRow,
+    subject: "操作系统",
+    chapter: "进程与线程",
+    question_text: "根据下图所示的进程状态转换，正确的是？",
+    choices: [
+      { label: "A", text: "就绪到运行" },
+      { label: "B", text: "运行到阻塞" },
+      { label: "C", text: "阻塞到运行" },
+      { label: "D", text: "就绪到阻塞" },
+    ],
+    standard_answer: "答案：A",
+    answer_explanation: "过程：A：正确；B：条件不完整；C：不能直接转换；D：不能直接转换。",
+    image_code: "required",
+  });
+
+  const report = getImportQualityReport(parsed);
+  const issue = report.rows[0].issues.find((item) => item.label === "依赖原图但未绑定");
+
+  assert.equal(report.importableCount, 1);
+  assert.equal(report.inboxRecommendedCount, 1);
+  assert.equal(issue?.severity, "warning");
+  assert.match(issue?.detail ?? "", /刷题时自动跳过/);
+});
+
+test("complete 408 per-choice explanations avoid the general-format info notice", () => {
+  const parsed = parseSingle({
+    ...validRow,
+    subject: "数据结构",
+    chapter: "绪论",
+    choices: [
+      { label: "A", text: "A" },
+      { label: "B", text: "B" },
+      { label: "C", text: "C" },
+      { label: "D", text: "D" },
+    ],
+    standard_answer: "答案：B",
+    answer_explanation: "过程：A：错误；B：正确；C：错误；D：错误。",
+  });
+
+  const labels = getImportQualityReport(parsed).rows[0].issues.map((issue) => issue.label);
+
+  assert.equal(labels.includes("逐项解析不完整，刷题时将保留完整总解析"), false);
 });

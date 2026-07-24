@@ -1,4 +1,6 @@
 import type { ImportParseResult, ImportQuestionCard, ImportParsedCard } from "./import-schema";
+import { parseChoiceExplanations } from "../questions/choice-explanation.ts";
+import { questionDependsOnImage } from "../questions/question-image.ts";
 
 export type ImportQualitySeverity = "error" | "warning" | "info";
 
@@ -190,6 +192,27 @@ function inspectCard(item: ImportParsedCard): ImportQualityRow {
 
   if (card.answer_explanation?.trim() && !card.answer_explanation.trim().startsWith("过程：")) {
     addIssue(issues, "warning", "解析建议以“过程：”开头");
+  }
+
+  if (
+    ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(card.subject) &&
+    card.choices.length > 0 &&
+    card.answer_explanation?.trim() &&
+    !parseChoiceExplanations(
+      card.answer_explanation,
+      card.choices.map((choice) => choice.label),
+    ).complete
+  ) {
+    addIssue(issues, "info", "逐项解析不完整，刷题时将保留完整总解析");
+  }
+
+  if (questionDependsOnImage(card) && !card.image_path?.trim()) {
+    addIssue(
+      issues,
+      "warning",
+      "依赖原图但未绑定",
+      "这道题会进入待整理，并在刷题时自动跳过；可在高级检查中绑定原图。",
+    );
   }
 
   if (hasBareLatex(text)) {

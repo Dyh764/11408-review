@@ -51,6 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isDesignPreview = pathname.startsWith("/design-preview");
   const isHome = pathname === "/";
+  const isPractice = pathname === "/practice";
 
   if (isDesignPreview) {
     return <main className="min-h-screen w-full overflow-x-hidden">{children}</main>;
@@ -68,10 +69,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f9fb] text-slate-950">
+    <div
+      className={
+        isPractice
+          ? "flex h-dvh min-h-0 flex-col overflow-hidden bg-[#f7f9fb] text-slate-950"
+          : "min-h-screen bg-[#f7f9fb] text-slate-950"
+      }
+    >
       <DesktopAppNav pathname={pathname} />
-      <div className="mx-auto min-h-screen w-full max-w-[520px] bg-[#f8fafc] md:max-w-[1500px] md:bg-transparent">
-        <main className="min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10">
+      <div
+        className={`mx-auto w-full max-w-[520px] bg-[#f8fafc] md:max-w-[1500px] md:bg-transparent ${
+          isPractice ? "min-h-0 flex-1" : "min-h-screen"
+        }`}
+      >
+        <main
+          className={
+            isPractice
+              ? "h-full min-h-0 overflow-y-auto overscroll-contain pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0"
+              : "min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10"
+          }
+        >
           {children}
         </main>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
 import { ReviewFlashcardDeck } from "@/components/study/ReviewFlashcardDeck";
@@ -20,8 +20,22 @@ import {
   filterPracticeQuestions,
   type PracticeFilter,
 } from "@/lib/practice/practice-catalog";
+import {
+  buildPracticeScopeKey,
+  buildPracticeSessionStorageKey,
+  completePracticeQuestion,
+  createPracticeSession,
+  markPracticeQuestionShown,
+  parsePracticeSession,
+  reconcilePracticeSession,
+  removeUnavailablePracticeQuestion,
+  selectPracticeResumeQuestionId,
+  skipPracticeQuestion,
+  type PracticeSessionV1,
+} from "@/lib/practice/practice-session";
 import { buildReviewAdjustmentPlan, shouldIncrementRepeatedWrongCount } from "@/lib/review-scheduler";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
+import { canUseQuestionInPractice } from "@/lib/questions/question-image";
 import { todayIsoDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { ReviewResult } from "@/lib/types";
@@ -66,11 +80,108 @@ function makePracticeReview(question: QuestionWithImage): FlashcardReview {
   };
 }
 
+function getPracticeQuestionSelection(
+  questions: QuestionWithImage[],
+  filter: PracticeFilter,
+) {
+  const filtered = filterPracticeQuestions(questions, filter);
+  const available = filtered.filter(canUseQuestionInPractice);
+
+  return {
+    available,
+    missingImageCount: filtered.length - available.length,
+  };
+}
+
+function getPracticeScopeLabel(filter: PracticeFilter) {
+  if (filter.type === "exam408-choice") {
+    return filter.chapter || filter.subject || "全部 408";
+  }
+
+  if (filter.type === "chapter") {
+    return `${filter.subject} / ${filter.chapter}`;
+  }
+
+  if (filter.type === "topic") {
+    return filter.topic;
+  }
+
+  return filter.mistakeType;
+}
+
+function practiceSessionSize(session: PracticeSessionV1) {
+  const completed = Object.values(session.completedCounts).reduce((sum, count) => sum + count, 0);
+  return session.remainingQuestionIds.length + completed + session.skippedCount;
+}
+
+function persistPracticeSession(session: PracticeSessionV1) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const storageKey = buildPracticeSessionStorageKey(session.userId, session.scopeKey);
+  window.localStorage.setItem(storageKey, JSON.stringify(session));
+}
+
+function preparePracticeRound(
+  questions: QuestionWithImage[],
+  filter: PracticeFilter,
+) {
+  const selection = getPracticeQuestionSelection(questions, filter);
+  const questionIds = selection.available.map((question) => question.id);
+  const questionById = new Map(selection.available.map((question) => [question.id, question]));
+  const userId = selection.available[0]?.user_id ?? questions[0]?.user_id ?? "";
+  const scopeKey = buildPracticeScopeKey(filter);
+  const storageKey = userId ? buildPracticeSessionStorageKey(userId, scopeKey) : "";
+  const stored =
+    storageKey && typeof window !== "undefined"
+      ? parsePracticeSession(window.localStorage.getItem(storageKey))
+      : null;
+  const matchingStored =
+    stored && stored.userId === userId && stored.scopeKey === scopeKey ? stored : null;
+  const reconciled = matchingStored
+    ? reconcilePracticeSession(matchingStored, questionIds)
+    : null;
+  let session =
+    reconciled && reconciled.remainingQuestionIds.length > 0
+      ? reconciled
+      : createPracticeSession({
+          userId,
+          filter,
+          questionIds,
+          previousFirstQuestionId: reconciled?.orderedQuestionIds[0],
+        });
+  const activeQuestionId = selectPracticeResumeQuestionId(session);
+
+  if (activeQuestionId) {
+    session = markPracticeQuestionShown(session, activeQuestionId);
+  }
+
+  if (userId) {
+    persistPracticeSession(session);
+  }
+
+  return {
+    session,
+    activeReviewId: activeQuestionId ? `practice-${activeQuestionId}` : "",
+    queue: session.remainingQuestionIds
+      .map((questionId) => questionById.get(questionId))
+      .filter((question): question is QuestionWithImage => Boolean(question))
+      .map(makePracticeReview),
+    missingImageCount: selection.missingImageCount,
+  };
+}
+
 export default function PracticePage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [activeFilter, setActiveFilter] = useState<PracticeFilter | null>(null);
   const [queue, setQueue] = useState<FlashcardReview[]>([]);
+  const [activeReviewId, setActiveReviewId] = useState("");
+  const [practiceSession, setPracticeSession] = useState<PracticeSessionV1 | null>(null);
+  const practiceSessionRef = useRef<PracticeSessionV1 | null>(null);
+  const unavailableImageIdsRef = useRef(new Set<string>());
+  const [missingImageCount, setMissingImageCount] = useState(0);
   const [initialCount, setInitialCount] = useState(0);
   const [completedCounts, setCompletedCounts] = useState<Record<ReviewResult, number>>({
     still_wrong: 0,
@@ -109,6 +220,38 @@ export default function PracticePage() {
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
+  const activatePreparedRound = useCallback(
+    (
+      prepared: ReturnType<typeof preparePracticeRound>,
+      filter: PracticeFilter,
+    ) => {
+      practiceSessionRef.current = prepared.session;
+      unavailableImageIdsRef.current.clear();
+      setPracticeSession(prepared.session);
+      setActiveFilter(filter);
+      setQueue(prepared.queue);
+      setActiveReviewId(prepared.activeReviewId);
+      setInitialCount(practiceSessionSize(prepared.session));
+      setCompletedCounts(prepared.session.completedCounts);
+      setSkippedCount(prepared.session.skippedCount);
+      setMissingImageCount(prepared.missingImageCount);
+      setRevealedAnswers({});
+      setSelectedChoices({});
+      setSubmittedChoices({});
+      setDraftAnswers({});
+      setMessage(
+        prepared.queue.length === 0
+          ? prepared.missingImageCount > 0
+            ? `当前范围有 ${prepared.missingImageCount} 道题依赖图片但没有可用原图，已自动跳过。`
+            : "这个范围暂时没有可刷的 408 选择题。"
+          : prepared.missingImageCount > 0
+            ? `已自动跳过 ${prepared.missingImageCount} 道缺图题。`
+            : "",
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!supabase) {
       return;
@@ -126,25 +269,10 @@ export default function PracticePage() {
               subject: subjectParam || undefined,
               chapter: chapterParam || undefined,
             };
-            const selected = filterPracticeQuestions(items, choiceFilter).map(makePracticeReview);
-            const scopeName = chapterParam || subjectParam || "四门专业课";
-
-            setActiveFilter(choiceFilter);
-            setQueue(selected);
-            setInitialCount(selected.length);
-            setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
-            setSkippedCount(0);
-            setMessage(selected.length === 0 ? `${scopeName}暂时没有可刷的选择题。` : "");
+            activatePreparedRound(preparePracticeRound(items, choiceFilter), choiceFilter);
           } else if (topicParam) {
             const topicFilter: PracticeFilter = { type: "topic", topic: topicParam };
-            const selected = filterPracticeQuestions(items, topicFilter).map(makePracticeReview);
-
-            setActiveFilter(topicFilter);
-            setQueue(selected);
-            setInitialCount(selected.length);
-            setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
-            setSkippedCount(0);
-            setMessage(selected.length === 0 ? "这个范围暂时没有错题。" : "");
+            activatePreparedRound(preparePracticeRound(items, topicFilter), topicFilter);
           } else {
             setMessage(items.length === 0 ? "还没有可刷的 408 选择题。" : "");
           }
@@ -164,18 +292,35 @@ export default function PracticePage() {
     return () => {
       isActive = false;
     };
-  }, [supabase, chapterParam, modeParam, subjectParam, topicParam]);
+  }, [
+    activatePreparedRound,
+    supabase,
+    chapterParam,
+    modeParam,
+    subjectParam,
+    topicParam,
+  ]);
 
-  const exam408ChoiceTotal = useMemo(
-    () => filterPracticeQuestions(questions, { type: "exam408-choice" }).length,
+  const exam408Selection = useMemo(
+    () => getPracticeQuestionSelection(questions, { type: "exam408-choice" }),
     [questions],
   );
+  const exam408ChoiceTotal = exam408Selection.available.length;
+  const exam408MissingImageTotal = exam408Selection.missingImageCount;
   const exam408SubjectCounts = useMemo(
     () =>
-      exam408SubjectOptions.map((subject) => ({
-        subject,
-        count: filterPracticeQuestions(questions, { type: "exam408-choice", subject }).length,
-      })),
+      exam408SubjectOptions.map((subject) => {
+        const selection = getPracticeQuestionSelection(questions, {
+          type: "exam408-choice",
+          subject,
+        });
+
+        return {
+          subject,
+          count: selection.available.length,
+          missingImageCount: selection.missingImageCount,
+        };
+      }),
     [questions],
   );
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
@@ -183,18 +328,7 @@ export default function PracticePage() {
     initialCount > 0 ? Math.round(((completedTotal + skippedCount) / initialCount) * 100) : 0;
 
   function resetRound(filter: PracticeFilter) {
-    const selected = filterPracticeQuestions(questions, filter).map(makePracticeReview);
-
-    setActiveFilter(filter);
-    setQueue(selected);
-    setInitialCount(selected.length);
-    setCompletedCounts({ still_wrong: 0, improved: 0, mastered: 0, wrong_again: 0 });
-    setSkippedCount(0);
-    setRevealedAnswers({});
-    setSelectedChoices({});
-    setSubmittedChoices({});
-    setDraftAnswers({});
-    setMessage(selected.length === 0 ? "这个范围暂时没有可刷的 408 选择题。" : "");
+    activatePreparedRound(preparePracticeRound(questions, filter), filter);
   }
 
   function toggleChoice(reviewId: string, label: string, isMultiple: boolean) {
@@ -237,17 +371,61 @@ export default function PracticePage() {
     });
   }
 
-  function handleSkipReview(review: FlashcardReview) {
-    setQueue((current) => current.filter((item) => item.id !== review.id));
-    setSkippedCount((count) => count + 1);
-    setMessage("已跳过本题，不记录本次结果。");
+  function syncPracticeSession(nextSession: PracticeSessionV1) {
+    practiceSessionRef.current = nextSession;
+    setPracticeSession(nextSession);
+    setInitialCount(practiceSessionSize(nextSession));
+    setCompletedCounts(nextSession.completedCounts);
+    setSkippedCount(nextSession.skippedCount);
+    persistPracticeSession(nextSession);
+  }
+
+  function updatePracticeSession(
+    update: (current: PracticeSessionV1) => PracticeSessionV1,
+  ) {
+    const current = practiceSessionRef.current;
+
+    if (!current) {
+      return null;
+    }
+
+    const next = update(current);
+    syncPracticeSession(next);
+    return next;
+  }
+
+  function retireVisibleReview(review: FlashcardReview) {
+    const reviewIndex = queue.findIndex((item) => item.id === review.id);
+    const remaining = queue.filter((item) => item.id !== review.id);
+    const nextReview =
+      remaining[Math.min(Math.max(reviewIndex, 0), Math.max(remaining.length - 1, 0))] ??
+      remaining[0];
+
+    setQueue(remaining);
+    setActiveReviewId(nextReview?.id ?? "");
     cleanupReviewDraft(review.id);
   }
 
+  function handleActiveReviewChange(review: FlashcardReview) {
+    setActiveReviewId(review.id);
+    updatePracticeSession((current) =>
+      markPracticeQuestionShown(current, review.question_id),
+    );
+  }
+
+  function handleSkipReview(review: FlashcardReview) {
+    updatePracticeSession((current) =>
+      skipPracticeQuestion(current, review.question_id),
+    );
+    retireVisibleReview(review);
+    setMessage("已跳过本题，不记录本次结果。");
+  }
+
   function completeReviewLocally(review: FlashcardReview, result: ReviewResult, nextMessage: string) {
-    setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
-    setQueue((current) => current.filter((item) => item.id !== review.id));
-    cleanupReviewDraft(review.id);
+    updatePracticeSession((current) =>
+      completePracticeQuestion(current, review.question_id, result),
+    );
+    retireVisibleReview(review);
     setMessage(nextMessage);
   }
 
@@ -374,7 +552,9 @@ export default function PracticePage() {
       return;
     }
 
-    setCompletedCounts((current) => ({ ...current, [result]: current[result] + 1 }));
+    updatePracticeSession((current) =>
+      completePracticeQuestion(current, review.question_id, result),
+    );
     setMessage(result === "mastered" ? "回答正确，查看解析后点下一题。" : "回答错误，查看解析后点下一题。");
     void persistReviewResult(review, result, {
       lock: false,
@@ -383,9 +563,22 @@ export default function PracticePage() {
   }
 
   function handleChoiceFeedbackNext(review: FlashcardReview) {
-    setQueue((current) => current.filter((item) => item.id !== review.id));
-    cleanupReviewDraft(review.id);
+    retireVisibleReview(review);
     setMessage("");
+  }
+
+  function handleImageUnavailable(review: FlashcardReview) {
+    if (unavailableImageIdsRef.current.has(review.question_id)) {
+      return;
+    }
+
+    unavailableImageIdsRef.current.add(review.question_id);
+    updatePracticeSession((current) =>
+      removeUnavailablePracticeQuestion(current, review.question_id),
+    );
+    setMissingImageCount((count) => count + 1);
+    retireVisibleReview(review);
+    setMessage("原题图片加载失败，已自动跳过本题，不记录作答结果。");
   }
 
   function renderDefaultPracticeEntry() {
@@ -396,15 +589,20 @@ export default function PracticePage() {
             <p className="text-sm font-bold text-white/75">408 选择题刷题</p>
             <p className="mt-2 text-3xl font-black tracking-normal">当前可刷 {exam408ChoiceTotal} 题</p>
             <p className="mt-3 text-sm leading-6 text-white/80">
-              默认只进入四门专业课选择题，提交后先看对错和解析，再进入下一题。
+              默认只进入四门专业课选择题，自动续接上次进度，提交后先看对错和解析。
             </p>
+            {exam408MissingImageTotal > 0 ? (
+              <p className="mt-2 rounded-lg bg-white/12 px-3 py-2 text-xs leading-5 text-white/85">
+                自动跳过 {exam408MissingImageTotal} 道缺少可用原图的题，不计入作答结果。
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={() => resetRound({ type: "exam408-choice" })}
               disabled={exam408ChoiceTotal === 0}
               className="mt-5 min-h-12 w-full rounded-lg bg-white px-4 text-sm font-black text-blue-700 disabled:bg-white/20 disabled:text-white/50"
             >
-              开始全部 408 选择题
+              开始 / 继续全部 408 选择题
             </button>
           </StudyDashboardCard>
         </MobileSection>
@@ -422,7 +620,14 @@ export default function PracticePage() {
               >
                 <StudyCard>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-base font-black text-slate-950">{option.subject}</p>
+                    <div>
+                      <p className="text-base font-black text-slate-950">{option.subject}</p>
+                      {option.missingImageCount > 0 ? (
+                        <p className="mt-1 text-xs leading-5 text-amber-700">
+                          自动跳过缺图 {option.missingImageCount} 题
+                        </p>
+                      ) : null}
+                    </div>
                     <StudyBadge tone={option.count > 0 ? "green" : "amber"}>
                       {option.count > 0 ? `${option.count} 题` : "暂无可刷"}
                     </StudyBadge>
@@ -438,7 +643,9 @@ export default function PracticePage() {
             <StudyCard>
               <p className="text-sm font-black text-slate-950">先导入 408 选择题</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                当前没有可刷的 408 选择题。导入时请让 JSON 包含 subject、choices 和 standard_answer，导入后这里会自动出现刷题入口。
+                {exam408MissingImageTotal > 0
+                  ? `当前 ${exam408MissingImageTotal} 道选择题依赖图片但没有可用原图，已自动跳过。`
+                  : "当前没有可刷的 408 选择题。导入时请让 JSON 包含 subject、choices 和 standard_answer，导入后这里会自动出现刷题入口。"}
               </p>
               <Link
                 href="/import"
@@ -499,6 +706,90 @@ export default function PracticePage() {
     );
   }
 
+  if (activeFilter && queue.length > 0) {
+    return (
+      <MobilePageShell className="flex h-full min-h-0 flex-col space-y-0 overflow-hidden bg-slate-50 pb-0">
+        <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-slate-950">
+                {getPracticeScopeLabel(activeFilter)}
+              </p>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                本轮 {progress}% · 剩余 {practiceSession?.remainingQuestionIds.length ?? queue.length} 题
+                {missingImageCount > 0 ? ` · 缺图跳过 ${missingImageCount} 题` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              data-swipe-ignore
+              onClick={() => {
+                setActiveFilter(null);
+                setQueue([]);
+                setActiveReviewId("");
+                setMessage("");
+              }}
+              className="min-h-9 shrink-0 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-700"
+            >
+              退出本轮
+            </button>
+          </div>
+        </header>
+
+        {message ? (
+          <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-2 text-center text-xs font-semibold leading-5 text-amber-800">
+            {message}
+          </div>
+        ) : null}
+
+        <div className="mx-auto min-h-0 w-full max-w-4xl flex-1">
+          <ReviewFlashcardDeck
+            reviews={queue}
+            activeReviewId={activeReviewId}
+            onActiveReviewChange={handleActiveReviewChange}
+            focusMode
+            onAdvance={(review) => {
+              const resultRecorded =
+                !practiceSession?.remainingQuestionIds.includes(review.question_id);
+
+              if (!submittedChoices[review.id] || !resultRecorded) {
+                return false;
+              }
+
+              handleChoiceFeedbackNext(review);
+              return true;
+            }}
+            renderCard={(review) => (
+              <ReviewFlashcard
+                review={review}
+                today={todayIsoDate()}
+                selectedChoices={selectedChoices[review.id] ?? []}
+                submittedChoice={Boolean(submittedChoices[review.id])}
+                answerRevealed={Boolean(revealedAnswers[review.id])}
+                draftAnswer={draftAnswers[review.id] ?? ""}
+                processing={processingReviewId === review.id}
+                processingLocked={Boolean(processingReviewId)}
+                focusMode
+                onImageUnavailable={() => handleImageUnavailable(review)}
+                onToggleChoice={toggleChoice}
+                onSubmitChoice={(result) => handleChoiceSubmitAndNext(review, result)}
+                onNextAfterFeedback={() => handleChoiceFeedbackNext(review)}
+                onRevealAnswer={() =>
+                  setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
+                }
+                onDraftAnswer={(value) =>
+                  setDraftAnswers((current) => ({ ...current, [review.id]: value }))
+                }
+                onSkip={() => handleSkipReview(review)}
+                onReview={(result) => handleReview(review, result)}
+              />
+            )}
+          />
+        </div>
+      </MobilePageShell>
+    );
+  }
+
   return (
     <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
@@ -528,36 +819,10 @@ export default function PracticePage() {
         </MobileSection>
       ) : null}
 
-      {!activeFilter && !isLoading ? renderDefaultPracticeEntry() : null}
-
-      {queue.length > 0 ? (
-        <ReviewFlashcardDeck
-          reviews={queue}
-          renderCard={(review) => (
-            <ReviewFlashcard
-              review={review}
-              today={todayIsoDate()}
-              selectedChoices={selectedChoices[review.id] ?? []}
-              submittedChoice={Boolean(submittedChoices[review.id])}
-              answerRevealed={Boolean(revealedAnswers[review.id])}
-              draftAnswer={draftAnswers[review.id] ?? ""}
-              processing={processingReviewId === review.id}
-              processingLocked={Boolean(processingReviewId)}
-              onToggleChoice={toggleChoice}
-              onSubmitChoice={(result) => handleChoiceSubmitAndNext(review, result)}
-              onNextAfterFeedback={() => handleChoiceFeedbackNext(review)}
-              onRevealAnswer={() =>
-                setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
-              }
-              onDraftAnswer={(value) =>
-                setDraftAnswers((current) => ({ ...current, [review.id]: value }))
-              }
-              onSkip={() => handleSkipReview(review)}
-              onReview={(result) => handleReview(review, result)}
-            />
-          )}
-        />
-      ) : null}
+      {!isLoading &&
+      (!activeFilter || (activeFilter && queue.length === 0 && initialCount === 0))
+        ? renderDefaultPracticeEntry()
+        : null}
 
       {activeFilter && queue.length === 0 && initialCount > 0 ? renderSummary() : null}
     </MobilePageShell>

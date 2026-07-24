@@ -7,6 +7,7 @@ import { MathText } from "@/components/mobile/MathText";
 import { ImagePlaceholder, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
 import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
+import { parseChoiceExplanations } from "@/lib/questions/choice-explanation";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import { buildQuestionBadges } from "@/lib/questions/question-badges";
 import { explainReviewPriorityScore } from "@/lib/reviews/priority-score";
@@ -85,6 +86,8 @@ export function ReviewFlashcard({
   onDraftAnswer,
   onSkip,
   onReview,
+  focusMode = false,
+  onImageUnavailable,
 }: {
   review: FlashcardReview;
   today: string;
@@ -101,6 +104,8 @@ export function ReviewFlashcard({
   onDraftAnswer: (value: string) => void;
   onSkip: () => void;
   onReview: (result: ReviewResult) => void;
+  focusMode?: boolean;
+  onImageUnavailable?: () => void;
 }) {
   const hasAnswer = Boolean(review.questions.standard_answer?.trim());
   const questionDisplay = getQuestionStemAndChoices(
@@ -126,189 +131,256 @@ export function ReviewFlashcard({
     reviewStatus: isOverdue(review.scheduled_date, today) ? "overdue" : "due_today",
     questionKind: isChoiceQuestion ? "选择题" : "文字题",
   });
+  const choiceExplanations = parseChoiceExplanations(
+    review.questions.answer_explanation,
+    questionDisplay.choices.map((choice) => choice.label),
+  );
+
+  const questionContent = (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {badges.map((badge) => (
+          <StudyBadge key={badge.label} tone={badge.tone}>
+            {badge.label}
+          </StudyBadge>
+        ))}
+      </div>
+
+      <div className="rounded-lg bg-slate-50 p-4">
+        {focusMode && review.signedImageUrl ? (
+          <a
+            href={review.signedImageUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-4 block overflow-hidden rounded-lg bg-white p-2 text-center ring-1 ring-slate-200"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={review.signedImageUrl}
+              alt="原题图片"
+              className="mx-auto max-h-[34dvh] w-full object-contain"
+              onError={onImageUnavailable}
+            />
+            <span className="mt-1 block text-xs font-black text-blue-700">点击查看原图</span>
+          </a>
+        ) : null}
+
+        <div className="flex gap-3">
+          {!focusMode && (review.signedImageUrl || review.questions.image_path) ? (
+            <Link
+              href={`/questions/${review.question_id}`}
+              className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-slate-200"
+            >
+              {review.signedImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={review.signedImageUrl}
+                  alt="原题缩略图"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImagePlaceholder label="原题缩略图" />
+              )}
+            </Link>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black text-blue-600">
+              {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
+            </p>
+            <MathText
+              text={review.questions.knowledge_point}
+              fallback="待识别知识点"
+              className="mt-1 text-xs font-semibold leading-5 text-slate-500"
+            />
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <TextQuestionPreview
+            subject={review.questions.subject}
+            chapter={review.questions.chapter}
+            knowledge_point={review.questions.knowledge_point}
+            question_text={questionDisplay.questionText}
+            mastery_status={review.questions.mastery_status}
+            question_text_status={review.questions.question_text_status}
+            source={review.questions.source}
+            compact
+            hideMeta
+            hideTitle
+          />
+        </div>
+      </div>
+
+      {questionDisplay.choices.length > 0 ? (
+        <div>
+          <p className="mb-2 text-sm font-black text-slate-950">选择题选项</p>
+          <ChoiceList
+            choices={questionDisplay.choices}
+            mode={submittedChoice ? "reviewed" : "answering"}
+            selectedLabels={selectedChoices}
+            correctLabels={answerChoices.labels}
+            revealAnswer={answerRevealed}
+            disabled={answerRevealed}
+            explanationsByLabel={choiceExplanations.explanationsByLabel}
+            onToggleChoice={(label) =>
+              onToggleChoice(review.id, label, answerChoices.isMultiple)
+            }
+          />
+        </div>
+      ) : (
+        <label className="block" data-swipe-ignore>
+          <span className="text-sm font-black text-slate-950">
+            非选择题答案核对区（可不填）
+          </span>
+          <textarea
+            value={draftAnswer}
+            onChange={(event) => onDraftAnswer(event.target.value)}
+            rows={3}
+            className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
+            placeholder="先写下你的答案或关键步骤，再查看标准答案。"
+          />
+        </label>
+      )}
+    </>
+  );
+
+  const primaryActions = canMoveToNextChoice ? (
+    <button
+      type="button"
+      data-swipe-ignore
+      onClick={onNextAfterFeedback}
+      className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
+    >
+      下一题
+    </button>
+  ) : (
+    <div className="grid grid-cols-2 gap-2">
+      {hasAnswer ? (
+        isChoiceQuestion && !answerRevealed ? (
+          <button
+            type="button"
+            data-swipe-ignore
+            onClick={() => onSubmitChoice(submittedChoiceResult)}
+            disabled={selectedChoices.length === 0 && answerChoices.labels.length > 0}
+            className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            提交答案
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-swipe-ignore
+            onClick={onRevealAnswer}
+            disabled={answerRevealed}
+            className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            {answerRevealed ? "答案已显示" : "我做完了，查看答案"}
+          </button>
+        )
+      ) : (
+        <StudyBadge tone="amber">暂无标准答案，可直接记录结果</StudyBadge>
+      )}
+      <button
+        type="button"
+        data-swipe-ignore
+        onClick={onSkip}
+        disabled={processingLocked || submittedChoice}
+        className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
+      >
+        跳过本题
+      </button>
+    </div>
+  );
+
+  const feedbackContent = answerRevealed ? (
+    <div className="space-y-3">
+      {isChoiceQuestion && answerChoices.labels.length > 0 ? (
+        <p
+          className={`rounded-lg p-3 text-sm font-black ${
+            choiceIsCorrect
+              ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
+              : "bg-red-50 text-red-800 ring-1 ring-red-100"
+          }`}
+        >
+          {choiceIsCorrect ? "回答正确" : "回答错误"}；正确答案：
+          {answerChoices.labels.join("、")}
+        </p>
+      ) : null}
+      {!isChoiceQuestion ? (
+        <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-700 ring-1 ring-blue-100">
+          <p>请对照标准答案自行判断，本工具暂不自动判定非选择题对错。</p>
+          {draftAnswer.trim() ? (
+            <p className="mt-2 break-words">本次答案/思路：{draftAnswer}</p>
+          ) : null}
+        </div>
+      ) : null}
+      <AnswerPanel
+        standard_answer={review.questions.standard_answer}
+        answer_explanation={review.questions.answer_explanation}
+        key_steps={review.questions.key_steps}
+        one_sentence_tip={review.questions.one_sentence_tip}
+        answer_status={review.questions.answer_status}
+        answer_source={review.questions.answer_source}
+        showExplanation={!choiceExplanations.complete}
+      />
+    </div>
+  ) : null;
+
+  const recordActions = canRecordReview ? (
+    <div>
+      <p className="mb-2 text-sm font-black text-slate-950">记录本题结果</p>
+      <div className="grid grid-cols-2 gap-2">
+        {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            data-swipe-ignore
+            onClick={() => onReview(key)}
+            disabled={processing || processingLocked}
+            className="min-h-12 rounded-lg bg-blue-50 px-3 text-sm font-black text-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
+          >
+            {processing ? "写入中..." : resultLabels[key]}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   return (
-    <MobileSection>
-      <SectionHeader
-        title="当前题目卡片"
-        subtitle="先独立作答，答案会在你确认后展开。"
-        action={<StudyBadge tone="purple">{priority.level}</StudyBadge>}
-      />
-      <StudyCard className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {badges.map((badge) => (
-            <StudyBadge key={badge.label} tone={badge.tone}>
-              {badge.label}
-            </StudyBadge>
-          ))}
-        </div>
-
-        <div className="rounded-lg bg-slate-50 p-4">
-          <div className="flex gap-3">
-            {review.signedImageUrl || review.questions.image_path ? (
-              <Link
-                href={`/questions/${review.question_id}`}
-                className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-slate-200"
-              >
-                {review.signedImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={review.signedImageUrl}
-                    alt="原题缩略图"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <ImagePlaceholder label="原题缩略图" />
-                )}
-              </Link>
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-black text-blue-600">
-                {review.questions.subject} / {review.questions.chapter ?? "待识别章节"}
-              </p>
-              <MathText
-                text={review.questions.knowledge_point}
-                fallback="待识别知识点"
-                className="mt-1 text-xs font-semibold leading-5 text-slate-500"
-              />
+    <MobileSection className={focusMode ? "flex h-full min-h-0 flex-col px-0" : ""}>
+      {!focusMode ? (
+        <SectionHeader
+          title="当前题目卡片"
+          subtitle="先独立作答，答案会在你确认后展开。"
+          action={<StudyBadge tone="purple">{priority.level}</StudyBadge>}
+        />
+      ) : null}
+      <StudyCard
+        className={
+          focusMode
+            ? "flex h-full min-h-0 flex-col overflow-hidden p-0"
+            : "space-y-4"
+        }
+      >
+        {focusMode ? (
+          <>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+              {questionContent}
+              {feedbackContent}
+              {recordActions}
             </div>
-          </div>
-
-          <div className="mt-4">
-            <TextQuestionPreview
-              subject={review.questions.subject}
-              chapter={review.questions.chapter}
-              knowledge_point={review.questions.knowledge_point}
-              question_text={questionDisplay.questionText}
-              mastery_status={review.questions.mastery_status}
-              question_text_status={review.questions.question_text_status}
-              source={review.questions.source}
-              compact
-              hideMeta
-              hideTitle
-            />
-          </div>
-        </div>
-
-        {questionDisplay.choices.length > 0 ? (
-          <div>
-            <p className="mb-2 text-sm font-black text-slate-950">选择题选项</p>
-            <ChoiceList
-              choices={questionDisplay.choices}
-              mode={submittedChoice ? "reviewed" : "answering"}
-              selectedLabels={selectedChoices}
-              correctLabels={answerChoices.labels}
-              revealAnswer={answerRevealed}
-              disabled={answerRevealed}
-              onToggleChoice={(label) => onToggleChoice(review.id, label, answerChoices.isMultiple)}
-            />
-          </div>
+            <div className="shrink-0 border-t border-slate-200 bg-white p-3">
+              {primaryActions}
+            </div>
+          </>
         ) : (
-          <label className="block">
-            <span className="text-sm font-black text-slate-950">
-              非选择题答案核对区（可不填）
-            </span>
-            <textarea
-              value={draftAnswer}
-              onChange={(event) => onDraftAnswer(event.target.value)}
-              rows={3}
-              className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-blue-500"
-              placeholder="先写下你的答案或关键步骤，再查看标准答案。"
-            />
-          </label>
+          <>
+            {questionContent}
+            {primaryActions}
+            {feedbackContent}
+            {recordActions}
+          </>
         )}
-
-        <div className="grid grid-cols-2 gap-2">
-          {hasAnswer ? (
-            isChoiceQuestion && !answerRevealed ? (
-              <button
-                type="button"
-                onClick={() => onSubmitChoice(submittedChoiceResult)}
-                disabled={selectedChoices.length === 0 && answerChoices.labels.length > 0}
-                className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
-              >
-                提交答案
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onRevealAnswer}
-                disabled={answerRevealed}
-                className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
-              >
-                {answerRevealed ? "答案已显示" : "我做完了，查看答案"}
-              </button>
-            )
-          ) : (
-            <StudyBadge tone="amber">暂无标准答案，可直接记录结果</StudyBadge>
-          )}
-          <button
-            type="button"
-            onClick={onSkip}
-            disabled={processingLocked || submittedChoice}
-            className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
-          >
-            跳过本题
-          </button>
-        </div>
-
-        {answerRevealed ? (
-          <div className="space-y-3">
-            {isChoiceQuestion && answerChoices.labels.length > 0 ? (
-              <p
-                className={`rounded-lg p-3 text-sm font-black ${
-                  choiceIsCorrect
-                    ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100"
-                    : "bg-red-50 text-red-800 ring-1 ring-red-100"
-                }`}
-              >
-                {choiceIsCorrect ? "回答正确" : "回答错误"}；正确答案：{answerChoices.labels.join("、")}
-              </p>
-            ) : null}
-            {!isChoiceQuestion ? (
-              <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-700 ring-1 ring-blue-100">
-                <p>请对照标准答案自行判断，本工具暂不自动判定非选择题对错。</p>
-                {draftAnswer.trim() ? <p className="mt-2 break-words">本次答案/思路：{draftAnswer}</p> : null}
-              </div>
-            ) : null}
-            <AnswerPanel
-              standard_answer={review.questions.standard_answer}
-              answer_explanation={review.questions.answer_explanation}
-              key_steps={review.questions.key_steps}
-              one_sentence_tip={review.questions.one_sentence_tip}
-              answer_status={review.questions.answer_status}
-              answer_source={review.questions.answer_source}
-            />
-          </div>
-        ) : null}
-
-        {canRecordReview ? (
-          <div>
-            <p className="mb-2 text-sm font-black text-slate-950">记录本题结果</p>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(resultLabels) as ReviewResult[]).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onReview(key)}
-                  disabled={processing || processingLocked}
-                  className="min-h-12 rounded-lg bg-blue-50 px-3 text-sm font-black text-blue-700 disabled:bg-slate-200 disabled:text-slate-400"
-                >
-                  {processing ? "写入中..." : resultLabels[key]}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {canMoveToNextChoice ? (
-          <button
-            type="button"
-            onClick={onNextAfterFeedback}
-            className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
-          >
-            下一题
-          </button>
-        ) : null}
       </StudyCard>
     </MobileSection>
   );

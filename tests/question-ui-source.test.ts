@@ -233,11 +233,17 @@ test("/review keeps answer hints hidden until answer reveal", () => {
   const review = read("components/study/ReviewFlashcard.tsx");
   const answerPanel = read("components/mobile/AnswerPanel.tsx");
 
-  const beforeAnswer = review.slice(review.indexOf("return ("), review.indexOf("{answerRevealed ?"));
-  assert.match(beforeAnswer, /questionDisplay\.questionText/);
-  assert.doesNotMatch(beforeAnswer, /one_sentence_tip/);
-  assert.doesNotMatch(beforeAnswer, /answer_explanation/);
-  assert.doesNotMatch(beforeAnswer, /key_steps/);
+  const questionContent = review.slice(
+    review.indexOf("const questionContent"),
+    review.indexOf("const primaryActions"),
+  );
+  const feedbackContent = review.slice(
+    review.indexOf("const feedbackContent = answerRevealed ?"),
+    review.indexOf("const recordActions"),
+  );
+  assert.match(questionContent, /questionDisplay\.questionText/);
+  assert.doesNotMatch(questionContent, /<AnswerPanel/);
+  assert.match(feedbackContent, /<AnswerPanel/);
   assert.match(review, /one_sentence_tip=\{review\.questions\.one_sentence_tip\}/);
   assert.match(answerPanel, /answer_explanation/);
   assert.match(answerPanel, /key_steps/);
@@ -297,6 +303,24 @@ test("home page is a wrong-question asset cockpit, not a technical menu", () => 
   assert.doesNotMatch(source, /dashboardStats/);
   assert.doesNotMatch(source, /开始今日复习|今日学习驾驶舱|打卡/);
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
+});
+
+test("mobile home keeps primary study routes visible and optional tools collapsed", () => {
+  const source = read("app/page.tsx");
+
+  assert.match(source, /primaryModuleLinks/);
+  assert.match(source, /secondaryModuleLinks/);
+  assert.match(source, /更多学习工具/);
+  assert.match(source, /title: "408 刷题"/);
+  assert.doesNotMatch(source, /title: "章节复盘"/);
+  assert.match(source, /aria-label="打开学习档案"/);
+});
+
+test("study dashboard cards keep inverse content readable", () => {
+  const source = read("components/study/study-ui.tsx");
+
+  assert.match(source, /StudyDashboardCard[\s\S]*bg-blue-700[\s\S]*text-white/);
+  assert.doesNotMatch(source, /StudyDashboardCard[\s\S]*border-blue-100 bg-white p-5/);
 });
 
 test("design preview exposes isolated responsive 408 exam platform mocks", () => {
@@ -421,7 +445,7 @@ test("home contribution panel has real review and practice entry points", () => 
   assert.match(home, /href="\/review\/today"/);
   assert.match(home, /href="\/practice"/);
   assert.match(home, /今日复习/);
-  assert.match(home, /专项练习/);
+  assert.match(home, /408 刷题/);
   assert.match(home, /90天内完成/);
 });
 
@@ -786,7 +810,7 @@ test("/practice is a 408 choice drill surface using the shared swipe flashcard d
 
   assert.match(source, /408 选择题刷题/);
   assert.match(source, /exam408SubjectOptions/);
-  assert.match(source, /开始全部 408 选择题/);
+  assert.match(source, /开始 \/ 继续全部 408 选择题/);
   assert.match(source, /先导入 408 选择题/);
   assert.doesNotMatch(source, /buildPracticeCatalog/);
   assert.doesNotMatch(source, /章节复盘/);
@@ -795,7 +819,8 @@ test("/practice is a 408 choice drill surface using the shared swipe flashcard d
   assert.match(source, /ReviewFlashcard/);
   assert.match(source, /ReviewFlashcardDeck/);
   assert.match(todayReview, /ReviewFlashcardDeck/);
-  assert.match(sharedDeck, /activeIndex/);
+  assert.match(sharedDeck, /uncontrolledActiveIndex/);
+  assert.match(sharedDeck, /activeReviewId/);
   assert.match(sharedDeck, /onPointerDown/);
   assert.match(sharedDeck, /onPointerMove/);
   assert.match(sharedDeck, /onPointerUp/);

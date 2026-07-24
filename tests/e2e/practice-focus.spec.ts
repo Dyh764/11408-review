@@ -1,0 +1,250 @@
+import { expect, test, type Page } from "@playwright/test";
+
+const practiceMockEnabled = process.env.E2E_PRACTICE_MOCK === "1";
+
+const mockQuestions = [
+  {
+    id: "practice-focus-one",
+    user_id: "practice-focus-user",
+    subject: "操作系统",
+    chapter: "进程与线程",
+    knowledge_point: "进程状态转换",
+    difficulty: "中等",
+    image_path: null,
+    question_text:
+      "在进程状态转换中，下列说法正确的是哪一项？为验证长题滚动区域，这里补充一段较长的题干说明。".repeat(
+        5,
+      ),
+    choices: [
+      { label: "A", text: "运行态进程可能因等待资源进入阻塞态" },
+      { label: "B", text: "阻塞态进程可以直接变为运行态" },
+      { label: "C", text: "就绪态进程已经占有处理器" },
+      { label: "D", text: "创建态进程必然直接进入运行态" },
+    ],
+    question_text_status: "verified",
+    mastery_status: "有一点思路",
+    user_note: null,
+    mistake_types: ["概念混淆"],
+    solution_summary: null,
+    standard_answer: "A",
+    answer_explanation:
+      "过程：A：等待事件发生时会由运行态转为阻塞态；B：阻塞态应先转为就绪态；C：就绪态尚未占有处理器；D：创建完成后通常先进入就绪态。",
+    key_steps: ["区分就绪态和阻塞态"],
+    one_sentence_tip: "先判断进程是否正在等待事件。",
+    related_practice_questions: [],
+    review_priority: "high",
+    confidence: "high",
+    needs_manual_check: false,
+    source: "chatgpt_import",
+    source_info: null,
+    answer_status: "verified",
+    answer_source: "chatgpt_import",
+    created_at: "2026-07-23T08:00:00.000Z",
+    analyzed_at: null,
+    deleted_at: null,
+    deleted_reason: null,
+  },
+  {
+    id: "practice-focus-two",
+    user_id: "practice-focus-user",
+    subject: "操作系统",
+    chapter: "进程与线程",
+    knowledge_point: "进程映像",
+    difficulty: "基础",
+    image_path: null,
+    question_text: "一个进程映像由哪些部分组成？",
+    choices: [
+      { label: "A", text: "只有程序代码" },
+      { label: "B", text: "程序、数据和进程控制块" },
+      { label: "C", text: "只有进程控制块" },
+      { label: "D", text: "只有程序和数据" },
+    ],
+    question_text_status: "verified",
+    mastery_status: "做对但不稳",
+    user_note: null,
+    mistake_types: ["记忆不牢"],
+    solution_summary: null,
+    standard_answer: "B",
+    answer_explanation:
+      "A. 缺少数据和进程控制块；B. 程序、数据和 PCB 共同构成进程映像；C. PCB 只是其中一部分；D. 还缺少 PCB。",
+    key_steps: ["记住程序、数据、PCB 三部分"],
+    one_sentence_tip: "进程映像不只包含程序本身。",
+    related_practice_questions: [],
+    review_priority: "medium",
+    confidence: "high",
+    needs_manual_check: false,
+    source: "chatgpt_import",
+    source_info: null,
+    answer_status: "verified",
+    answer_source: "chatgpt_import",
+    created_at: "2026-07-23T09:00:00.000Z",
+    analyzed_at: null,
+    deleted_at: null,
+    deleted_reason: null,
+  },
+  {
+    id: "practice-focus-missing-image",
+    user_id: "practice-focus-user",
+    subject: "操作系统",
+    chapter: "进程与线程",
+    knowledge_point: "进程调度",
+    difficulty: "中等",
+    image_path: null,
+    question_text: "如图所示，调度顺序正确的是哪一项？",
+    choices: [
+      { label: "A", text: "顺序一" },
+      { label: "B", text: "顺序二" },
+      { label: "C", text: "顺序三" },
+      { label: "D", text: "顺序四" },
+    ],
+    question_text_status: "verified",
+    mastery_status: "完全没思路",
+    user_note: "image_code: required",
+    mistake_types: ["缺少原图"],
+    solution_summary: null,
+    standard_answer: "A",
+    answer_explanation: "A：正确；B：错误；C：错误；D：错误。",
+    key_steps: [],
+    one_sentence_tip: null,
+    related_practice_questions: [],
+    review_priority: "high",
+    confidence: "low",
+    needs_manual_check: true,
+    source: "chatgpt_import",
+    source_info: null,
+    answer_status: "verified",
+    answer_source: "chatgpt_import",
+    created_at: "2026-07-23T10:00:00.000Z",
+    analyzed_at: null,
+    deleted_at: null,
+    deleted_reason: null,
+  },
+];
+
+async function installMockSupabase(page: Page) {
+  await page.route("http://127.0.0.1:3139/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (url.pathname === "/rest/v1/questions" && request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "content-range": `0-${mockQuestions.length - 1}/${mockQuestions.length}` },
+        body: JSON.stringify(mockQuestions),
+      });
+      return;
+    }
+
+    if (url.pathname === "/auth/v1/user") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "practice-focus-user",
+          aud: "authenticated",
+          role: "authenticated",
+          email: "practice-focus@example.com",
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: request.method() === "GET" ? "[]" : "{}",
+    });
+  });
+}
+
+async function activeQuestionText(page: Page) {
+  return page.locator("div.overflow-y-auto.overscroll-contain").last().innerText();
+}
+
+async function dragCard(page: Page, deltaX: number, deltaY: number) {
+  const card = page.locator("div.touch-pan-y").last();
+  const box = await card.boundingBox();
+
+  expect(box).not.toBeNull();
+  const startX = (box?.x ?? 0) + (box?.width ?? 0) / 2;
+  const startY = (box?.y ?? 0) + Math.min((box?.height ?? 0) / 2, 260);
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 8 });
+  await page.mouse.up();
+}
+
+test.describe("固定刷题模式", () => {
+  test.skip(!practiceMockEnabled, "需要 E2E_PRACTICE_MOCK=1 和本地模拟 Supabase 地址");
+
+  for (const viewport of [
+    { width: 390, height: 844, label: "mobile" },
+    { width: 1280, height: 900, label: "desktop" },
+  ]) {
+    test(`${viewport.label} 固定布局、续刷、手势、逐项解析和缺图过滤`, async ({ page }) => {
+      await installMockSupabase(page);
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await page.evaluate(() => window.localStorage.clear());
+      await page.goto("/practice?mode=exam408-choice&subject=操作系统");
+
+      await expect(page.getByText(/缺图跳过 1 题/)).toBeVisible();
+      await expect(page.getByText(/剩余 2 题/)).toBeVisible();
+      await expect(page.getByRole("button", { name: "提交答案" })).toBeVisible();
+
+      const firstQuestion = await activeQuestionText(page);
+      await page.reload();
+      const resumedQuestion = await activeQuestionText(page);
+      expect(resumedQuestion).not.toBe(firstQuestion);
+
+      const fixedMetrics = await page.evaluate(() => {
+        const root = document.documentElement;
+        const shellMain = document.querySelector("main");
+        return {
+          horizontalOverflow: root.scrollWidth - root.clientWidth,
+          documentOverflow: root.scrollHeight - root.clientHeight,
+          mainOverflow: shellMain
+            ? shellMain.scrollHeight - shellMain.clientHeight
+            : Number.POSITIVE_INFINITY,
+        };
+      });
+      expect(fixedMetrics.horizontalOverflow).toBeLessThanOrEqual(1);
+      expect(fixedMetrics.documentOverflow).toBeLessThanOrEqual(1);
+      expect(fixedMetrics.mainOverflow).toBeLessThanOrEqual(1);
+
+      const beforeVerticalDrag = await activeQuestionText(page);
+      await dragCard(page, 6, -110);
+      expect(await activeQuestionText(page)).toBe(beforeVerticalDrag);
+
+      const scrollArea = page.locator("div.overflow-y-auto.overscroll-contain").last();
+      const beforeScrollTop = await scrollArea.evaluate((element) => element.scrollTop);
+      await scrollArea.hover();
+      await page.mouse.wheel(0, 460);
+      const afterScrollTop = await scrollArea.evaluate((element) => element.scrollTop);
+      expect(afterScrollTop).toBeGreaterThan(beforeScrollTop);
+
+      const beforeHorizontalDrag = await activeQuestionText(page);
+      const canGoNext = await page
+        .getByRole("button", { name: "下一题", exact: true })
+        .last()
+        .isEnabled();
+      await dragCard(page, canGoNext ? -90 : 90, 5);
+      await expect.poll(() => activeQuestionText(page)).not.toBe(beforeHorizontalDrag);
+
+      await page.locator("button.answer-choice").first().click();
+      await page.getByRole("button", { name: "提交答案" }).click();
+      for (const label of ["A", "B", "C", "D"]) {
+        await expect(page.getByText(`${label} 项解析`, { exact: false })).toHaveCount(1);
+      }
+
+      const primaryNext = page.getByRole("button", { name: "下一题", exact: true }).first();
+      await expect(primaryNext).toBeVisible();
+      const nextBox = await primaryNext.boundingBox();
+      expect((nextBox?.y ?? viewport.height) + (nextBox?.height ?? 0)).toBeLessThanOrEqual(
+        viewport.height,
+      );
+    });
+  }
+});

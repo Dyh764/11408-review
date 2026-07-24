@@ -14,6 +14,7 @@ type AnswerPanelProps = {
   one_sentence_tip?: string | null;
   answer_status?: AnswerStatus | null;
   answer_source?: AnswerSource | null;
+  showExplanation?: boolean;
 };
 
 export function AnswerPanel({
@@ -23,6 +24,7 @@ export function AnswerPanel({
   one_sentence_tip,
   answer_status,
   answer_source,
+  showExplanation = true,
 }: AnswerPanelProps) {
   const hasAnswer = Boolean(standard_answer?.trim());
   const steps = key_steps?.filter(Boolean) ?? [];
@@ -48,10 +50,12 @@ export function AnswerPanel({
             <MathText text={standard_answer} className="mt-1" />
           </div>
 
-          <div>
-            <p className="font-semibold text-slate-900">过程：</p>
-            <MathText text={answer_explanation} fallback="暂无完整过程。" className="mt-1" />
-          </div>
+          {showExplanation ? (
+            <div>
+              <p className="font-semibold text-slate-900">过程：</p>
+              <MathText text={answer_explanation} fallback="暂无完整过程。" className="mt-1" />
+            </div>
+          ) : null}
 
           <div>
             <p className="font-semibold text-slate-900">关键步骤：</p>

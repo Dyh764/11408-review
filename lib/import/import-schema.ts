@@ -233,7 +233,8 @@ chapter 只能使用以下大章，不要把小节写成单独大章：
 subject 必须是四科之一，不要写成“408”。
 choices 必须是 A/B/C/D 四个选项数组，每项包含 label 和 text。
 standard_answer 必须以“答案：”开头。
-answer_explanation 必须以“过程：”开头，并逐项分析 A/B/C/D。
+answer_explanation 必须严格写成“过程：A：...；B：...；C：...；D：...”，逐项分析 A/B/C/D。
+题干或选项依赖图片、表格、拓扑图、时序图时，必须输出 image_code: "required"；纯文字题省略 image_code。
 user_note 里记录 user_answer 和 correct_answer，例如“我选了B，正确答案是C；主要问题是概念混淆”。
 每题可以包含 related_practice_questions；如果无法保证严谨，则写 []。
 related_practice_questions 每道题必须包含 question_text、choices、correct_answer、answer_explanation、knowledge_point、why_related、difficulty、rigor_check。

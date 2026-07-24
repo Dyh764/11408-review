@@ -327,6 +327,7 @@ function ImportActionPanel({
   directCount,
   inboxCount,
   seriousCount,
+  missingRequiredImageCount,
   repairNotices,
   canImport,
   isImporting,
@@ -340,6 +341,7 @@ function ImportActionPanel({
   directCount: number;
   inboxCount: number;
   seriousCount: number;
+  missingRequiredImageCount: number;
   repairNotices: string[];
   canImport: boolean;
   isImporting: boolean;
@@ -360,6 +362,11 @@ function ImportActionPanel({
           <StatCard label="可直接导入" value={directCount} tone="green" />
           <StatCard label="建议待整理" value={inboxCount} tone="amber" />
         </div>
+        {missingRequiredImageCount > 0 ? (
+          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900 ring-1 ring-amber-100">
+            {missingRequiredImageCount} 道题依赖原图但尚未绑定：会进入待整理，并在刷题时自动跳过。可在下方“高级检查”中补图。
+          </p>
+        ) : null}
         {repairNotices.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {repairNotices.map((notice) => (
@@ -435,7 +442,24 @@ export default function ImportPage() {
     [hasParsed, jsonText],
   );
   const previewCards = parsed.cards;
-  const qualityReport = useMemo(() => getImportQualityReport(parsed), [parsed]);
+  const qualityReport = useMemo(
+    () =>
+      getImportQualityReport({
+        ...parsed,
+        cards: parsed.cards.map((item) =>
+          selectedImageFiles[item.index]
+            ? {
+                ...item,
+                card: {
+                  ...item.card,
+                  image_path: item.card.image_path ?? "pending-local-upload",
+                },
+              }
+            : item,
+        ),
+      }),
+    [parsed, selectedImageFiles],
+  );
   const qualityByIndex = useMemo(
     () => new Map(qualityReport.rows.map((row) => [row.index, row])),
     [qualityReport],
@@ -450,13 +474,24 @@ export default function ImportPage() {
   );
   const previewStats = useMemo(() => {
     const withAnswer = previewCards.filter((item) => item.card.standard_answer?.trim()).length;
-    const withoutImage = previewCards.filter((item) => !item.card.image_path).length;
+    const withoutImage = previewCards.filter(
+      (item) => !item.card.image_path && !selectedImageFiles[item.index],
+    ).length;
     const needsCheck = previewCards.filter(
       (item) => item.card.needs_manual_check || item.card.question_text_status !== "verified",
     ).length;
 
     return { withAnswer, withoutImage, needsCheck };
-  }, [previewCards]);
+  }, [previewCards, selectedImageFiles]);
+  const missingRequiredImageCount = useMemo(
+    () =>
+      qualityReport.rows.filter(
+        (row) =>
+          !selectedImageFiles[row.index] &&
+          row.issues.some((issue) => issue.label === "依赖原图但未绑定"),
+      ).length,
+    [qualityReport, selectedImageFiles],
+  );
   const canImport = previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
   const visibleRepairNotices =
     parseRepairNotices.length > 0 ? parseRepairNotices : (parsed.repairNotices ?? []);
@@ -879,6 +914,7 @@ export default function ImportPage() {
           directCount={qualityReport.importableCount - qualityReport.inboxRecommendedCount}
           inboxCount={qualityReport.inboxRecommendedCount}
           seriousCount={qualityReport.seriousCount}
+          missingRequiredImageCount={missingRequiredImageCount}
           repairNotices={visibleRepairNotices}
           canImport={canImport}
           isImporting={isImporting}
