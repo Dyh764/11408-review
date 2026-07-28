@@ -11,6 +11,7 @@ import type {
   ReviewPriority,
   ReviewResult,
   QuestionSource,
+  QuestionSourceInfo,
   Subject,
 } from "@/lib/types";
 
@@ -29,6 +30,7 @@ export type DueReview = {
     difficulty: Difficulty | null;
     image_path: string | null;
     source: QuestionSource;
+    source_info: QuestionSourceInfo | null;
     question_text: string | null;
     choices: ChoiceOption[];
     question_text_status: QuestionTextStatus;
@@ -67,6 +69,7 @@ const dueReviewColumns = `
     difficulty,
     image_path,
     source,
+    source_info,
     question_text,
     choices,
     question_text_status,
@@ -89,42 +92,70 @@ export function todayIsoDate() {
   return todayIsoDateInTimeZone();
 }
 
-async function addSignedImageUrl(
+async function addSignedImageUrls(
   supabase: SupabaseClient,
-  review: Omit<DueReview, "signedImageUrl">,
-): Promise<DueReview> {
-  if (!review.questions.image_path) {
-    return {
-      ...review,
-      signedImageUrl: null,
-    };
+  reviews: Array<Omit<DueReview, "signedImageUrl">>,
+): Promise<DueReview[]> {
+  const paths = Array.from(
+    new Set(
+      reviews
+        .map((review) => review.questions.image_path?.trim() ?? "")
+        .filter(Boolean),
+    ),
+  );
+  const signedByPath = new Map<string, string>();
+
+  for (let offset = 0; offset < paths.length; offset += 100) {
+    const batch = paths.slice(offset, offset + 100);
+    const { data, error } = await supabase.storage
+      .from(supabaseBucket)
+      .createSignedUrls(batch, 60 * 10);
+
+    if (error) {
+      continue;
+    }
+
+    for (const row of data ?? []) {
+      if (row.path && row.signedUrl) {
+        signedByPath.set(row.path, row.signedUrl);
+      }
+    }
   }
 
-  const { data, error } = await supabase.storage
-    .from(supabaseBucket)
-    .createSignedUrl(review.questions.image_path, 60 * 10);
-
-  return {
+  return reviews.map((review) => ({
     ...review,
-    signedImageUrl: error ? null : data.signedUrl,
-  };
+    signedImageUrl: review.questions.image_path
+      ? signedByPath.get(review.questions.image_path) ?? null
+      : null,
+  }));
 }
 
 export async function fetchDueReviews(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("reviews")
-    .select(dueReviewColumns)
-    .lte("scheduled_date", todayIsoDate())
-    .is("completed_at", null)
-    .is("questions.deleted_at", null)
-    .order("scheduled_date", { ascending: true })
-    .order("created_at", { ascending: true });
+  const rawReviews: RawDueReview[] = [];
 
-  if (error) {
-    throw error;
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select(dueReviewColumns)
+      .lte("scheduled_date", todayIsoDate())
+      .is("completed_at", null)
+      .is("questions.deleted_at", null)
+      .order("scheduled_date", { ascending: true })
+      .order("created_at", { ascending: true })
+      .range(offset, offset + 999);
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = (data ?? []) as unknown as RawDueReview[];
+    rawReviews.push(...batch);
+    if (batch.length < 1000) {
+      break;
+    }
   }
 
-  const reviews = ((data ?? []) as unknown as RawDueReview[])
+  const reviews = rawReviews
     .map((review) => ({
       ...review,
       questions: Array.isArray(review.questions) ? review.questions[0] : review.questions,
@@ -133,5 +164,5 @@ export async function fetchDueReviews(supabase: SupabaseClient) {
       Boolean(review.questions) && review.questions.deleted_at === null,
     );
 
-  return Promise.all(reviews.map((review) => addSignedImageUrl(supabase, review)));
+  return addSignedImageUrls(supabase, reviews);
 }

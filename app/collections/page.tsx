@@ -11,6 +11,7 @@ import {
   StudyCard,
   StudyPageHeader,
 } from "@/components/study/study-ui";
+import { buildCollectionPrintHtml } from "@/lib/collections/collection-print";
 import { createClient } from "@/lib/supabase/client";
 import { fetchCurrentUserQuestions, type QuestionWithImage } from "@/lib/questions";
 
@@ -126,6 +127,7 @@ export default function CollectionsPage() {
   const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看我的收藏。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [activeKey, setActiveKey] = useState<CollectionKey>("weak");
+  const [printMessage, setPrintMessage] = useState("");
 
   useEffect(() => {
     if (!supabase) {
@@ -161,12 +163,48 @@ export default function CollectionsPage() {
   const activeCollection = collections.find((item) => item.key === activeKey) ?? collections[0];
   const masteredCount = useMemo(() => questions.filter(isMastered).length, [questions]);
 
+  function printActiveCollection() {
+    if (activeCollection.items.length === 0) {
+      setPrintMessage("当前题本是空的，暂时没有可打印内容。");
+      return;
+    }
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "popup,width=960,height=760",
+    );
+
+    if (!printWindow) {
+      setPrintMessage("浏览器拦截了打印窗口，请允许本站弹出窗口后重试。");
+      return;
+    }
+
+    printWindow.addEventListener(
+      "load",
+      () => {
+        printWindow.focus();
+        printWindow.print();
+      },
+      { once: true },
+    );
+    printWindow.document.open();
+    printWindow.document.write(
+      buildCollectionPrintHtml({
+        title: `11408 复盘题单 · ${activeCollection.title}`,
+        questions: activeCollection.items,
+      }),
+    );
+    printWindow.document.close();
+    setPrintMessage("已生成打印题单；在打印窗口中选择“另存为 PDF”即可导出。");
+  }
+
   return (
     <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         eyebrow="408 考试平台"
         title="我的收藏"
-        subtitle="把 408os 式收藏夹和掌握度分组接到现有错题库：不新建表，直接用题卡状态自动归类。"
+        subtitle="按掌握度自动归类题本，并支持生成“题目在前、答案在后”的打印版或 PDF。"
       />
 
       <MobileSection>
@@ -186,6 +224,14 @@ export default function CollectionsPage() {
         <MobileSection>
           <p className="rounded-lg bg-white p-3 text-sm leading-6 text-slate-700 ring-1 ring-slate-200">
             {message}
+          </p>
+        </MobileSection>
+      ) : null}
+
+      {printMessage ? (
+        <MobileSection>
+          <p className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-800 ring-1 ring-blue-100">
+            {printMessage}
           </p>
         </MobileSection>
       ) : null}
@@ -237,6 +283,15 @@ export default function CollectionsPage() {
               打开题组
             </Link>
           </div>
+
+          <button
+            type="button"
+            onClick={printActiveCollection}
+            disabled={activeCollection.items.length === 0}
+            className="min-h-11 w-full rounded-lg bg-emerald-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            打印 / 保存 PDF（{activeCollection.items.length} 题）
+          </button>
 
           <div className="grid gap-3">
             {activeCollection.items.slice(0, 8).map((question) => (

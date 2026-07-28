@@ -39,6 +39,25 @@ export type QuestionSourceInfo = {
   page: string;
   problem_number: string;
   raw: string;
+  import_key?: string;
+  asset_file?: string;
+  source_file?: string;
+  collection_role?: "practice_bank" | "wrong_question";
+  chapter_number?: string;
+  answer_page_ref?: string;
+  answer_pdf_page?: string;
+  answer_printed_page?: string;
+  manual_reason?: string;
+  image_crop?: QuestionImageCrop;
+};
+
+export type QuestionImageCrop = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  page_width: number;
+  page_height: number;
 };
 
 export type ChoiceOption = {

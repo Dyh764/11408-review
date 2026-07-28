@@ -1,4 +1,4 @@
-import type { QuestionSourceInfo } from "@/lib/types";
+import type { QuestionImageCrop, QuestionSourceInfo } from "@/lib/types";
 
 export const unmarkedSourceInfo: QuestionSourceInfo = {
   type: "未标来源",
@@ -38,6 +38,34 @@ export type QuestionSourceStats = {
 
 function clean(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeImageCrop(value: unknown): QuestionImageCrop | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const input = value as Record<string, unknown>;
+  const fields = ["x", "y", "width", "height", "page_width", "page_height"] as const;
+  const values = Object.fromEntries(
+    fields.map((field) => [field, Number(input[field])]),
+  ) as Record<(typeof fields)[number], number>;
+
+  if (
+    fields.some((field) => !Number.isFinite(values[field])) ||
+    values.x < 0 ||
+    values.y < 0 ||
+    values.width <= 0 ||
+    values.height <= 0 ||
+    values.page_width <= 0 ||
+    values.page_height <= 0 ||
+    values.x + values.width > values.page_width + 2 ||
+    values.y + values.height > values.page_height + 2
+  ) {
+    return undefined;
+  }
+
+  return values;
 }
 
 function inferSection(raw: string) {
@@ -114,7 +142,11 @@ export function normalizeQuestionSourceInfo(input: SourceInfoInput): QuestionSou
   }
 
   const raw = clean(input.raw) || clean(input.name) || unmarkedSourceInfo.raw;
-  return {
+  const collectionRole =
+    input.collection_role === "practice_bank" || input.collection_role === "wrong_question"
+      ? input.collection_role
+      : undefined;
+  const result: QuestionSourceInfo = {
     type: clean(input.type) || inferType(raw),
     name: clean(input.name) || inferName(raw),
     section: clean(input.section) || inferSection(raw),
@@ -125,6 +157,32 @@ export function normalizeQuestionSourceInfo(input: SourceInfoInput): QuestionSou
     problem_number: clean(input.problem_number),
     raw,
   };
+  const optionalStrings = [
+    "import_key",
+    "asset_file",
+    "source_file",
+    "chapter_number",
+    "answer_page_ref",
+    "answer_pdf_page",
+    "answer_printed_page",
+    "manual_reason",
+  ] as const;
+
+  for (const field of optionalStrings) {
+    const value = clean(input[field]);
+    if (value) {
+      result[field] = value;
+    }
+  }
+  if (collectionRole) {
+    result.collection_role = collectionRole;
+  }
+  const imageCrop = normalizeImageCrop(input.image_crop);
+  if (imageCrop) {
+    result.image_crop = imageCrop;
+  }
+
+  return result;
 }
 
 export function getQuestionSourceInfo(question: {

@@ -36,7 +36,17 @@ const mockQuestions = [
     confidence: "high",
     needs_manual_check: false,
     source: "chatgpt_import",
-    source_info: null,
+    source_info: {
+      type: "真题",
+      name: "2023 年 408 真题",
+      section: "",
+      part: "",
+      volume: "",
+      paper: "",
+      page: "",
+      problem_number: "1",
+      raw: "",
+    },
     answer_status: "verified",
     answer_source: "chatgpt_import",
     created_at: "2026-07-23T08:00:00.000Z",
@@ -74,7 +84,17 @@ const mockQuestions = [
     confidence: "high",
     needs_manual_check: false,
     source: "chatgpt_import",
-    source_info: null,
+    source_info: {
+      type: "真题",
+      name: "2024 年 408 真题",
+      section: "",
+      part: "",
+      volume: "",
+      paper: "",
+      page: "",
+      problem_number: "2",
+      raw: "",
+    },
     answer_status: "verified",
     answer_source: "chatgpt_import",
     created_at: "2026-07-23T09:00:00.000Z",
@@ -180,6 +200,7 @@ test.describe("固定刷题模式", () => {
   test.skip(!practiceMockEnabled, "需要 E2E_PRACTICE_MOCK=1 和本地模拟 Supabase 地址");
 
   for (const viewport of [
+    { width: 390, height: 667, label: "compact-mobile" },
     { width: 390, height: 844, label: "mobile" },
     { width: 1280, height: 900, label: "desktop" },
   ]) {
@@ -193,6 +214,30 @@ test.describe("固定刷题模式", () => {
       await expect(page.getByText(/缺图跳过 1 题/)).toBeVisible();
       await expect(page.getByText(/剩余 2 题/)).toBeVisible();
       await expect(page.getByRole("button", { name: "提交答案" })).toBeVisible();
+
+      const scrollArea = page.locator("div.overflow-y-auto.overscroll-contain").last();
+      const optionLayout = await page.locator("button.answer-choice").evaluateAll(
+        (buttons) =>
+          buttons.map((button) => ({
+            width: button.getBoundingClientRect().width,
+            scrollOverflow: button.scrollWidth - button.clientWidth,
+          })),
+      );
+      const scrollAreaMetrics = await scrollArea.evaluate((element) => ({
+        width: element.clientWidth,
+        height: element.clientHeight,
+        horizontalOverflow: element.scrollWidth - element.clientWidth,
+      }));
+
+      expect(optionLayout).toHaveLength(4);
+      for (const option of optionLayout) {
+        expect(option.width).toBeGreaterThanOrEqual(scrollAreaMetrics.width - 40);
+        expect(option.scrollOverflow).toBeLessThanOrEqual(1);
+      }
+      expect(scrollAreaMetrics.height).toBeGreaterThanOrEqual(
+        viewport.height < 720 ? 240 : 280,
+      );
+      expect(scrollAreaMetrics.horizontalOverflow).toBeLessThanOrEqual(1);
 
       const firstQuestion = await activeQuestionText(page);
       await page.reload();
@@ -218,12 +263,18 @@ test.describe("固定刷题模式", () => {
       await dragCard(page, 6, -110);
       expect(await activeQuestionText(page)).toBe(beforeVerticalDrag);
 
-      const scrollArea = page.locator("div.overflow-y-auto.overscroll-contain").last();
       const beforeScrollTop = await scrollArea.evaluate((element) => element.scrollTop);
+      const scrollOverflow = await scrollArea.evaluate(
+        (element) => element.scrollHeight - element.clientHeight,
+      );
       await scrollArea.hover();
       await page.mouse.wheel(0, 460);
       const afterScrollTop = await scrollArea.evaluate((element) => element.scrollTop);
-      expect(afterScrollTop).toBeGreaterThan(beforeScrollTop);
+      if (scrollOverflow > 1) {
+        expect(afterScrollTop).toBeGreaterThan(beforeScrollTop);
+      } else {
+        expect(afterScrollTop).toBe(beforeScrollTop);
+      }
 
       const beforeHorizontalDrag = await activeQuestionText(page);
       const canGoNext = await page
@@ -245,6 +296,40 @@ test.describe("固定刷题模式", () => {
       expect((nextBox?.y ?? viewport.height) + (nextBox?.height ?? 0)).toBeLessThanOrEqual(
         viewport.height,
       );
+    });
+
+    test(`${viewport.label} 每日一题、高频错题和考点刷题入口可用`, async ({ page }) => {
+      await installMockSupabase(page);
+      await page.setViewportSize(viewport);
+      await page.goto("/practice");
+
+      await expect(page.getByRole("button", { name: /每日一题/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /个人高频错题/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: /按考点刷题/ })).toHaveAttribute(
+        "href",
+        "/knowledge-map",
+      );
+      await expect(page.getByRole("link", { name: /二刷错题/ })).toHaveAttribute(
+        "href",
+        "/review",
+      );
+
+      await page.getByRole("button", { name: /每日一题/ }).click();
+      await expect(page.getByText("每日一题", { exact: true })).toBeVisible();
+      await expect(page.getByText(/剩余 1 题/)).toBeVisible();
+
+      await page.goto("/knowledge-map");
+      await expect(
+        page.getByRole("heading", { name: "考点刷题与考频" }),
+      ).toBeVisible();
+      await expect(page.getByText("进程与线程", { exact: true })).toBeVisible();
+      await expect(page.getByText(/开始刷本章 3 道选择题/)).toBeVisible();
+      await expect(page.getByText(/2023、2024 年/)).toBeVisible();
+
+      const horizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(horizontalOverflow).toBeLessThanOrEqual(1);
     });
   }
 });

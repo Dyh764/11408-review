@@ -555,7 +555,7 @@ function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
     throw new Error("source 必须是对象或字符串。");
   }
 
-  const allowedFields: Array<keyof QuestionSourceInfo> = [
+  const allowedStringFields = [
     "type",
     "name",
     "section",
@@ -565,22 +565,38 @@ function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
     "page",
     "problem_number",
     "raw",
-  ];
+    "import_key",
+    "asset_file",
+    "source_file",
+    "collection_role",
+    "chapter_number",
+    "answer_page_ref",
+    "answer_pdf_page",
+    "answer_printed_page",
+    "manual_reason",
+  ] as const;
   const sourceInfo: Partial<QuestionSourceInfo> = {};
 
-  for (const field of allowedFields) {
+  for (const field of allowedStringFields) {
     const fieldValue = value[field];
     if (fieldValue === undefined || fieldValue === null) {
-      sourceInfo[field] = "";
       continue;
     }
 
     if (typeof fieldValue !== "string") {
-      throw new Error("source 格式错误：type、name、section、part、volume、paper、page、problem_number、raw 必须是字符串。");
+      throw new Error(`source.${field} 必须是字符串。`);
     }
 
-    sourceInfo[field] = fieldValue.trim();
+    if (field === "collection_role") {
+      if (fieldValue !== "practice_bank" && fieldValue !== "wrong_question") {
+        throw new Error("source.collection_role 只能是 practice_bank 或 wrong_question。");
+      }
+      sourceInfo.collection_role = fieldValue;
+    } else {
+      sourceInfo[field] = fieldValue.trim();
+    }
   }
+  sourceInfo.image_crop = value.image_crop as QuestionSourceInfo["image_crop"];
 
   return normalizeQuestionSourceInfo(sourceInfo);
 }
@@ -666,13 +682,26 @@ function normalizeRow(value: unknown): ImportQuestionCard {
     }
 
     const standardAnswer = optionalString(value.standard_answer, "standard_answer");
-    if (!standardAnswer.startsWith("答案：")) {
+    if (
+      standardAnswer &&
+      !standardAnswer.startsWith("答案：")
+    ) {
       throw new Error("standard_answer 必须以“答案：”开头。");
     }
 
     const answerExplanation = optionalString(value.answer_explanation, "answer_explanation");
-    if (!answerExplanation.startsWith("过程：")) {
+    if (
+      answerExplanation &&
+      !answerExplanation.startsWith("过程：")
+    ) {
       throw new Error("answer_explanation 必须以“过程：”开头。");
+    }
+
+    if (
+      answerStatus !== "needs_fix" &&
+      (!standardAnswer || !answerExplanation)
+    ) {
+      throw new Error("408 选择题缺少答案时，answer_status 必须标记为 needs_fix。");
     }
   }
   const displayQuestionText =

@@ -187,3 +187,84 @@ test("filterPracticeQuestions narrows a four-course choice round to one chapter"
     ["os-intro-high", "os-intro-low"],
   );
 });
+
+test("filterPracticeQuestions returns one stable daily question for the same date", () => {
+  const questions = [
+    {
+      ...baseQuestion,
+      id: "daily-1",
+      subject: "数据结构",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-01T00:00:00.000Z",
+    },
+    {
+      ...baseQuestion,
+      id: "daily-2",
+      subject: "操作系统",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-02T00:00:00.000Z",
+    },
+    {
+      ...baseQuestion,
+      id: "daily-3",
+      subject: "计算机网络",
+      choices: [{ label: "A", text: "1" }],
+      created_at: "2026-06-03T00:00:00.000Z",
+    },
+  ];
+
+  const first = filterPracticeQuestions(questions, {
+    type: "daily-choice",
+    date: "2026-07-28",
+  });
+  const second = filterPracticeQuestions(questions, {
+    type: "daily-choice",
+    date: "2026-07-28",
+  });
+
+  assert.equal(first.length, 1);
+  assert.equal(second[0]?.id, first[0]?.id);
+});
+
+test("filterPracticeQuestions builds a personal high-frequency wrong-question round", () => {
+  const questions = [
+    {
+      ...baseQuestion,
+      id: "priority-high",
+      subject: "数据结构",
+      choices: [{ label: "A", text: "1" }],
+      review_priority: "high",
+      mastery_status: "计算错误",
+    },
+    {
+      ...baseQuestion,
+      id: "unstable",
+      subject: "操作系统",
+      choices: [{ label: "A", text: "1" }],
+      review_priority: "medium",
+      mastery_status: "做对但不稳",
+    },
+    {
+      ...baseQuestion,
+      id: "mastered",
+      subject: "计算机网络",
+      choices: [{ label: "A", text: "1" }],
+      review_priority: "low",
+      mastery_status: "完全掌握",
+    },
+    {
+      ...baseQuestion,
+      id: "math",
+      subject: "数学",
+      choices: [{ label: "A", text: "1" }],
+      review_priority: "high",
+    },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, { type: "high-frequency-choice" }).map(
+      (question) => question.id,
+    ),
+    ["priority-high", "unstable"],
+  );
+});

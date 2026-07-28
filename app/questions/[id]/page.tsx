@@ -9,8 +9,10 @@ import { MathText } from "@/components/mobile/MathText";
 import { LoadingState, MobileCard, MobilePageShell, MobileSection, SectionCard } from "@/components/mobile/primitives";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { QuestionSourceImage } from "@/components/study/QuestionSourceImage";
 import { todayIsoDate } from "@/lib/dates";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
+import { parseChoiceExplanations } from "@/lib/questions/choice-explanation";
 import { getAnswerStatusLabel } from "@/lib/questions/answer-labels";
 import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { getQuestionTextStatusLabel } from "@/lib/questions/meta-labels";
@@ -423,6 +425,10 @@ export default function QuestionDetailPage() {
     ? getQuestionStemAndChoices(question.question_text, question.choices)
     : { questionText: "", choices: [] };
   const parsedChoiceAnswer = question ? parseAnswerChoiceLabels(question.standard_answer) : { labels: [], isMultiple: false };
+  const choiceExplanations = parseChoiceExplanations(
+    question?.answer_explanation,
+    questionDisplay.choices.map((choice) => choice.label),
+  );
   const canSubmitChoiceAnswer =
     questionDisplay.choices.length > 0 && parsedChoiceAnswer.labels.length > 0 && selectedAnswerLabels.length > 0;
   const relatedPracticeQuestions =
@@ -490,13 +496,9 @@ export default function QuestionDetailPage() {
                   onClick={() => setIsPreviewOpen(true)}
                   className="mt-4 block w-full overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <QuestionSourceImage
                     src={question.signedImageUrl}
-                    alt="原题图片"
-                    loading="lazy"
-                    decoding="async"
-                    className="max-h-[520px] w-full object-contain"
+                    sourceInfo={question.source_info}
                   />
                 </button>
               ) : question.image_path ? (
@@ -520,6 +522,7 @@ export default function QuestionDetailPage() {
                     correctLabels={choicePracticeResult?.correctLabels ?? []}
                     revealAnswer={Boolean(choicePracticeResult)}
                     disabled={Boolean(choicePracticeResult) || isSubmittingPractice}
+                    explanationsByLabel={choiceExplanations.explanationsByLabel}
                     onToggleChoice={(label) => handleToggleChoice(label, parsedChoiceAnswer.isMultiple)}
                   />
                   {parsedChoiceAnswer.labels.length === 0 ? (

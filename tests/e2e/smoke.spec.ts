@@ -39,6 +39,11 @@ async function expectBottomNav(page: Page) {
   await expect(bottomNav.getByRole("link", { name: /我的|鎴戠殑/ })).toBeVisible();
 }
 
+async function expectPracticeFocusShell(page: Page) {
+  await expect(page.locator("nav.fixed")).toHaveCount(0);
+  await expect(page.locator("main.h-full.overflow-hidden")).toBeVisible();
+}
+
 async function expectDesktopNav(page: Page) {
   const desktopNav = page.getByRole("navigation", { name: "桌面主导航" });
 
@@ -61,6 +66,8 @@ async function expectRouteLoadsOrRequiresLogin(page: Page, route: string) {
     const viewport = page.viewportSize();
     if ((viewport?.width ?? 0) >= 1024) {
       await expectDesktopNav(page);
+    } else if (route === "/practice") {
+      await expectPracticeFocusShell(page);
     } else {
       await expectBottomNav(page);
     }
@@ -679,7 +686,9 @@ test("mobile viewport has no obvious horizontal scroll and keeps bottom nav visi
     await page.goto(route);
     await expectPageHasNoHorizontalOverflow(page);
 
-    if (!page.url().includes("/login")) {
+    if (page.url().includes("/practice")) {
+      await expectPracticeFocusShell(page);
+    } else if (!page.url().includes("/login")) {
       await expectBottomNav(page);
     }
   }

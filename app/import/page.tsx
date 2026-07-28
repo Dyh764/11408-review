@@ -749,6 +749,16 @@ export default function ImportPage() {
       />
 
       <MobileSection>
+        <Link
+          href="/import/question-bank"
+          className="flex min-h-12 items-center justify-between rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.18)]"
+        >
+          <span>批量导入王道 408 题库</span>
+          <span aria-hidden>→</span>
+        </Link>
+      </MobileSection>
+
+      <MobileSection>
         <details className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-950">
           <summary className="cursor-pointer list-none text-xs font-black text-blue-700">
             导入步骤

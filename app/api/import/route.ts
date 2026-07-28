@@ -25,6 +25,7 @@ type ImportSuccess = {
   reviewCount: number;
   warning?: string;
   inbox?: boolean;
+  skipped?: boolean;
 };
 
 type PendingImport = {
@@ -64,6 +65,10 @@ function buildQuestionInsert(card: ImportQuestionCard, userId: string) {
     answer_source: card.answer_source,
     analyzed_at: new Date().toISOString(),
   };
+}
+
+function getImportKey(card: ImportQuestionCard) {
+  return card.source_info.import_key?.trim() ?? "";
 }
 
 export async function POST(request: Request) {
@@ -137,14 +142,66 @@ export async function POST(request: Request) {
     });
   }
 
-  if (pendingInserts.length > 0) {
+  let insertsToCreate = pendingInserts;
+  const importKeys = Array.from(
+    new Set(pendingInserts.map((pending) => getImportKey(pending.card)).filter(Boolean)),
+  );
+
+  if (importKeys.length > 0) {
+    const { data: existingRows, error: existingError } = await supabase
+      .from("questions")
+      .select("id,source_info")
+      .in("source_info->>import_key", importKeys)
+      .eq("user_id", user.id)
+      .is("deleted_at", null);
+
+    if (existingError) {
+      for (const pending of pendingInserts) {
+        failures.push({
+          index: pending.index,
+          message: `题库去重检查失败：${existingError.message}`,
+        });
+      }
+      insertsToCreate = [];
+    } else {
+      const existingByKey = new Map(
+        ((existingRows ?? []) as Array<{
+          id: string;
+          source_info: { import_key?: string } | null;
+        }>)
+          .map((row) => [row.source_info?.import_key?.trim() ?? "", row.id] as const)
+          .filter(([key]) => Boolean(key)),
+      );
+
+      insertsToCreate = pendingInserts.filter((pending) => {
+        const importKey = getImportKey(pending.card);
+        const existingId = importKey ? existingByKey.get(importKey) : undefined;
+
+        if (!existingId) {
+          return true;
+        }
+
+        successes.push({
+          index: pending.index,
+          questionId: existingId,
+          reviewCount: 0,
+          warning: "题库中已存在相同原题，本次已跳过重复写入。",
+          inbox: pending.inbox,
+          skipped: true,
+        });
+        return false;
+      });
+    }
+  }
+
+  if (insertsToCreate.length > 0) {
     const { data: insertedRows, error: insertError } = await supabase
       .from("questions")
-      .insert(pendingInserts.map((pending) => buildQuestionInsert(pending.card, user.id)))
+      .insert(insertsToCreate.map((pending) => buildQuestionInsert(pending.card, user.id)))
       .select("id");
 
     if (insertError || !insertedRows) {
-      for (const pending of pendingInserts) {
+      for (const pending of insertsToCreate) {
         failures.push({
           index: pending.index,
           message: insertError?.message ?? "错题写入失败。",
@@ -152,7 +209,7 @@ export async function POST(request: Request) {
       }
     } else {
       const insertedQuestions = insertedRows as Array<{ id: string }>;
-      const importedQuestions = pendingInserts
+      const importedQuestions = insertsToCreate
         .map((pending, position) => {
           const row = insertedQuestions[position];
 
@@ -223,6 +280,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     successCount: successes.length,
+    importedCount: successes.filter((success) => !success.skipped).length,
+    skippedCount: successes.filter((success) => success.skipped).length,
     failureCount: failures.length,
     quality: qualityReport,
     diagnostics: failures.length > 0 ? diagnosticResult.diagnostics : [],

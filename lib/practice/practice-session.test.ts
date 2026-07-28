@@ -24,6 +24,14 @@ test("builds independent scope keys for subject and chapter rounds", () => {
     }),
     "exam408-choice:操作系统:进程与线程",
   );
+  assert.equal(
+    buildPracticeScopeKey({ type: "daily-choice", date: "2026-07-28" }),
+    "daily-choice:2026-07-28",
+  );
+  assert.equal(
+    buildPracticeScopeKey({ type: "high-frequency-choice" }),
+    "high-frequency-choice",
+  );
 });
 
 test("reopening resumes after the last shown unfinished question", () => {

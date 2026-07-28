@@ -42,7 +42,9 @@ export type PracticeFilter =
   | { type: "chapter"; subject: string; chapter: string }
   | { type: "mistake"; mistakeType: string }
   | { type: "topic"; topic: string }
-  | { type: "exam408-choice"; subject?: string; chapter?: string };
+  | { type: "exam408-choice"; subject?: string; chapter?: string }
+  | { type: "daily-choice"; date: string }
+  | { type: "high-frequency-choice" };
 
 const untaggedMistakeType = "未标注错因";
 
@@ -86,6 +88,26 @@ function isExam408ChoiceQuestion(question: PracticeQuestion) {
     ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(question.subject) &&
     (question.choices?.length ?? 0) > 0
   );
+}
+
+function isPersonalHighFrequencyQuestion(question: PracticeQuestion) {
+  return (
+    isExam408ChoiceQuestion(question) &&
+    (question.review_priority === "high" ||
+      ["完全没思路", "有一点思路", "思路对但卡住", "做对但不稳"].includes(
+        question.mastery_status?.trim() ?? "",
+      ))
+  );
+}
+
+function stableTextHash(value: string) {
+  let hash = 0;
+
+  for (const character of value) {
+    hash = (hash * 31 + character.codePointAt(0)!) >>> 0;
+  }
+
+  return hash;
 }
 
 function questionCreatedTime(question: PracticeQuestion) {
@@ -166,6 +188,16 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
   questions: T[],
   filter: PracticeFilter,
 ) {
+  if (filter.type === "daily-choice") {
+    const candidates = sortPracticeQuestions(questions.filter(isExam408ChoiceQuestion));
+
+    if (candidates.length === 0) {
+      return [];
+    }
+
+    return [candidates[stableTextHash(filter.date) % candidates.length]];
+  }
+
   return sortPracticeQuestions(
     questions.filter((question) => {
       if (filter.type === "chapter") {
@@ -183,6 +215,10 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
           (!filter.subject || question.subject === filter.subject) &&
           (!filter.chapter || chapterLabel(question) === filter.chapter)
         );
+      }
+
+      if (filter.type === "high-frequency-choice") {
+        return isPersonalHighFrequencyQuestion(question);
       }
 
       return mistakeLabels(question).includes(filter.mistakeType);

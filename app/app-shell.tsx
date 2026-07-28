@@ -85,16 +85,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main
           className={
             isPractice
-              ? "h-full min-h-0 overflow-y-auto overscroll-contain pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0"
+              ? "h-full min-h-0 overflow-hidden"
               : "min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10"
           }
         >
           {children}
         </main>
       </div>
-      <div className="md:hidden">
-        <BottomNav />
-      </div>
+      {!isPractice ? (
+        <div className="md:hidden">
+          <BottomNav />
+        </div>
+      ) : null}
     </div>
   );
 }

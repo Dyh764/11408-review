@@ -488,17 +488,21 @@ test("non-home routes keep a desktop navigation shell instead of forcing phone w
   assert.doesNotMatch(shell, /return \(\s*<div className="phone-shell">/);
 });
 
-test("408 dashboard nav has lightweight knowledge map and statistics pages", () => {
+test("408 dashboard nav has real question-bank knowledge map and statistics pages", () => {
   const knowledgeMap = read("app/knowledge-map/page.tsx");
+  const insights = read("lib/question-bank/question-bank-insights.ts");
   const statistics = read("app/statistics/page.tsx");
 
-  assert.match(knowledgeMap, /知识图谱/);
-  assert.match(knowledgeMap, /数据结构/);
-  assert.match(knowledgeMap, /计算机组成原理/);
-  assert.match(knowledgeMap, /操作系统/);
-  assert.match(knowledgeMap, /计算机网络/);
-  assert.match(knowledgeMap, /href="\/questions"/);
+  assert.match(knowledgeMap, /考点刷题与考频/);
+  assert.match(knowledgeMap, /fetchCurrentUserQuestions/);
+  assert.match(knowledgeMap, /buildQuestionBankSubjectInsights/);
+  assert.match(knowledgeMap, /历年真题/);
+  assert.match(knowledgeMap, /题库考频/);
   assert.match(knowledgeMap, /href="\/practice"/);
+  assert.match(insights, /数据结构/);
+  assert.match(insights, /计算机组成原理/);
+  assert.match(insights, /操作系统/);
+  assert.match(insights, /计算机网络/);
 
   assert.match(statistics, /数据统计/);
   assert.match(statistics, /学习报告/);

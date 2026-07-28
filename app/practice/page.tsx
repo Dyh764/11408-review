@@ -61,6 +61,7 @@ function makePracticeReview(question: QuestionWithImage): FlashcardReview {
       difficulty: question.difficulty,
       image_path: question.image_path,
       source: question.source,
+      source_info: question.source_info,
       question_text: question.question_text,
       choices: question.choices,
       question_text_status: question.question_text_status,
@@ -96,6 +97,14 @@ function getPracticeQuestionSelection(
 function getPracticeScopeLabel(filter: PracticeFilter) {
   if (filter.type === "exam408-choice") {
     return filter.chapter || filter.subject || "全部 408";
+  }
+
+  if (filter.type === "daily-choice") {
+    return "每日一题";
+  }
+
+  if (filter.type === "high-frequency-choice") {
+    return "个人高频错题";
   }
 
   if (filter.type === "chapter") {
@@ -270,6 +279,20 @@ export default function PracticePage() {
               chapter: chapterParam || undefined,
             };
             activatePreparedRound(preparePracticeRound(items, choiceFilter), choiceFilter);
+          } else if (modeParam === "daily-choice") {
+            const dailyFilter: PracticeFilter = {
+              type: "daily-choice",
+              date: todayIsoDate(),
+            };
+            activatePreparedRound(preparePracticeRound(items, dailyFilter), dailyFilter);
+          } else if (modeParam === "high-frequency-choice") {
+            const highFrequencyFilter: PracticeFilter = {
+              type: "high-frequency-choice",
+            };
+            activatePreparedRound(
+              preparePracticeRound(items, highFrequencyFilter),
+              highFrequencyFilter,
+            );
           } else if (topicParam) {
             const topicFilter: PracticeFilter = { type: "topic", topic: topicParam };
             activatePreparedRound(preparePracticeRound(items, topicFilter), topicFilter);
@@ -307,6 +330,18 @@ export default function PracticePage() {
   );
   const exam408ChoiceTotal = exam408Selection.available.length;
   const exam408MissingImageTotal = exam408Selection.missingImageCount;
+  const dailyChoiceSelection = useMemo(
+    () =>
+      getPracticeQuestionSelection(questions, {
+        type: "daily-choice",
+        date: todayIsoDate(),
+      }),
+    [questions],
+  );
+  const highFrequencySelection = useMemo(
+    () => getPracticeQuestionSelection(questions, { type: "high-frequency-choice" }),
+    [questions],
+  );
   const exam408SubjectCounts = useMemo(
     () =>
       exam408SubjectOptions.map((subject) => {
@@ -608,6 +643,74 @@ export default function PracticePage() {
         </MobileSection>
 
         <MobileSection>
+          <SectionHeader
+            title="题库专项"
+            subtitle="视频里的每日一题、高频错题、二刷错题和考点刷题都从你的题库生成。"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                resetRound({
+                  type: "daily-choice",
+                  date: todayIsoDate(),
+                })
+              }
+              disabled={dailyChoiceSelection.available.length === 0}
+              className="rounded-lg bg-emerald-50 p-4 text-left ring-1 ring-emerald-100 disabled:opacity-50"
+            >
+              <span className="block text-sm font-black text-emerald-800">每日一题</span>
+              <span className="mt-1 block text-xs leading-5 text-emerald-700">
+                每天固定同一道题
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => resetRound({ type: "high-frequency-choice" })}
+              disabled={highFrequencySelection.available.length === 0}
+              className="rounded-lg bg-amber-50 p-4 text-left ring-1 ring-amber-100 disabled:opacity-50"
+            >
+              <span className="block text-sm font-black text-amber-900">个人高频错题</span>
+              <span className="mt-1 block text-xs leading-5 text-amber-700">
+                {highFrequencySelection.available.length} 道反复不稳题
+              </span>
+            </button>
+            <Link
+              href="/knowledge-map"
+              className="rounded-lg bg-white p-4 ring-1 ring-slate-100"
+            >
+              <span className="block text-sm font-black text-slate-950">按考点刷题</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                按科目、章节和考频选题
+              </span>
+            </Link>
+            <Link
+              href="/review"
+              className="rounded-lg bg-white p-4 ring-1 ring-slate-100"
+            >
+              <span className="block text-sm font-black text-slate-950">二刷错题</span>
+              <span className="mt-1 block text-xs leading-5 text-slate-500">
+                回填仍错、进步或掌握
+              </span>
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Link
+              href="/collections"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+            >
+              收藏夹 / PDF
+            </Link>
+            <Link
+              href="/notes"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+            >
+              题目与考点笔记
+            </Link>
+          </div>
+        </MobileSection>
+
+        <MobileSection>
           <SectionHeader title="按科目刷题" subtitle="入口只统计已经拆出 A/B/C/D 选项的 408 选择题。" />
           <div className="grid gap-3">
             {exam408SubjectCounts.map((option) => (
@@ -708,7 +811,7 @@ export default function PracticePage() {
 
   if (activeFilter && queue.length > 0) {
     return (
-      <MobilePageShell className="flex h-full min-h-0 flex-col space-y-0 overflow-hidden bg-slate-50 pb-0">
+      <MobilePageShell className="flex h-full min-h-0 flex-col space-y-0 overflow-hidden bg-slate-50 pb-[env(safe-area-inset-bottom)]">
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
             <div className="min-w-0">

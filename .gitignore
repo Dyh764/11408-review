@@ -12,3 +12,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 dev-server.*.log
 test-results/
+tmp/
+__pycache__/
+*.pyc

@@ -40,6 +40,41 @@ test("normalizeQuestionSourceInfo keeps Li Lin 880 source parts for nested brows
   assert.equal(source.section, "高等数学");
 });
 
+test("normalizeQuestionSourceInfo preserves question-bank keys and crop coordinates", () => {
+  const source = normalizeQuestionSourceInfo({
+    type: "题库",
+    name: "王道 408",
+    raw: "王道 408",
+    import_key: "wangdao-27-q1",
+    asset_file: "data-structure-p002.webp",
+    answer_page_ref: "4",
+    answer_pdf_page: "16",
+    answer_printed_page: "4",
+    collection_role: "practice_bank",
+    image_crop: {
+      x: 20,
+      y: 30,
+      width: 400,
+      height: 180,
+      page_width: 1200,
+      page_height: 1680,
+    },
+  });
+
+  assert.equal(source.import_key, "wangdao-27-q1");
+  assert.equal(source.answer_pdf_page, "16");
+  assert.equal(source.answer_printed_page, "4");
+  assert.equal(source.collection_role, "practice_bank");
+  assert.deepEqual(source.image_crop, {
+    x: 20,
+    y: 30,
+    width: 400,
+    height: 180,
+    page_width: 1200,
+    page_height: 1680,
+  });
+});
+
 test("getQuestionSourceInfo reads source_info and falls back without reusing ingestion source", () => {
   assert.equal(
     getQuestionSourceInfo({ source: "chatgpt_import", source_info: null }).name,

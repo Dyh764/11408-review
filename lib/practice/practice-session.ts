@@ -30,6 +30,14 @@ export function buildPracticeScopeKey(filter: PracticeFilter) {
     return ["exam408-choice", filter.subject || "all", filter.chapter || "all"].join(":");
   }
 
+  if (filter.type === "daily-choice") {
+    return ["daily-choice", filter.date].join(":");
+  }
+
+  if (filter.type === "high-frequency-choice") {
+    return "high-frequency-choice";
+  }
+
   if (filter.type === "chapter") {
     return ["chapter", filter.subject, filter.chapter].join(":");
   }

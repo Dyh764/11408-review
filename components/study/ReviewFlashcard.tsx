@@ -6,6 +6,7 @@ import { ChoiceList } from "@/components/mobile/ChoiceList";
 import { MathText } from "@/components/mobile/MathText";
 import { ImagePlaceholder, MobileSection } from "@/components/mobile/primitives";
 import { TextQuestionPreview } from "@/components/mobile/TextQuestionPreview";
+import { QuestionSourceImage } from "@/components/study/QuestionSourceImage";
 import { areChoiceAnswersEqual, parseAnswerChoiceLabels } from "@/lib/questions/answer-choice";
 import { parseChoiceExplanations } from "@/lib/questions/choice-explanation";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
@@ -21,6 +22,7 @@ import type {
   MasteryStatus,
   QuestionSource,
   QuestionTextStatus,
+  QuestionSourceInfo,
   ReviewPriority,
   Subject,
 } from "@/lib/types";
@@ -38,6 +40,7 @@ export type FlashcardQuestion = {
   difficulty: Difficulty | null;
   image_path: string | null;
   source: QuestionSource;
+  source_info: QuestionSourceInfo | null;
   question_text: string | null;
   choices: ChoiceOption[];
   question_text_status: QuestionTextStatus;
@@ -146,7 +149,7 @@ export function ReviewFlashcard({
         ))}
       </div>
 
-      <div className="rounded-lg bg-slate-50 p-4">
+      <div className={`rounded-lg bg-slate-50 ${focusMode ? "p-3" : "p-4"}`}>
         {focusMode && review.signedImageUrl ? (
           <a
             href={review.signedImageUrl}
@@ -154,11 +157,9 @@ export function ReviewFlashcard({
             rel="noreferrer"
             className="mb-4 block overflow-hidden rounded-lg bg-white p-2 text-center ring-1 ring-slate-200"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <QuestionSourceImage
               src={review.signedImageUrl}
-              alt="原题图片"
-              className="mx-auto max-h-[34dvh] w-full object-contain"
+              sourceInfo={review.questions.source_info}
               onError={onImageUnavailable}
             />
             <span className="mt-1 block text-xs font-black text-blue-700">点击查看原图</span>
@@ -172,11 +173,10 @@ export function ReviewFlashcard({
               className="grid h-20 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-white text-xs text-slate-500 ring-1 ring-slate-200"
             >
               {review.signedImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <QuestionSourceImage
                   src={review.signedImageUrl}
-                  alt="原题缩略图"
-                  className="h-full w-full object-cover"
+                  sourceInfo={review.questions.source_info}
+                  compact
                 />
               ) : (
                 <ImagePlaceholder label="原题缩略图" />
@@ -195,7 +195,7 @@ export function ReviewFlashcard({
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className={focusMode ? "mt-3" : "mt-4"}>
           <TextQuestionPreview
             subject={review.questions.subject}
             chapter={review.questions.chapter}
@@ -213,9 +213,10 @@ export function ReviewFlashcard({
 
       {questionDisplay.choices.length > 0 ? (
         <div>
-          <p className="mb-2 text-sm font-black text-slate-950">选择题选项</p>
+          <p className="mb-1.5 text-sm font-black text-slate-950">选择题选项</p>
           <ChoiceList
             choices={questionDisplay.choices}
+            compact={focusMode}
             mode={submittedChoice ? "reviewed" : "answering"}
             selectedLabels={selectedChoices}
             correctLabels={answerChoices.labels}
@@ -364,12 +365,12 @@ export function ReviewFlashcard({
       >
         {focusMode ? (
           <>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 md:space-y-4 md:p-4">
               {questionContent}
               {feedbackContent}
               {recordActions}
             </div>
-            <div className="shrink-0 border-t border-slate-200 bg-white p-3">
+            <div className="shrink-0 border-t border-slate-200 bg-white p-2.5 md:p-3">
               {primaryActions}
             </div>
           </>

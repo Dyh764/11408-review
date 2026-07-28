@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import { MobileSection } from "@/components/mobile/primitives";
-import { StudyCard } from "@/components/study/study-ui";
 
 type SwipeReview = {
   id: string;
@@ -264,14 +263,14 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
   }
 
   const navigation = (
-    <StudyCard className="py-2.5">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-xs font-black text-slate-500">
+    <div className="rounded-lg border border-slate-200 bg-white p-1.5 shadow-[0_6px_16px_rgba(15,23,42,0.04)] md:p-2">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs font-black text-slate-500 md:gap-3">
         <button
           type="button"
           data-swipe-ignore
           onClick={goPrevious}
           disabled={navigationLocked || safeActiveIndex === 0}
-          className="min-h-9 rounded-lg bg-slate-100 px-3 text-slate-700 disabled:text-slate-300"
+          className="min-h-8 rounded-lg bg-slate-100 px-3 text-slate-700 disabled:text-slate-300 md:min-h-9"
         >
           上一题
         </button>
@@ -283,21 +282,30 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
           data-swipe-ignore
           onClick={goNext}
           disabled={navigationLocked || safeActiveIndex >= reviews.length - 1}
-          className="min-h-9 rounded-lg bg-blue-50 px-3 text-blue-700 disabled:text-slate-300"
+          className="min-h-8 rounded-lg bg-blue-50 px-3 text-blue-700 disabled:text-slate-300 md:min-h-9"
         >
           下一题
         </button>
       </div>
-    </StudyCard>
+    </div>
   );
 
   return (
     <div
       className={
-        focusMode ? "flex h-full min-h-0 flex-col gap-2 px-3 py-2" : "space-y-3"
+        focusMode
+          ? "flex h-full min-h-0 flex-col gap-1.5 px-2 py-1.5 md:gap-2 md:px-3 md:py-2"
+          : "space-y-3"
       }
     >
-      <div className="shrink-0 px-1 text-center text-xs font-black text-slate-500" aria-live="polite">
+      <div
+        className={
+          focusMode
+            ? "sr-only shrink-0 px-1 text-center text-xs font-black text-slate-500 md:not-sr-only md:block"
+            : "shrink-0 px-1 text-center text-xs font-black text-slate-500"
+        }
+        aria-live="polite"
+      >
         {dragDirectionLabel}
       </div>
       <div

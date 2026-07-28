@@ -79,6 +79,8 @@ test("/practice uses a fixed focus shell with directional swipe locking", () => 
   const source = read("app/practice/page.tsx");
   const deck = read("components/study/ReviewFlashcardDeck.tsx");
   const card = read("components/study/ReviewFlashcard.tsx");
+  const sourceImage = read("components/study/QuestionSourceImage.tsx");
+  const shell = read("app/app-shell.tsx");
 
   assert.match(source, /flex h-full min-h-0 flex-col/);
   assert.match(source, /activeReviewId=\{activeReviewId\}/);
@@ -88,7 +90,14 @@ test("/practice uses a fixed focus shell with directional swipe locking", () => 
   assert.match(deck, /gesture\.axis === "horizontal"/);
   assert.match(deck, /touch-pan-y/);
   assert.match(card, /overflow-y-auto overscroll-contain/);
-  assert.match(card, /max-h-\[34dvh\]/);
+  assert.match(card, /QuestionSourceImage/);
+  assert.match(sourceImage, /sourceInfo\?\.image_crop/);
+  assert.match(sourceImage, /crop\.page_width \/ crop\.width/);
+  assert.match(sourceImage, /max-h-\[30dvh\]/);
+  assert.match(card, /compact=\{focusMode\}/);
+  assert.match(read("components/mobile/ChoiceList.tsx"), /answer-choice flex w-full max-w-full/);
+  assert.match(shell, /isPractice\s*\?\s*"h-full min-h-0 overflow-hidden"/);
+  assert.match(shell, /!isPractice \?/);
 });
 
 test("submitted choices render per-option explanations with a legacy fallback", () => {
@@ -110,7 +119,10 @@ test("/practice default entry is a 408 choice drill surface, not the old mixed c
   assert.match(source, /exam408SubjectOptions/);
   assert.match(source, /exam408ChoiceTotal/);
   assert.match(source, /resetRound\(\{ type: "exam408-choice" \}\)/);
-  assert.match(source, /!\s*activeFilter && !isLoading \? renderDefaultPracticeEntry/);
+  assert.match(source, /renderDefaultPracticeEntry\(\)/);
+  assert.match(source, /每日一题/);
+  assert.match(source, /个人高频错题/);
+  assert.match(source, /href="\/knowledge-map"/);
 
   const defaultPanel = source.slice(
     source.indexOf("function renderDefaultPracticeEntry"),
@@ -126,4 +138,30 @@ test("import preview keeps noisy per-card checks collapsed below the main import
   assert.match(source, /<details/);
   assert.match(source, /ImportImageBindingCard/);
   assert.match(source, /ImportPreviewCard/);
+});
+
+test("question-bank importer uploads one asset set and writes cards in resumable chunks", () => {
+  const source = read("app/import/question-bank/page.tsx");
+  const importPage = read("app/import/page.tsx");
+  const api = read("app/api/import/route.ts");
+
+  assert.match(importPage, /href="\/import\/question-bank"/);
+  assert.match(source, /webkitdirectory/);
+  assert.match(source, /uniqueAssetNames/);
+  assert.match(source, /uploadConcurrency = 6/);
+  assert.match(source, /importChunkSize = 60/);
+  assert.match(source, /upsert: true/);
+  assert.match(source, /fetch\("\/api\/import"/);
+  assert.match(api, /source_info->>import_key/);
+  assert.match(api, /skipped: true/);
+});
+
+test("large question banks and due reviews paginate queries and batch-sign image paths", () => {
+  const questions = read("lib/questions.ts");
+  const reviews = read("lib/reviews.ts");
+
+  assert.match(questions, /\.range\(offset, offset \+ 999\)/);
+  assert.match(questions, /\.createSignedUrls\(batch/);
+  assert.match(reviews, /\.range\(offset, offset \+ 999\)/);
+  assert.match(reviews, /\.createSignedUrls\(batch/);
 });

@@ -62,7 +62,7 @@ export function ChoiceList({
               onClick={() => onToggleChoice?.(choice.label)}
               disabled={!isInteractive}
               aria-pressed={isSelected}
-              className={`answer-choice flex min-w-0 items-start gap-3 rounded-xl border text-left transition ${stateClass} ${
+              className={`answer-choice flex w-full max-w-full min-w-0 items-start gap-3 rounded-xl border text-left transition ${stateClass} ${
                 isInteractive ? "active:scale-[0.99]" : "cursor-default"
               } ${compact ? "min-h-11 p-2.5" : "min-h-12 p-3.5"}`}
             >
@@ -74,7 +74,7 @@ export function ChoiceList({
               <MathText
                 text={choice.text}
                 compact={compact}
-                className={`min-w-0 flex-1 pt-0.5 font-semibold ${compact ? "text-sm leading-6" : "text-base leading-7"}`}
+                className={`min-w-0 flex-1 break-words pt-0.5 font-semibold ${compact ? "text-sm leading-6" : "text-base leading-7"}`}
               />
             </button>
             {explanation ? (

@@ -41,7 +41,7 @@ test("import route batches question inserts, review plans, and knowledge stat re
   const knowledgeStats = read("lib/knowledge-stats.ts");
 
   assert.match(route, /pendingInserts/);
-  assert.match(route, /\.from\("questions"\)\s*\n\s*\.insert\(pendingInserts\.map/);
+  assert.match(route, /\.from\("questions"\)\s*\n\s*\.insert\(insertsToCreate\.map/);
   assert.match(route, /reviewPlans\.flatMap/);
   assert.match(route, /\.from\("reviews"\)\s*\n\s*\.upsert\(reviewRows/);
   assert.match(route, /updateKnowledgeStatsForQuestionIds/);

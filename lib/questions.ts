@@ -84,41 +84,68 @@ const questionColumns = `
   deleted_reason
 `;
 
-async function addSignedImageUrl(
+async function addSignedImageUrls(
   supabase: SupabaseClient,
-  question: QuestionRecord,
-): Promise<QuestionWithImage> {
-  if (!question.image_path) {
-    return {
-      ...question,
-      signedImageUrl: null,
-    };
+  questions: QuestionRecord[],
+): Promise<QuestionWithImage[]> {
+  const paths = Array.from(
+    new Set(
+      questions
+        .map((question) => question.image_path?.trim() ?? "")
+        .filter(Boolean),
+    ),
+  );
+  const signedByPath = new Map<string, string>();
+
+  for (let offset = 0; offset < paths.length; offset += 100) {
+    const batch = paths.slice(offset, offset + 100);
+    const { data, error } = await supabase.storage
+      .from(supabaseBucket)
+      .createSignedUrls(batch, 60 * 10);
+
+    if (error) {
+      continue;
+    }
+
+    for (const row of data ?? []) {
+      if (row.path && row.signedUrl) {
+        signedByPath.set(row.path, row.signedUrl);
+      }
+    }
   }
 
-  const { data, error } = await supabase.storage
-    .from(supabaseBucket)
-    .createSignedUrl(question.image_path, 60 * 10);
-
-  return {
+  return questions.map((question) => ({
     ...question,
-    signedImageUrl: error ? null : data.signedUrl,
-  };
+    signedImageUrl: question.image_path
+      ? signedByPath.get(question.image_path) ?? null
+      : null,
+  }));
 }
 
 export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
-  const { data, error } = await supabase
-    .from("questions")
-    .select(questionColumns)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  const questions: QuestionRecord[] = [];
 
-  if (error) {
-    throw error;
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase
+      .from("questions")
+      .select(questionColumns)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(offset, offset + 999);
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = (data ?? []) as QuestionRecord[];
+    questions.push(...batch);
+    if (batch.length < 1000) {
+      break;
+    }
   }
 
-  return Promise.all(
-    ((data ?? []) as QuestionRecord[]).map((question) => addSignedImageUrl(supabase, question)),
-  );
+  return addSignedImageUrls(supabase, questions);
 }
 
 export async function fetchCurrentUserQuestion(
@@ -141,5 +168,5 @@ export async function fetchCurrentUserQuestion(
     throw error;
   }
 
-  return addSignedImageUrl(supabase, data as QuestionRecord);
+  return (await addSignedImageUrls(supabase, [data as QuestionRecord]))[0];
 }
