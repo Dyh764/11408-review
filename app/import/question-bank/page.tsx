@@ -52,6 +52,7 @@ type ImportFailure = {
 type ImportResponse = {
   error?: string;
   importedCount?: number;
+  updatedCount?: number;
   skippedCount?: number;
   failureCount?: number;
   failures?: ImportFailure[];
@@ -63,7 +64,7 @@ type PackageState = {
   missingAssets: string[];
 };
 
-const storageFolder = "question-bank/wangdao-27";
+const storageFolder = "question-bank/wangdao-27-v2";
 const importChunkSize = 60;
 const uploadConcurrency = 6;
 
@@ -119,6 +120,7 @@ export default function QuestionBankImportPage() {
   const [uploadedCount, setUploadedCount] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
   const [importedCount, setImportedCount] = useState(0);
+  const [updatedCount, setUpdatedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const [failures, setFailures] = useState<ImportFailure[]>([]);
 
@@ -139,6 +141,7 @@ export default function QuestionBankImportPage() {
     setUploadedCount(0);
     setProcessedCount(0);
     setImportedCount(0);
+    setUpdatedCount(0);
     setSkippedCount(0);
 
     if (!files?.length) {
@@ -182,6 +185,7 @@ export default function QuestionBankImportPage() {
     setUploadedCount(0);
     setProcessedCount(0);
     setImportedCount(0);
+    setUpdatedCount(0);
     setSkippedCount(0);
     setMessage("正在确认登录状态...");
 
@@ -247,6 +251,7 @@ export default function QuestionBankImportPage() {
 
       const allFailures: ImportFailure[] = [];
       let imported = 0;
+      let updated = 0;
       let skipped = 0;
 
       for (let offset = 0; offset < enrichedCards.length; offset += importChunkSize) {
@@ -260,6 +265,7 @@ export default function QuestionBankImportPage() {
           body: JSON.stringify({
             jsonText: JSON.stringify(chunk),
             importMode: "direct",
+            replaceExisting: true,
           }),
         });
         const result = (await response.json().catch(() => ({}))) as ImportResponse;
@@ -269,6 +275,7 @@ export default function QuestionBankImportPage() {
         }
 
         imported += result.importedCount ?? 0;
+        updated += result.updatedCount ?? 0;
         skipped += result.skippedCount ?? 0;
         for (const failure of result.failures ?? []) {
           allFailures.push({
@@ -277,6 +284,7 @@ export default function QuestionBankImportPage() {
           });
         }
         setImportedCount(imported);
+        setUpdatedCount(updated);
         setSkippedCount(skipped);
         setProcessedCount(Math.min(offset + chunk.length, enrichedCards.length));
         setFailures([...allFailures]);
@@ -285,7 +293,7 @@ export default function QuestionBankImportPage() {
       setMessage(
         allFailures.length > 0
           ? `导入完成：新增 ${imported} 题，跳过重复 ${skipped} 题，失败 ${allFailures.length} 题。`
-          : `导入完成：新增 ${imported} 题，跳过重复 ${skipped} 题，所有题图和原书答案均已处理。`,
+          : `导入完成：新增 ${imported} 题，更新 ${updated} 题，跳过重复 ${skipped} 题，所有题图和原书答案均已处理。`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "题库导入失败。");
@@ -355,14 +363,14 @@ export default function QuestionBankImportPage() {
               tone={packageState?.missingAssets.length ? "red" : "slate"}
             />
           </div>
-          <SectionCard subtitle="上传和写入均可重复执行；已存在的图片会覆盖同路径，已存在的题目按导入键跳过。">
+          <SectionCard subtitle="上传和写入均可重复执行；已存在题目会按导入键更新逐题原图和原书内容，同时保留个人掌握度与复习记录。">
             <button
               type="button"
               onClick={() => void handleImport()}
               disabled={!canImport}
               className="min-h-14 w-full rounded-xl bg-blue-600 px-4 text-base font-black text-white disabled:bg-slate-300"
             >
-              {isImporting ? "正在导入，请保持页面打开" : `导入全部 ${cards.length} 题`}
+              {isImporting ? "正在导入，请保持页面打开" : `导入或更新全部 ${cards.length} 题`}
             </button>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
               <p className="rounded-lg bg-slate-50 p-3">
@@ -373,6 +381,9 @@ export default function QuestionBankImportPage() {
               </p>
               <p className="rounded-lg bg-emerald-50 p-3 text-emerald-800">
                 新增：{importedCount}
+              </p>
+              <p className="rounded-lg bg-amber-50 p-3 text-amber-800">
+                更新：{updatedCount}
               </p>
               <p className="rounded-lg bg-blue-50 p-3 text-blue-800">
                 重复跳过：{skippedCount}

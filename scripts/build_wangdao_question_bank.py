@@ -763,7 +763,13 @@ def build_package(
     render_assets: bool,
 ) -> dict[str, Any]:
     assets_root = output_root / "assets"
+    page_assets_root = output_root / "_rendered_pages"
     output_root.mkdir(parents=True, exist_ok=True)
+    if render_assets:
+        shutil.rmtree(assets_root, ignore_errors=True)
+        shutil.rmtree(page_assets_root, ignore_errors=True)
+    assets_root.mkdir(parents=True, exist_ok=True)
+    page_assets_root.mkdir(parents=True, exist_ok=True)
     all_cards: list[dict[str, Any]] = []
     all_assets: list[dict[str, Any]] = []
     qa_failures: list[dict[str, Any]] = []
@@ -780,84 +786,60 @@ def build_package(
         )
 
         page_assets: dict[int, Path] = {}
-        page_sizes: dict[int, tuple[int, int]] = {}
         for page in pages:
-            asset_file = f"{config.slug}-p{page.number:03d}.webp"
-            asset_path = assets_root / asset_file
+            asset_path = page_assets_root / f"{config.slug}-p{page.number:03d}.webp"
             if render_assets:
-                page_sizes[page.number] = render_page(
+                render_page(
                     pdftoppm,
                     pdf_path,
                     page.number,
                     asset_path,
                     dpi,
                 )
-            elif asset_path.exists():
-                with Image.open(asset_path) as existing:
-                    page_sizes[page.number] = existing.size
-            else:
-                scale = dpi / 72
-                page_sizes[page.number] = (
-                    round(page.width * scale),
-                    round(page.height * scale),
-                )
             page_assets[page.number] = asset_path
-            all_assets.append(
-                {
-                    "file": asset_file,
-                    "kind": "pdf_page",
-                    "subject": config.subject,
-                    "source_file": pdf_path.name,
-                    "pdf_page": page.number,
-                }
-            )
 
         dedicated_count = 0
         for question in questions:
-            dedicated_crop = (
-                question.image_required
-                or question.page_end != question.page_start
-                or bool(question.manual_reason)
+            import_key = stable_import_key(
+                config,
+                question.section_number,
+                question.problem_number,
+                question.question_text,
             )
-            if dedicated_crop:
-                dedicated_count += 1
-                crop_file = (
-                    f"{config.slug}-s{question.section_number.replace('.', '-') or 'unknown'}"
-                    f"-q{int(question.problem_number):03d}-p{question.page_start:03d}.webp"
+            dedicated_count += 1
+            crop_file = (
+                f"{config.slug}-question-v2-"
+                f"{import_key.rsplit('-', 1)[-1]}.webp"
+            )
+            crop_path = assets_root / crop_file
+            if render_assets:
+                build_question_crop(
+                    page_assets,
+                    pages,
+                    question,
+                    crop_path,
                 )
-                crop_path = assets_root / crop_file
-                if render_assets:
-                    build_question_crop(
-                        page_assets,
-                        pages,
-                        question,
-                        crop_path,
-                    )
-                all_assets.append(
-                    {
-                        "file": crop_file,
-                        "kind": "question_crop",
-                        "subject": config.subject,
-                        "source_file": pdf_path.name,
-                        "pdf_page": question.page_start,
-                        "section": question.section_number,
-                        "problem_number": question.problem_number,
-                    }
-                )
-                asset_file = crop_file
-                image_size = (0, 0)
-            else:
-                asset_file = f"{config.slug}-p{question.page_start:03d}.webp"
-                image_size = page_sizes[question.page_start]
+            all_assets.append(
+                {
+                    "file": crop_file,
+                    "kind": "question_crop",
+                    "subject": config.subject,
+                    "source_file": pdf_path.name,
+                    "pdf_page": question.page_start,
+                    "section": question.section_number,
+                    "problem_number": question.problem_number,
+                    "import_key": import_key,
+                }
+            )
 
             card = build_card(
                 config,
                 pdf_path,
                 pages,
                 question,
-                asset_file,
-                image_size,
-                dedicated_crop,
+                crop_file,
+                (0, 0),
+                True,
             )
             all_cards.append(card)
 
@@ -886,7 +868,7 @@ def build_package(
         "notes": [
             "题目和选项由本地 PDF 排版文字提取，原书页图是核对依据。",
             "先生成题目清单，再运行 extract_wangdao_answers.py 从原书答案页补全官方答案与解析。",
-            "相同页图只上传一次；普通题通过 source.image_crop 显示该题区域。",
+            "每道题使用独立的原书裁图，避免整页显示、跨题串图和覆盖缓存。",
         ],
         "books": book_summaries,
         "assets": all_assets,
@@ -943,6 +925,8 @@ def build_package(
         ),
         encoding="utf-8",
     )
+    if render_assets:
+        shutil.rmtree(page_assets_root, ignore_errors=True)
     return manifest
 
 

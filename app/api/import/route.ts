@@ -26,6 +26,7 @@ type ImportSuccess = {
   warning?: string;
   inbox?: boolean;
   skipped?: boolean;
+  updated?: boolean;
 };
 
 type PendingImport = {
@@ -71,6 +72,53 @@ function getImportKey(card: ImportQuestionCard) {
   return card.source_info.import_key?.trim() ?? "";
 }
 
+function buildQuestionRefresh(card: ImportQuestionCard) {
+  return {
+    subject: card.subject,
+    chapter: card.chapter ?? null,
+    knowledge_point: card.knowledge_point ?? null,
+    difficulty: card.difficulty ?? null,
+    image_path: card.image_path ?? null,
+    question_text: card.question_text ?? null,
+    choices: card.choices,
+    question_text_status: card.question_text_status,
+    solution_summary: card.solution_summary ?? null,
+    standard_answer: card.standard_answer ?? null,
+    answer_explanation: card.answer_explanation ?? null,
+    key_steps: card.key_steps,
+    one_sentence_tip: card.one_sentence_tip ?? null,
+    related_practice_questions: card.related_practice_questions,
+    confidence: card.confidence ?? null,
+    needs_manual_check: card.needs_manual_check,
+    source_info: card.source_info,
+    answer_status: card.answer_status,
+    answer_source: card.answer_source,
+    analyzed_at: new Date().toISOString(),
+  };
+}
+
+async function runPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+) {
+  let cursor = 0;
+  const runners = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      for (;;) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= items.length) {
+          return;
+        }
+        await worker(items[index]);
+      }
+    },
+  );
+  await Promise.all(runners);
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
 
@@ -90,6 +138,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     jsonText?: unknown;
     importMode?: unknown;
+    replaceExisting?: unknown;
   };
 
   if (typeof body.jsonText !== "string") {
@@ -103,6 +152,7 @@ export async function POST(request: Request) {
     qualityReport.rows.map((row) => [row.index, row]),
   );
   const forceInbox = body.importMode === "inbox";
+  const replaceExisting = body.replaceExisting === true;
   const failures: ImportFailure[] = parsed.errors.map((error) => ({
     index: error.index,
     message: error.message,
@@ -143,6 +193,7 @@ export async function POST(request: Request) {
   }
 
   let insertsToCreate = pendingInserts;
+  const updatesToApply: Array<PendingImport & { questionId: string }> = [];
   const importKeys = Array.from(
     new Set(pendingInserts.map((pending) => getImportKey(pending.card)).filter(Boolean)),
   );
@@ -181,6 +232,14 @@ export async function POST(request: Request) {
           return true;
         }
 
+        if (replaceExisting) {
+          updatesToApply.push({
+            ...pending,
+            questionId: existingId,
+          });
+          return false;
+        }
+
         successes.push({
           index: pending.index,
           questionId: existingId,
@@ -192,6 +251,34 @@ export async function POST(request: Request) {
         return false;
       });
     }
+  }
+
+  if (updatesToApply.length > 0) {
+    await runPool(updatesToApply, 10, async (pending) => {
+      const { error } = await supabase
+        .from("questions")
+        .update(buildQuestionRefresh(pending.card))
+        .eq("id", pending.questionId)
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
+
+      if (error) {
+        failures.push({
+          index: pending.index,
+          message: `原题更新失败：${error.message}`,
+        });
+        return;
+      }
+
+      successes.push({
+        index: pending.index,
+        questionId: pending.questionId,
+        reviewCount: 0,
+        warning: "已更新逐题原图和原书题目内容。",
+        inbox: pending.inbox,
+        updated: true,
+      });
+    });
   }
 
   if (insertsToCreate.length > 0) {
@@ -280,7 +367,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     successCount: successes.length,
-    importedCount: successes.filter((success) => !success.skipped).length,
+    importedCount: successes.filter((success) => !success.skipped && !success.updated).length,
+    updatedCount: successes.filter((success) => success.updated).length,
     skippedCount: successes.filter((success) => success.skipped).length,
     failureCount: failures.length,
     quality: qualityReport,

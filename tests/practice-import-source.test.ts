@@ -140,10 +140,12 @@ test("import preview keeps noisy per-card checks collapsed below the main import
   assert.match(source, /ImportPreviewCard/);
 });
 
-test("question-bank importer uploads one asset set and writes cards in resumable chunks", () => {
+test("question-bank importer uploads dedicated crops and refreshes existing cards in resumable chunks", () => {
   const source = read("app/import/question-bank/page.tsx");
   const importPage = read("app/import/page.tsx");
   const api = read("app/api/import/route.ts");
+  const builder = read("scripts/build_wangdao_question_bank.py");
+  const verifier = read("scripts/verify_wangdao_question_bank.py");
 
   assert.match(importPage, /href="\/import\/question-bank"/);
   assert.match(source, /webkitdirectory/);
@@ -152,8 +154,24 @@ test("question-bank importer uploads one asset set and writes cards in resumable
   assert.match(source, /importChunkSize = 60/);
   assert.match(source, /upsert: true/);
   assert.match(source, /fetch\("\/api\/import"/);
+  assert.match(source, /replaceExisting: true/);
+  assert.match(source, /updatedCount/);
   assert.match(api, /source_info->>import_key/);
   assert.match(api, /skipped: true/);
+  assert.match(api, /buildQuestionRefresh/);
+  assert.match(api, /updated: true/);
+  const refreshFields =
+    api.match(/function buildQuestionRefresh[\s\S]*?\n}\n\nasync function runPool/)?.[0] ?? "";
+  assert.match(refreshFields, /image_path: card\.image_path/);
+  assert.match(refreshFields, /source_info: card\.source_info/);
+  assert.doesNotMatch(
+    refreshFields,
+    /mastery_status|user_note|mistake_types|review_priority/,
+  );
+  assert.match(builder, /question-v2-/);
+  assert.match(builder, /"kind": "question_crop"/);
+  assert.match(builder, /每道题使用独立的原书裁图/);
+  assert.match(verifier, /被多题共用的图片/);
 });
 
 test("large question banks and due reviews paginate queries and batch-sign image paths", () => {

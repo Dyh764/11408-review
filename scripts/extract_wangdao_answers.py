@@ -700,7 +700,7 @@ def enrich_manifest(
         "题目和选项由做题本 PDF 的文字层确定，原题页图是最终核对依据。",
         "standard_answer 与解析正文按《2027 年考研复习指导》原书答案页提取。",
         "解析按 A/B/C/D 就地展示；正确选项后保留原书完整解析。",
-        "相同页图只上传一次；普通题通过 source.image_crop 显示该题区域。",
+        "每道题使用独立的原书裁图，避免整页显示、跨题串图和覆盖缓存。",
     ]
     qa = manifest.setdefault("qa", {})
     qa["official_answers_matched"] = matched

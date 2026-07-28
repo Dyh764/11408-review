@@ -42,6 +42,10 @@ def main() -> None:
     asset_names = [str(asset.get("file") or "") for asset in assets]
     if len(asset_names) != len(set(asset_names)):
         failures.append("assets 存在重复文件名")
+    if len(asset_names) != len(cards):
+        failures.append(f"逐题裁图数量错误：题目 {len(cards)}，图片 {len(asset_names)}")
+    if any(str(asset.get("kind") or "") != "question_crop" for asset in assets):
+        failures.append("assets 中仍存在非逐题裁图")
     missing_asset_files = [
         name
         for name in asset_names
@@ -55,15 +59,20 @@ def main() -> None:
     invalid_choices: list[int] = []
     invalid_inline_explanations: list[int] = []
     missing_card_assets: list[int] = []
+    shared_card_assets: list[str] = []
+    card_asset_names: list[str] = []
     for index, card in enumerate(cards, start=1):
         source = card.get("source") if isinstance(card.get("source"), dict) else {}
         import_key = str(source.get("import_key") or "").strip()
         asset_file = str(source.get("asset_file") or "").strip()
+        card_asset_names.append(asset_file)
         import_keys.append(import_key)
         if not import_key:
             failures.append(f"第 {index} 题缺少 import_key")
         if not asset_file or asset_file not in set(asset_names):
             missing_card_assets.append(index)
+        if source.get("image_crop"):
+            failures.append(f"第 {index} 题仍依赖整页 CSS 裁切")
 
         choices = card.get("choices")
         labels = [
@@ -91,6 +100,13 @@ def main() -> None:
     ]
     if duplicate_import_keys:
         failures.append(f"存在 {len(duplicate_import_keys)} 个重复 import_key")
+    shared_card_assets = [
+        name
+        for name, count in Counter(card_asset_names).items()
+        if name and count > 1
+    ]
+    if shared_card_assets:
+        failures.append(f"存在 {len(shared_card_assets)} 张被多题共用的图片")
     if missing_card_assets:
         failures.append(f"{len(missing_card_assets)} 题没有可上传原图")
     if invalid_choices:
@@ -110,6 +126,7 @@ def main() -> None:
         "missing_answers": len(missing_answers),
         "invalid_inline_explanations": len(invalid_inline_explanations),
         "duplicate_import_keys": len(duplicate_import_keys),
+        "shared_card_assets": len(shared_card_assets),
         "failures": failures,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
