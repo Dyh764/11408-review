@@ -140,7 +140,7 @@ test("import preview keeps noisy per-card checks collapsed below the main import
   assert.match(source, /ImportPreviewCard/);
 });
 
-test("question-bank importer uploads dedicated crops and refreshes existing cards in resumable chunks", () => {
+test("question-bank importer uploads only real figures and clears wrong images from text-only cards", () => {
   const source = read("app/import/question-bank/page.tsx");
   const importPage = read("app/import/page.tsx");
   const api = read("app/api/import/route.ts");
@@ -168,9 +168,13 @@ test("question-bank importer uploads dedicated crops and refreshes existing card
     refreshFields,
     /mastery_status|user_note|mistake_types|review_priority/,
   );
-  assert.match(builder, /question-v2-/);
-  assert.match(builder, /"kind": "question_crop"/);
-  assert.match(builder, /每道题使用独立的原书裁图/);
+  assert.match(source, /image_path: null/);
+  assert.match(source, /wangdao-27-v3/);
+  assert.match(builder, /figure-v3-/);
+  assert.match(builder, /"kind": "question_figure"/);
+  assert.match(builder, /普通文字题不绑定图片/);
+  assert.match(builder, /不包含题干、选项或同页其他题/);
+  assert.match(verifier, /普通文字题错误绑定了图片/);
   assert.match(verifier, /被多题共用的图片/);
 });
 

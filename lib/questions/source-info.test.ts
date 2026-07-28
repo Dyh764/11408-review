@@ -51,6 +51,7 @@ test("normalizeQuestionSourceInfo preserves question-bank keys and crop coordina
     answer_pdf_page: "16",
     answer_printed_page: "4",
     collection_role: "practice_bank",
+    image_required: true,
     image_crop: {
       x: 20,
       y: 30,
@@ -65,6 +66,7 @@ test("normalizeQuestionSourceInfo preserves question-bank keys and crop coordina
   assert.equal(source.answer_pdf_page, "16");
   assert.equal(source.answer_printed_page, "4");
   assert.equal(source.collection_role, "practice_bank");
+  assert.equal(source.image_required, true);
   assert.deepEqual(source.image_crop, {
     x: 20,
     y: 30,

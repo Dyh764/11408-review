@@ -7,6 +7,9 @@ export type QuestionImageSignals = {
   question_text?: string | null;
   user_note?: string | null;
   choices?: ChoiceOption[] | null;
+  source_info?: {
+    image_required?: boolean | null;
+  } | null;
 };
 
 export type PracticeImageAvailability = "available" | "not_required" | "missing";
@@ -24,6 +27,10 @@ function noteImageCode(value: string | null | undefined) {
 }
 
 export function questionDependsOnImage(question: QuestionImageSignals) {
+  if (typeof question.source_info?.image_required === "boolean") {
+    return question.source_info.image_required;
+  }
+
   if (
     hasRequiredImageCode(question.image_code) ||
     hasRequiredImageCode(noteImageCode(question.user_note))

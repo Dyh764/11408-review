@@ -132,6 +132,16 @@ class PageInfo:
     width: float
     height: float
     tokens: list[Token]
+    figures: list["FigureRegion"]
+
+
+@dataclass(frozen=True)
+class FigureRegion:
+    page: int
+    x0: float
+    x1: float
+    top: float
+    bottom: float
 
 
 @dataclass
@@ -242,6 +252,20 @@ def build_page_info(pdf_path: Path) -> list[PageInfo]:
                     width=float(page.width),
                     height=float(page.height),
                     tokens=tokens,
+                    figures=[
+                        FigureRegion(
+                            page=page_number,
+                            x0=float(image.get("x0", 0)),
+                            x1=float(image.get("x1", 0)),
+                            top=float(image.get("top", 0)),
+                            bottom=float(image.get("bottom", 0)),
+                        )
+                        for image in page.images
+                        if (
+                            float(image.get("x1", 0)) > float(image.get("x0", 0))
+                            and float(image.get("bottom", 0)) > float(image.get("top", 0))
+                        )
+                    ],
                 )
             )
     return pages
@@ -538,41 +562,63 @@ def render_page(
     return dimensions
 
 
-def crop_box_pixels(
+def figure_regions_for_question(
+    pages: list[PageInfo],
+    question: ParsedQuestion,
+) -> list[FigureRegion]:
+    regions: list[FigureRegion] = []
+    for page_number in range(question.page_start, question.page_end + 1):
+        page = pages[page_number - 1]
+        start_top = question.top_start if page_number == question.page_start else 32
+        end_top = (
+            question.top_end
+            if page_number == question.page_end
+            else page.height - 42
+        )
+        for figure in page.figures:
+            center = (figure.top + figure.bottom) / 2
+            if start_top - 3 <= center <= end_top + 3:
+                regions.append(figure)
+    return regions
+
+
+def figure_crop_box_pixels(
     page: PageInfo,
-    start_top: float,
-    end_top: float,
+    figure: FigureRegion,
     image_size: tuple[int, int],
+    padding_points: float = 2,
 ) -> tuple[int, int, int, int]:
     scale_x = image_size[0] / page.width
     scale_y = image_size[1] / page.height
-    left = max(0, round(58 * scale_x))
-    right = min(image_size[0], round((page.width - 54) * scale_x))
-    top = max(0, round(max(32, start_top - 7) * scale_y))
+    left = max(0, round((figure.x0 - padding_points) * scale_x))
+    right = min(
+        image_size[0],
+        round((figure.x1 + padding_points) * scale_x),
+    )
+    top = max(0, round((figure.top - padding_points) * scale_y))
     bottom = min(
         image_size[1],
-        round(min(page.height - 42, end_top - 7) * scale_y),
+        round((figure.bottom + padding_points) * scale_y),
     )
-    if bottom <= top:
-        bottom = min(image_size[1], top + round(80 * scale_y))
     return left, top, right, bottom
 
 
-def build_question_crop(
+def build_figure_crop(
     page_assets: dict[int, Path],
     page_infos: list[PageInfo],
-    question: ParsedQuestion,
+    figures: list[FigureRegion],
     output_path: Path,
 ) -> None:
     pieces: list[Image.Image] = []
-    for page_number in range(question.page_start, question.page_end + 1):
-        page = page_infos[page_number - 1]
-        start_top = question.top_start if page_number == question.page_start else 32
-        end_top = question.top_end if page_number == question.page_end else page.height - 42
-        with Image.open(page_assets[page_number]) as image:
+    for figure in figures:
+        page = page_infos[figure.page - 1]
+        with Image.open(page_assets[figure.page]) as image:
             rgb = image.convert("RGB")
-            box = crop_box_pixels(page, start_top, end_top, rgb.size)
+            box = figure_crop_box_pixels(page, figure, rgb.size)
             pieces.append(rgb.crop(box))
+
+    if not pieces:
+        raise ValueError("配图裁切至少需要一个 PDF 图形区域。")
 
     width = max(piece.width for piece in pieces)
     gap = 12
@@ -583,7 +629,7 @@ def build_question_crop(
         canvas.paste(piece, (0, y))
         y += piece.height + gap
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas.save(output_path, "WEBP", quality=86, method=6)
+    canvas.save(output_path, "WEBP", quality=90, method=6)
 
 
 def stable_import_key(
@@ -637,7 +683,7 @@ def source_info(
     question: ParsedQuestion,
     import_key: str,
     asset_file: str,
-    image_crop: dict[str, int] | None,
+    image_required: bool,
     manual_reason: str,
 ) -> dict[str, Any]:
     major = int(question.section_number.split(".", 1)[0]) if question.section_number else 0
@@ -659,13 +705,13 @@ def source_info(
             f"第{question.problem_number}题"
         ).strip(),
         "import_key": import_key,
-        "asset_file": asset_file,
         "source_file": pdf_path.name,
         "collection_role": "practice_bank",
         "answer_page_ref": str(answer_page_ref or ""),
+        "image_required": image_required,
     }
-    if image_crop:
-        result["image_crop"] = image_crop
+    if asset_file:
+        result["asset_file"] = asset_file
     if manual_reason:
         result["manual_reason"] = manual_reason
     if major:
@@ -676,11 +722,9 @@ def source_info(
 def build_card(
     config: BookConfig,
     pdf_path: Path,
-    pages: list[PageInfo],
     question: ParsedQuestion,
     asset_file: str,
-    image_size: tuple[int, int],
-    dedicated_crop: bool,
+    image_required: bool,
 ) -> dict[str, Any]:
     major = int(question.section_number.split(".", 1)[0]) if question.section_number else 0
     chapter = config.chapters.get(major, "待整理 / 未分类")
@@ -690,24 +734,6 @@ def build_card(
         question.problem_number,
         question.question_text,
     )
-    image_crop: dict[str, int] | None = None
-    if not dedicated_crop:
-        page = pages[question.page_start - 1]
-        left, top, right, bottom = crop_box_pixels(
-            page,
-            question.top_start,
-            question.top_end,
-            image_size,
-        )
-        image_crop = {
-            "x": left,
-            "y": top,
-            "width": right - left,
-            "height": bottom - top,
-            "page_width": image_size[0],
-            "page_height": image_size[1],
-        }
-
     return {
         "import_protocol_version": "2.0",
         "subject": config.subject,
@@ -717,7 +743,7 @@ def build_card(
             question,
             import_key,
             asset_file,
-            image_crop,
+            image_required,
             question.manual_reason,
         ),
         "chapter": chapter,
@@ -785,8 +811,15 @@ def build_package(
             for failure in failures
         )
 
+        pages_with_figures = {
+            page.number
+            for page in pages
+            if page.figures
+        }
         page_assets: dict[int, Path] = {}
         for page in pages:
+            if page.number not in pages_with_figures:
+                continue
             asset_path = page_assets_root / f"{config.slug}-p{page.number:03d}.webp"
             if render_assets:
                 render_page(
@@ -798,7 +831,8 @@ def build_package(
                 )
             page_assets[page.number] = asset_path
 
-        dedicated_count = 0
+        figure_question_count = 0
+        assigned_figures: set[FigureRegion] = set()
         for question in questions:
             import_key = stable_import_key(
                 config,
@@ -806,43 +840,70 @@ def build_package(
                 question.problem_number,
                 question.question_text,
             )
-            dedicated_count += 1
-            crop_file = (
-                f"{config.slug}-question-v2-"
-                f"{import_key.rsplit('-', 1)[-1]}.webp"
-            )
-            crop_path = assets_root / crop_file
-            if render_assets:
-                build_question_crop(
-                    page_assets,
-                    pages,
-                    question,
-                    crop_path,
+            figures = figure_regions_for_question(pages, question)
+            crop_file = ""
+            if figures:
+                figure_question_count += 1
+                assigned_figures.update(figures)
+                crop_file = (
+                    f"{config.slug}-figure-v3-"
+                    f"{import_key.rsplit('-', 1)[-1]}.webp"
                 )
-            all_assets.append(
-                {
-                    "file": crop_file,
-                    "kind": "question_crop",
-                    "subject": config.subject,
-                    "source_file": pdf_path.name,
-                    "pdf_page": question.page_start,
-                    "section": question.section_number,
-                    "problem_number": question.problem_number,
-                    "import_key": import_key,
-                }
-            )
+                crop_path = assets_root / crop_file
+                if render_assets:
+                    build_figure_crop(
+                        page_assets,
+                        pages,
+                        figures,
+                        crop_path,
+                    )
+                all_assets.append(
+                    {
+                        "file": crop_file,
+                        "kind": "question_figure",
+                        "subject": config.subject,
+                        "source_file": pdf_path.name,
+                        "pdf_page": question.page_start,
+                        "section": question.section_number,
+                        "problem_number": question.problem_number,
+                        "import_key": import_key,
+                        "figure_count": len(figures),
+                    }
+                )
 
             card = build_card(
                 config,
                 pdf_path,
-                pages,
                 question,
                 crop_file,
-                (0, 0),
-                True,
+                bool(figures),
             )
             all_cards.append(card)
 
+        all_pdf_figures = {
+            figure
+            for page in pages
+            for figure in page.figures
+        }
+        unassigned_figures = sorted(
+            all_pdf_figures - assigned_figures,
+            key=lambda figure: (figure.page, figure.top, figure.x0),
+        )
+        qa_failures.extend(
+            {
+                "subject": config.subject,
+                "source_file": pdf_path.name,
+                "page": figure.page,
+                "message": "PDF 图形未能归属到任何题目",
+                "figure": {
+                    "x0": figure.x0,
+                    "x1": figure.x1,
+                    "top": figure.top,
+                    "bottom": figure.bottom,
+                },
+            }
+            for figure in unassigned_figures
+        )
         book_summaries.append(
             {
                 "subject": config.subject,
@@ -851,7 +912,9 @@ def build_package(
                 "question_starts": len(questions) + len(failures),
                 "parsed_questions": len(questions),
                 "parse_failures": len(failures),
-                "dedicated_question_crops": dedicated_count,
+                "figure_questions": figure_question_count,
+                "pdf_figures": len(all_pdf_figures),
+                "unassigned_figures": len(unassigned_figures),
             }
         )
 
@@ -866,9 +929,10 @@ def build_package(
         "schema_version": "wangdao-question-bank-v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "notes": [
-            "题目和选项由本地 PDF 排版文字提取，原书页图是核对依据。",
+            "题目和选项由本地 PDF 排版文字提取，原书 PDF 是核对依据。",
             "先生成题目清单，再运行 extract_wangdao_answers.py 从原书答案页补全官方答案与解析。",
-            "每道题使用独立的原书裁图，避免整页显示、跨题串图和覆盖缓存。",
+            "普通文字题不绑定图片；只有 PDF 内确有配图的题才绑定图片。",
+            "配图资产只裁切本题的图形对象，不包含题干、选项或同页其他题。",
         ],
         "books": book_summaries,
         "assets": all_assets,

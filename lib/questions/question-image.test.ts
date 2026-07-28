@@ -39,6 +39,23 @@ test("recognizes import image_code stored directly or in user_note", () => {
   assert.equal(questionDependsOnImage({ image_code: "none" }), false);
 });
 
+test("uses authoritative PDF figure metadata before noisy text signals", () => {
+  assert.equal(
+    questionDependsOnImage({
+      question_text: "选项中提到了图中结点，但原题是完整文字题。",
+      source_info: { image_required: false },
+    }),
+    false,
+  );
+  assert.equal(
+    questionDependsOnImage({
+      question_text: "题干文字未写如图",
+      source_info: { image_required: true },
+    }),
+    true,
+  );
+});
+
 test("requires a usable signed URL when a stored image path exists", () => {
   assert.equal(
     getPracticeImageAvailability({

@@ -177,6 +177,9 @@ export function normalizeQuestionSourceInfo(input: SourceInfoInput): QuestionSou
   if (collectionRole) {
     result.collection_role = collectionRole;
   }
+  if (typeof input.image_required === "boolean") {
+    result.image_required = input.image_required;
+  }
   const imageCrop = normalizeImageCrop(input.image_crop);
   if (imageCrop) {
     result.image_crop = imageCrop;

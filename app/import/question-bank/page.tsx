@@ -24,6 +24,7 @@ type ManifestCard = {
   source?: {
     asset_file?: string;
     import_key?: string;
+    image_required?: boolean;
   };
   image_path?: string;
   standard_answer?: string;
@@ -64,7 +65,7 @@ type PackageState = {
   missingAssets: string[];
 };
 
-const storageFolder = "question-bank/wangdao-27-v2";
+const storageFolder = "question-bank/wangdao-27-v3";
 const importChunkSize = 60;
 const uploadConcurrency = 6;
 
@@ -237,10 +238,16 @@ export default function QuestionBankImportPage() {
 
       const enrichedCards = packageState.manifest.cards.map((card) => {
         const assetFile = card.source?.asset_file?.trim() ?? "";
+        if (!assetFile) {
+          return {
+            ...card,
+            image_path: null,
+          };
+        }
         const imagePath = storageByAsset.get(assetFile);
 
         if (!imagePath) {
-          throw new Error(`题卡缺少图片映射：${assetFile || "未填写 asset_file"}`);
+          throw new Error(`配图题缺少图片映射：${assetFile}`);
         }
 
         return {
@@ -293,7 +300,7 @@ export default function QuestionBankImportPage() {
       setMessage(
         allFailures.length > 0
           ? `导入完成：新增 ${imported} 题，跳过重复 ${skipped} 题，失败 ${allFailures.length} 题。`
-          : `导入完成：新增 ${imported} 题，更新 ${updated} 题，跳过重复 ${skipped} 题，所有题图和原书答案均已处理。`,
+          : `导入完成：新增 ${imported} 题，更新 ${updated} 题，跳过重复 ${skipped} 题；普通题已清除误绑图片，配图题只保留本题图形。`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "题库导入失败。");
@@ -306,11 +313,11 @@ export default function QuestionBankImportPage() {
     <MobilePageShell>
       <PageHeader
         title="王道 408 题库批量导入"
-        subtitle="一次选择完整题库包，自动上传去重原图并分批写入全部题目。"
+        subtitle="一次选择完整题库包，只上传真正配图题的图形并分批更新全部题目。"
       />
 
       <MobileSection>
-        <SectionCard subtitle="题库原 PDF 不进入公开仓库；这里只把生成后的题卡与原题图上传到你的私有存储。">
+        <SectionCard subtitle="题库原 PDF 不进入公开仓库；普通题不上传图片，配图题只上传本题图形到你的私有存储。">
           <div className="flex flex-wrap gap-2">
             <StatusPill label="支持断点重试" tone="blue" />
             <StatusPill label="按原书答案" tone="blue" />
@@ -363,7 +370,7 @@ export default function QuestionBankImportPage() {
               tone={packageState?.missingAssets.length ? "red" : "slate"}
             />
           </div>
-          <SectionCard subtitle="上传和写入均可重复执行；已存在题目会按导入键更新逐题原图和原书内容，同时保留个人掌握度与复习记录。">
+          <SectionCard subtitle="上传和写入均可重复执行；已存在题目会按导入键清除普通题误绑图片、更新真正题图和原书内容，同时保留个人掌握度与复习记录。">
             <button
               type="button"
               onClick={() => void handleImport()}

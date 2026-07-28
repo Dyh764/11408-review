@@ -48,6 +48,7 @@ export type QuestionSourceInfo = {
   answer_pdf_page?: string;
   answer_printed_page?: string;
   manual_reason?: string;
+  image_required?: boolean;
   image_crop?: QuestionImageCrop;
 };
 

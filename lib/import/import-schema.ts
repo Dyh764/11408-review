@@ -596,6 +596,12 @@ function normalizeImportSourceInfo(value: unknown): QuestionSourceInfo {
       sourceInfo[field] = fieldValue.trim();
     }
   }
+  if (value.image_required !== undefined && value.image_required !== null) {
+    if (typeof value.image_required !== "boolean") {
+      throw new Error("source.image_required 必须是 boolean。");
+    }
+    sourceInfo.image_required = value.image_required;
+  }
   sourceInfo.image_crop = value.image_crop as QuestionSourceInfo["image_crop"];
 
   return normalizeQuestionSourceInfo(sourceInfo);

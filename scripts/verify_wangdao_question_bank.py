@@ -42,10 +42,8 @@ def main() -> None:
     asset_names = [str(asset.get("file") or "") for asset in assets]
     if len(asset_names) != len(set(asset_names)):
         failures.append("assets 存在重复文件名")
-    if len(asset_names) != len(cards):
-        failures.append(f"逐题裁图数量错误：题目 {len(cards)}，图片 {len(asset_names)}")
-    if any(str(asset.get("kind") or "") != "question_crop" for asset in assets):
-        failures.append("assets 中仍存在非逐题裁图")
+    if any(str(asset.get("kind") or "") != "question_figure" for asset in assets):
+        failures.append("assets 中存在非题图本体资产")
     missing_asset_files = [
         name
         for name in asset_names
@@ -58,19 +56,27 @@ def main() -> None:
     missing_answers: list[int] = []
     invalid_choices: list[int] = []
     invalid_inline_explanations: list[int] = []
-    missing_card_assets: list[int] = []
+    missing_required_images: list[int] = []
+    unexpected_text_question_images: list[int] = []
+    invalid_image_required_flags: list[int] = []
     shared_card_assets: list[str] = []
     card_asset_names: list[str] = []
+    asset_name_set = set(asset_names)
     for index, card in enumerate(cards, start=1):
         source = card.get("source") if isinstance(card.get("source"), dict) else {}
         import_key = str(source.get("import_key") or "").strip()
         asset_file = str(source.get("asset_file") or "").strip()
+        image_required = source.get("image_required")
         card_asset_names.append(asset_file)
         import_keys.append(import_key)
         if not import_key:
             failures.append(f"第 {index} 题缺少 import_key")
-        if not asset_file or asset_file not in set(asset_names):
-            missing_card_assets.append(index)
+        if not isinstance(image_required, bool):
+            invalid_image_required_flags.append(index)
+        elif image_required and (not asset_file or asset_file not in asset_name_set):
+            missing_required_images.append(index)
+        elif not image_required and asset_file:
+            unexpected_text_question_images.append(index)
         if source.get("image_crop"):
             failures.append(f"第 {index} 题仍依赖整页 CSS 裁切")
 
@@ -107,8 +113,29 @@ def main() -> None:
     ]
     if shared_card_assets:
         failures.append(f"存在 {len(shared_card_assets)} 张被多题共用的图片")
-    if missing_card_assets:
-        failures.append(f"{len(missing_card_assets)} 题没有可上传原图")
+    unreferenced_assets = sorted(asset_name_set - set(card_asset_names))
+    if unreferenced_assets:
+        failures.append(f"{len(unreferenced_assets)} 张图片没有对应题目")
+    image_question_count = sum(
+        1
+        for card in cards
+        if isinstance(card.get("source"), dict)
+        and card["source"].get("image_required") is True
+    )
+    if len(asset_names) != image_question_count:
+        failures.append(
+            f"配图题与题图数量不一致：配图题 {image_question_count}，题图 {len(asset_names)}"
+        )
+    if invalid_image_required_flags:
+        failures.append(
+            f"{len(invalid_image_required_flags)} 题缺少明确的 image_required 标记"
+        )
+    if missing_required_images:
+        failures.append(f"{len(missing_required_images)} 道配图题缺少本题图片")
+    if unexpected_text_question_images:
+        failures.append(
+            f"{len(unexpected_text_question_images)} 道普通文字题错误绑定了图片"
+        )
     if invalid_choices:
         failures.append(f"{len(invalid_choices)} 题不是完整 A/B/C/D")
     if missing_answers:
@@ -119,9 +146,14 @@ def main() -> None:
     result = {
         "questions": len(cards),
         "assets": len(asset_names),
+        "image_questions": image_question_count,
+        "text_only_questions": len(cards) - image_question_count,
         "subject_counts": dict(counts),
         "missing_asset_files": len(missing_asset_files),
-        "missing_card_assets": len(missing_card_assets),
+        "missing_required_images": len(missing_required_images),
+        "unexpected_text_question_images": len(unexpected_text_question_images),
+        "invalid_image_required_flags": len(invalid_image_required_flags),
+        "unreferenced_assets": len(unreferenced_assets),
         "invalid_choices": len(invalid_choices),
         "missing_answers": len(missing_answers),
         "invalid_inline_explanations": len(invalid_inline_explanations),
