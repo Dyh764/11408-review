@@ -12,6 +12,7 @@ import { parseChoiceExplanations } from "@/lib/questions/choice-explanation";
 import { getQuestionStemAndChoices } from "@/lib/questions/extract-choices";
 import { buildQuestionBadges } from "@/lib/questions/question-badges";
 import { explainReviewPriorityScore } from "@/lib/reviews/priority-score";
+import type { PracticeAnswerMode } from "@/lib/practice/practice-mode";
 import type { DueReview } from "@/lib/reviews";
 import type { ReviewResult } from "@/lib/types";
 import type {
@@ -91,6 +92,9 @@ export function ReviewFlashcard({
   onReview,
   focusMode = false,
   onImageUnavailable,
+  practiceMode = "standard",
+  onEditAnswer,
+  onOpenBookNext,
 }: {
   review: FlashcardReview;
   today: string;
@@ -109,6 +113,9 @@ export function ReviewFlashcard({
   onReview: (result: ReviewResult) => void;
   focusMode?: boolean;
   onImageUnavailable?: () => void;
+  practiceMode?: PracticeAnswerMode;
+  onEditAnswer?: () => void;
+  onOpenBookNext?: () => void;
 }) {
   const hasAnswer = Boolean(review.questions.standard_answer?.trim());
   const questionDisplay = getQuestionStemAndChoices(
@@ -245,16 +252,71 @@ export function ReviewFlashcard({
     </>
   );
 
-  const primaryActions = canMoveToNextChoice ? (
-    <button
-      type="button"
-      data-swipe-ignore
-      onClick={onNextAfterFeedback}
-      className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
-    >
-      下一题
-    </button>
-  ) : (
+  const primaryActions =
+    practiceMode === "quick-fill" ? (
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          data-swipe-ignore
+          onClick={() => onReview("wrong_again")}
+          disabled={processing || processingLocked}
+          className="min-h-12 rounded-lg bg-red-50 px-4 text-sm font-black text-red-700 ring-1 ring-red-100 disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          {processing ? "写入中..." : "标记做错"}
+        </button>
+        <button
+          type="button"
+          data-swipe-ignore
+          onClick={() => onReview("mastered")}
+          disabled={processing || processingLocked}
+          className="min-h-12 rounded-lg bg-emerald-600 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          {processing ? "写入中..." : "标记做对"}
+        </button>
+      </div>
+    ) : practiceMode === "open-book" ? (
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          data-swipe-ignore
+          onClick={onSkip}
+          disabled={processingLocked}
+          className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700 disabled:text-slate-400"
+        >
+          稍后再看
+        </button>
+        <button
+          type="button"
+          data-swipe-ignore
+          onClick={onOpenBookNext}
+          disabled={processingLocked}
+          className="min-h-12 rounded-lg bg-slate-950 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          看完，下一题
+        </button>
+      </div>
+    ) : canMoveToNextChoice ? (
+      <div className={practiceMode === "editable" ? "grid grid-cols-2 gap-2" : ""}>
+        {practiceMode === "editable" ? (
+          <button
+            type="button"
+            data-swipe-ignore
+            onClick={onEditAnswer}
+            className="min-h-12 rounded-lg border border-blue-100 bg-white px-4 text-sm font-black text-blue-700"
+          >
+            修改答案
+          </button>
+        ) : null}
+        <button
+          type="button"
+          data-swipe-ignore
+          onClick={onNextAfterFeedback}
+          className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white"
+        >
+          下一题
+        </button>
+      </div>
+    ) : (
     <div className="grid grid-cols-2 gap-2">
       {hasAnswer ? (
         isChoiceQuestion && !answerRevealed ? (
@@ -295,7 +357,7 @@ export function ReviewFlashcard({
 
   const feedbackContent = answerRevealed ? (
     <div className="space-y-3">
-      {isChoiceQuestion && answerChoices.labels.length > 0 ? (
+      {isChoiceQuestion && answerChoices.labels.length > 0 && submittedChoice ? (
         <p
           className={`rounded-lg p-3 text-sm font-black ${
             choiceIsCorrect
@@ -327,7 +389,10 @@ export function ReviewFlashcard({
     </div>
   ) : null;
 
-  const recordActions = canRecordReview ? (
+  const recordActions =
+    practiceMode === "quick-fill" || practiceMode === "open-book"
+      ? null
+      : canRecordReview ? (
     <div>
       <p className="mb-2 text-sm font-black text-slate-950">记录本题结果</p>
       <div className="grid grid-cols-2 gap-2">
@@ -345,7 +410,8 @@ export function ReviewFlashcard({
         ))}
       </div>
     </div>
-  ) : null;
+        )
+      : null;
 
   return (
     <MobileSection className={focusMode ? "flex h-full min-h-0 flex-col px-0" : ""}>

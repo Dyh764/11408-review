@@ -19,7 +19,14 @@ import { getDailyMotivation } from "@/lib/motivation";
 import {
   filterPracticeQuestions,
   type PracticeFilter,
+  type PracticeSourceRange,
 } from "@/lib/practice/practice-catalog";
+import {
+  parsePracticeAnswerMode,
+  practiceAnswerModeLabels,
+  practiceAnswerModeOptions,
+  type PracticeAnswerMode,
+} from "@/lib/practice/practice-mode";
 import {
   buildPracticeScopeKey,
   buildPracticeSessionStorageKey,
@@ -41,6 +48,16 @@ import { createClient } from "@/lib/supabase/client";
 import type { ReviewResult } from "@/lib/types";
 
 const exam408SubjectOptions = ["数据结构", "计算机组成原理", "操作系统", "计算机网络"] as const;
+const practiceDifficultyOptions = ["基础", "中等", "较难", "压轴"] as const;
+const practiceSourceOptions: Array<{
+  key: PracticeSourceRange;
+  label: string;
+}> = [
+  { key: "all", label: "全部题源" },
+  { key: "book", label: "王道书配套题" },
+  { key: "exam", label: "历年真题" },
+  { key: "supplement", label: "补充习题" },
+];
 
 function makePracticeReview(question: QuestionWithImage): FlashcardReview {
   const today = todayIsoDate();
@@ -85,7 +102,11 @@ function getPracticeQuestionSelection(
   questions: QuestionWithImage[],
   filter: PracticeFilter,
 ) {
-  const filtered = filterPracticeQuestions(questions, filter);
+  const candidates =
+    filter.type === "daily-choice"
+      ? questions.filter(canUseQuestionInPractice)
+      : questions;
+  const filtered = filterPracticeQuestions(candidates, filter);
   const available = filtered.filter(canUseQuestionInPractice);
 
   return {
@@ -96,7 +117,15 @@ function getPracticeQuestionSelection(
 
 function getPracticeScopeLabel(filter: PracticeFilter) {
   if (filter.type === "exam408-choice") {
-    return filter.chapter || filter.subject || "全部 408";
+    const sourceLabel =
+      practiceSourceOptions.find((option) => option.key === filter.sourceRange)?.label ?? "";
+    return [
+      filter.chapter || filter.subject || "全部 408",
+      filter.difficulty,
+      filter.sourceRange && filter.sourceRange !== "all" ? sourceLabel : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   if (filter.type === "daily-choice") {
@@ -188,6 +217,12 @@ export default function PracticePage() {
   const [queue, setQueue] = useState<FlashcardReview[]>([]);
   const [activeReviewId, setActiveReviewId] = useState("");
   const [practiceSession, setPracticeSession] = useState<PracticeSessionV1 | null>(null);
+  const [activeAnswerMode, setActiveAnswerMode] = useState<PracticeAnswerMode>("standard");
+  const [vipAnswerMode, setVipAnswerMode] =
+    useState<Exclude<PracticeAnswerMode, "standard">>("editable");
+  const [vipSourceRange, setVipSourceRange] = useState<PracticeSourceRange>("all");
+  const [vipSubject, setVipSubject] = useState("");
+  const [vipDifficulty, setVipDifficulty] = useState("");
   const practiceSessionRef = useRef<PracticeSessionV1 | null>(null);
   const unavailableImageIdsRef = useRef(new Set<string>());
   const [missingImageCount, setMissingImageCount] = useState(0);
@@ -202,6 +237,11 @@ export default function PracticePage() {
   const [revealedAnswers, setRevealedAnswers] = useState<Record<string, boolean>>({});
   const [selectedChoices, setSelectedChoices] = useState<Record<string, string[]>>({});
   const [submittedChoices, setSubmittedChoices] = useState<Record<string, boolean>>({});
+  const [submittedResults, setSubmittedResults] = useState<
+    Record<string, ReviewResult | undefined>
+  >({});
+  const [repeatAttemptCount, setRepeatAttemptCount] = useState(0);
+  const [openBookViewedCount, setOpenBookViewedCount] = useState(0);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
   const [topicParam] = useState(() =>
@@ -224,6 +264,11 @@ export default function PracticePage() {
       ? new URLSearchParams(window.location.search).get("chapter")?.trim() ?? ""
       : "",
   );
+  const [answerModeParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("answerMode")?.trim() ?? ""
+      : "",
+  );
   const [message, setMessage] = useState(
     supabase ? "" : "请配置 Supabase 环境变量后查看 408 刷题数据。",
   );
@@ -233,11 +278,13 @@ export default function PracticePage() {
     (
       prepared: ReturnType<typeof preparePracticeRound>,
       filter: PracticeFilter,
+      answerMode: PracticeAnswerMode = "standard",
     ) => {
       practiceSessionRef.current = prepared.session;
       unavailableImageIdsRef.current.clear();
       setPracticeSession(prepared.session);
       setActiveFilter(filter);
+      setActiveAnswerMode(answerMode);
       setQueue(prepared.queue);
       setActiveReviewId(prepared.activeReviewId);
       setInitialCount(practiceSessionSize(prepared.session));
@@ -247,6 +294,9 @@ export default function PracticePage() {
       setRevealedAnswers({});
       setSelectedChoices({});
       setSubmittedChoices({});
+      setSubmittedResults({});
+      setRepeatAttemptCount(0);
+      setOpenBookViewedCount(0);
       setDraftAnswers({});
       setMessage(
         prepared.queue.length === 0
@@ -273,12 +323,18 @@ export default function PracticePage() {
         if (isActive) {
           setQuestions(items);
           if (modeParam === "exam408-choice") {
+            const answerMode = parsePracticeAnswerMode(answerModeParam);
             const choiceFilter: PracticeFilter = {
               type: "exam408-choice",
               subject: subjectParam || undefined,
               chapter: chapterParam || undefined,
+              answerMode: answerMode === "standard" ? undefined : answerMode,
             };
-            activatePreparedRound(preparePracticeRound(items, choiceFilter), choiceFilter);
+            activatePreparedRound(
+              preparePracticeRound(items, choiceFilter),
+              choiceFilter,
+              answerMode,
+            );
           } else if (modeParam === "daily-choice") {
             const dailyFilter: PracticeFilter = {
               type: "daily-choice",
@@ -317,6 +373,7 @@ export default function PracticePage() {
     };
   }, [
     activatePreparedRound,
+    answerModeParam,
     supabase,
     chapterParam,
     modeParam,
@@ -358,12 +415,39 @@ export default function PracticePage() {
       }),
     [questions],
   );
+  const vipFilter = useMemo<PracticeFilter>(
+    () => ({
+      type: "exam408-choice",
+      subject: vipSubject || undefined,
+      difficulty: vipDifficulty || undefined,
+      sourceRange: vipSourceRange,
+    }),
+    [vipDifficulty, vipSourceRange, vipSubject],
+  );
+  const vipSelection = useMemo(
+    () => getPracticeQuestionSelection(questions, vipFilter),
+    [questions, vipFilter],
+  );
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
   const progress =
     initialCount > 0 ? Math.round(((completedTotal + skippedCount) / initialCount) * 100) : 0;
 
-  function resetRound(filter: PracticeFilter) {
-    activatePreparedRound(preparePracticeRound(questions, filter), filter);
+  function resetRound(
+    filter: PracticeFilter,
+    answerMode: PracticeAnswerMode = "standard",
+  ) {
+    const scopedFilter: PracticeFilter =
+      filter.type === "exam408-choice"
+        ? {
+            ...filter,
+            answerMode: answerMode === "standard" ? undefined : answerMode,
+          }
+        : filter;
+    activatePreparedRound(
+      preparePracticeRound(questions, scopedFilter),
+      scopedFilter,
+      answerMode,
+    );
   }
 
   function toggleChoice(reviewId: string, label: string, isMultiple: boolean) {
@@ -395,6 +479,11 @@ export default function PracticePage() {
       return next;
     });
     setSubmittedChoices((current) => {
+      const next = { ...current };
+      delete next[reviewId];
+      return next;
+    });
+    setSubmittedResults((current) => {
       const next = { ...current };
       delete next[reviewId];
       return next;
@@ -448,12 +537,40 @@ export default function PracticePage() {
     );
   }
 
+  function advanceRepeatReview(review: FlashcardReview) {
+    const reviewIndex = queue.findIndex((item) => item.id === review.id);
+    const nextReview = queue[(reviewIndex + 1 + queue.length) % queue.length];
+
+    cleanupReviewDraft(review.id);
+    if (nextReview) {
+      setActiveReviewId(nextReview.id);
+      updatePracticeSession((current) =>
+        markPracticeQuestionShown(current, nextReview.question_id),
+      );
+    }
+    setMessage("已保留本组题目，可继续循环作答。");
+  }
+
   function handleSkipReview(review: FlashcardReview) {
+    if (activeAnswerMode === "repeat") {
+      advanceRepeatReview(review);
+      return;
+    }
+
     updatePracticeSession((current) =>
       skipPracticeQuestion(current, review.question_id),
     );
     retireVisibleReview(review);
     setMessage("已跳过本题，不记录本次结果。");
+  }
+
+  function handleOpenBookNext(review: FlashcardReview) {
+    updatePracticeSession((current) =>
+      skipPracticeQuestion(current, review.question_id),
+    );
+    setOpenBookViewedCount((count) => count + 1);
+    retireVisibleReview(review);
+    setMessage("本题已回顾，不写入对错记录。");
   }
 
   function completeReviewLocally(review: FlashcardReview, result: ReviewResult, nextMessage: string) {
@@ -581,15 +698,28 @@ export default function PracticePage() {
   function handleChoiceSubmitAndNext(review: FlashcardReview, result?: ReviewResult) {
     setSubmittedChoices((current) => ({ ...current, [review.id]: true }));
     setRevealedAnswers((current) => ({ ...current, [review.id]: true }));
+    setSubmittedResults((current) => ({ ...current, [review.id]: result }));
 
     if (!result) {
       setMessage("已显示答案；这道题暂时无法自动判断，请手动记录结果。");
       return;
     }
 
+    if (activeAnswerMode === "editable") {
+      setMessage(
+        result === "mastered"
+          ? "回答正确；如需调整可点“修改答案”，确认后再进入下一题。"
+          : "回答错误；可查看逐项解析，也可以修改答案后重新提交。",
+      );
+      return;
+    }
+
     updatePracticeSession((current) =>
       completePracticeQuestion(current, review.question_id, result),
     );
+    if (activeAnswerMode === "repeat") {
+      setRepeatAttemptCount((count) => count + 1);
+    }
     setMessage(result === "mastered" ? "回答正确，查看解析后点下一题。" : "回答错误，查看解析后点下一题。");
     void persistReviewResult(review, result, {
       lock: false,
@@ -598,8 +728,40 @@ export default function PracticePage() {
   }
 
   function handleChoiceFeedbackNext(review: FlashcardReview) {
+    if (activeAnswerMode === "editable") {
+      const result = submittedResults[review.id];
+
+      if (!result) {
+        return;
+      }
+
+      updatePracticeSession((current) =>
+        completePracticeQuestion(current, review.question_id, result),
+      );
+      void persistReviewResult(review, result, {
+        lock: false,
+        failurePrefix: "后台记录失败：",
+      });
+    }
+
+    if (activeAnswerMode === "repeat") {
+      advanceRepeatReview(review);
+      return;
+    }
+
     retireVisibleReview(review);
     setMessage("");
+  }
+
+  function handleEditChoice(review: FlashcardReview) {
+    setSubmittedChoices((current) => ({ ...current, [review.id]: false }));
+    setRevealedAnswers((current) => ({ ...current, [review.id]: false }));
+    setSubmittedResults((current) => {
+      const next = { ...current };
+      delete next[review.id];
+      return next;
+    });
+    setMessage("已恢复作答，可重新选择并提交；本轮以最后一次答案为准。");
   }
 
   function handleImageUnavailable(review: FlashcardReview) {
@@ -640,6 +802,132 @@ export default function PracticePage() {
               开始 / 继续全部 408 选择题
             </button>
           </StudyDashboardCard>
+        </MobileSection>
+
+        <MobileSection>
+          <SectionHeader
+            title="VIP 专业刷题"
+            subtitle="使用你自己的题库，按题源、科目和难度组题；四种模式都可直接使用。"
+            action={<StudyBadge tone="amber">已解锁</StudyBadge>}
+          />
+          <StudyCard className="space-y-4">
+            <div>
+              <p className="mb-2 text-sm font-black text-slate-950">答题模式</p>
+              <div className="grid grid-cols-2 gap-2">
+                {practiceAnswerModeOptions.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setVipAnswerMode(option.key)}
+                    className={`min-h-[74px] rounded-lg p-3 text-left ${
+                      vipAnswerMode === option.key
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-50 text-slate-700 ring-1 ring-slate-100"
+                    }`}
+                  >
+                    <span className="block text-sm font-black">{option.label}</span>
+                    <span className="mt-1 block text-[11px] leading-4 opacity-75">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-600">题源</span>
+                <select
+                  value={vipSourceRange}
+                  onChange={(event) =>
+                    setVipSourceRange(event.target.value as PracticeSourceRange)
+                  }
+                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                >
+                  {practiceSourceOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-600">科目</span>
+                <select
+                  value={vipSubject}
+                  onChange={(event) => setVipSubject(event.target.value)}
+                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                >
+                  <option value="">全部科目</option>
+                  {exam408SubjectOptions.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-black text-slate-600">难度</span>
+                <select
+                  value={vipDifficulty}
+                  onChange={(event) => setVipDifficulty(event.target.value)}
+                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                >
+                  <option value="">全部难度</option>
+                  {practiceDifficultyOptions.map((difficulty) => (
+                    <option key={difficulty} value={difficulty}>
+                      {difficulty}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-800 ring-1 ring-blue-100">
+              当前组合可刷 <strong>{vipSelection.available.length}</strong> 题
+              {vipSelection.missingImageCount > 0
+                ? `，另有 ${vipSelection.missingImageCount} 道缺图题会自动跳过`
+                : ""}
+              。没有真实题目的题源会显示 0 题，不会用别的题冒充。
+            </div>
+
+            <button
+              type="button"
+              onClick={() => resetRound(vipFilter, vipAnswerMode)}
+              disabled={vipSelection.available.length === 0}
+              className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
+            >
+              进入{practiceAnswerModeLabels[vipAnswerMode]}（
+              {vipSelection.available.length} 题）
+            </button>
+
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
+              <Link
+                href="/review"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                错题二刷与统计
+              </Link>
+              <Link
+                href="/collections"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                收藏夹与 PDF
+              </Link>
+              <Link
+                href="/notes"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                题目与考点笔记
+              </Link>
+              <Link
+                href="/knowledge-map"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                考点与考频
+              </Link>
+            </div>
+          </StudyCard>
         </MobileSection>
 
         <MobileSection>
@@ -764,12 +1052,20 @@ export default function PracticePage() {
   }
 
   function renderSummary() {
+    const gradedTotal = completedCounts.mastered + completedCounts.wrong_again;
+    const accuracy =
+      gradedTotal > 0 ? Math.round((completedCounts.mastered / gradedTotal) * 100) : 0;
+
     return (
       <MobileSection>
         <StudyDashboardCard>
           <p className="text-sm font-bold text-white/75">本轮刷题完成</p>
-          <p className="mt-2 text-3xl font-black tracking-normal">本轮完成 {completedTotal} 题</p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <p className="mt-2 text-3xl font-black tracking-normal">
+            {activeAnswerMode === "open-book"
+              ? `本轮回顾 ${openBookViewedCount} 题`
+              : `本轮完成 ${completedTotal} 题`}
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="rounded-lg bg-white/12 p-3">
               <p className="text-xs text-white/70">又错</p>
               <p className="mt-1 text-2xl font-black">{completedCounts.wrong_again}</p>
@@ -778,15 +1074,24 @@ export default function PracticePage() {
               <p className="text-xs text-white/70">已掌握</p>
               <p className="mt-1 text-2xl font-black">{completedCounts.mastered}</p>
             </div>
+            <div className="rounded-lg bg-white/12 p-3">
+              <p className="text-xs text-white/70">正确率</p>
+              <p className="mt-1 text-2xl font-black">
+                {gradedTotal > 0 ? `${accuracy}%` : "—"}
+              </p>
+            </div>
           </div>
           <p className="mt-4 text-sm leading-6 text-white/80">
-            本章建议：把又错的题回到详情页补充卡点，下一轮优先处理同类错因。
+            {activeAnswerMode === "open-book"
+              ? "开卷回顾不写入对错；需要检验掌握度时，可再用修改模式或快速回填。"
+              : "本章建议：把又错的题回到详情页补充卡点，下一轮优先处理同类错因。"}
           </p>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => {
                 setActiveFilter(null);
+                setActiveAnswerMode("standard");
                 setInitialCount(0);
                 setMessage("");
               }}
@@ -819,7 +1124,12 @@ export default function PracticePage() {
                 {getPracticeScopeLabel(activeFilter)}
               </p>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                本轮 {progress}% · 剩余 {practiceSession?.remainingQuestionIds.length ?? queue.length} 题
+                {practiceAnswerModeLabels[activeAnswerMode]} ·{" "}
+                {activeAnswerMode === "repeat"
+                  ? `已作答 ${repeatAttemptCount} 次 · 本组 ${queue.length} 题`
+                  : `本轮 ${progress}% · 剩余 ${
+                      practiceSession?.remainingQuestionIds.length ?? queue.length
+                    } 题`}
                 {missingImageCount > 0 ? ` · 缺图跳过 ${missingImageCount} 题` : ""}
               </p>
             </div>
@@ -828,6 +1138,7 @@ export default function PracticePage() {
               data-swipe-ignore
               onClick={() => {
                 setActiveFilter(null);
+                setActiveAnswerMode("standard");
                 setQueue([]);
                 setActiveReviewId("");
                 setMessage("");
@@ -851,7 +1162,23 @@ export default function PracticePage() {
             activeReviewId={activeReviewId}
             onActiveReviewChange={handleActiveReviewChange}
             focusMode
+            loopNavigation={activeAnswerMode === "repeat"}
             onAdvance={(review) => {
+              if (activeAnswerMode === "open-book") {
+                handleOpenBookNext(review);
+                return true;
+              }
+
+              if (activeAnswerMode === "repeat" && submittedChoices[review.id]) {
+                advanceRepeatReview(review);
+                return true;
+              }
+
+              if (activeAnswerMode === "editable" && submittedChoices[review.id]) {
+                handleChoiceFeedbackNext(review);
+                return true;
+              }
+
               const resultRecorded =
                 !practiceSession?.remainingQuestionIds.includes(review.question_id);
 
@@ -868,15 +1195,22 @@ export default function PracticePage() {
                 today={todayIsoDate()}
                 selectedChoices={selectedChoices[review.id] ?? []}
                 submittedChoice={Boolean(submittedChoices[review.id])}
-                answerRevealed={Boolean(revealedAnswers[review.id])}
+                answerRevealed={
+                  activeAnswerMode === "open-book" ||
+                  activeAnswerMode === "quick-fill" ||
+                  Boolean(revealedAnswers[review.id])
+                }
                 draftAnswer={draftAnswers[review.id] ?? ""}
                 processing={processingReviewId === review.id}
                 processingLocked={Boolean(processingReviewId)}
                 focusMode
+                practiceMode={activeAnswerMode}
                 onImageUnavailable={() => handleImageUnavailable(review)}
                 onToggleChoice={toggleChoice}
                 onSubmitChoice={(result) => handleChoiceSubmitAndNext(review, result)}
                 onNextAfterFeedback={() => handleChoiceFeedbackNext(review)}
+                onEditAnswer={() => handleEditChoice(review)}
+                onOpenBookNext={() => handleOpenBookNext(review)}
                 onRevealAnswer={() =>
                   setRevealedAnswers((current) => ({ ...current, [review.id]: true }))
                 }

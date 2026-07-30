@@ -39,6 +39,7 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
   activeReviewId,
   onActiveReviewChange,
   focusMode = false,
+  loopNavigation = false,
 }: {
   reviews: T[];
   renderCard: (review: T) => ReactNode;
@@ -47,6 +48,7 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
   activeReviewId?: string;
   onActiveReviewChange?: (review: T) => void;
   focusMode?: boolean;
+  loopNavigation?: boolean;
 }) {
   const [uncontrolledActiveIndex, setUncontrolledActiveIndex] = useState(0);
   const [dragOffsetX, setDragOffsetX] = useState(0);
@@ -81,7 +83,10 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
         return;
       }
 
-      const safeIndex = Math.max(0, Math.min(nextIndex, reviews.length - 1));
+      const safeIndex =
+        loopNavigation && reviews.length > 1
+          ? (nextIndex + reviews.length) % reviews.length
+          : Math.max(0, Math.min(nextIndex, reviews.length - 1));
       const nextReview = reviews[safeIndex];
 
       if (activeReviewId === undefined) {
@@ -92,7 +97,7 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
         onActiveReviewChange?.(nextReview);
       }
     },
-    [activeReviewId, onActiveReviewChange, reviews],
+    [activeReviewId, loopNavigation, onActiveReviewChange, reviews],
   );
 
   const goPrevious = useCallback(() => {
@@ -269,7 +274,7 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
           type="button"
           data-swipe-ignore
           onClick={goPrevious}
-          disabled={navigationLocked || safeActiveIndex === 0}
+          disabled={navigationLocked || (!loopNavigation && safeActiveIndex === 0)}
           className="min-h-8 rounded-lg bg-slate-100 px-3 text-slate-700 disabled:text-slate-300 md:min-h-9"
         >
           上一题
@@ -281,7 +286,9 @@ export function ReviewFlashcardDeck<T extends SwipeReview>({
           type="button"
           data-swipe-ignore
           onClick={goNext}
-          disabled={navigationLocked || safeActiveIndex >= reviews.length - 1}
+          disabled={
+            navigationLocked || (!loopNavigation && safeActiveIndex >= reviews.length - 1)
+          }
           className="min-h-8 rounded-lg bg-blue-50 px-3 text-blue-700 disabled:text-slate-300 md:min-h-9"
         >
           下一题

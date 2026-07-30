@@ -27,7 +27,21 @@ export const emptyPracticeResultCounts = (): PracticeResultCounts => ({
 
 export function buildPracticeScopeKey(filter: PracticeFilter) {
   if (filter.type === "exam408-choice") {
-    return ["exam408-choice", filter.subject || "all", filter.chapter || "all"].join(":");
+    const base = ["exam408-choice", filter.subject || "all", filter.chapter || "all"];
+
+    if (filter.sourceRange && filter.sourceRange !== "all") {
+      base.push(`source-${filter.sourceRange}`);
+    }
+
+    if (filter.difficulty) {
+      base.push(`difficulty-${filter.difficulty}`);
+    }
+
+    if (filter.answerMode && filter.answerMode !== "standard") {
+      base.push(`mode-${filter.answerMode}`);
+    }
+
+    return base.join(":");
   }
 
   if (filter.type === "daily-choice") {

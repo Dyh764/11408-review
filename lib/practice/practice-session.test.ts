@@ -32,6 +32,23 @@ test("builds independent scope keys for subject and chapter rounds", () => {
     buildPracticeScopeKey({ type: "high-frequency-choice" }),
     "high-frequency-choice",
   );
+  assert.equal(
+    buildPracticeScopeKey({
+      type: "exam408-choice",
+      subject: "操作系统",
+      sourceRange: "book",
+      difficulty: "中等",
+    }),
+    "exam408-choice:操作系统:all:source-book:difficulty-中等",
+  );
+  assert.equal(
+    buildPracticeScopeKey({
+      type: "exam408-choice",
+      subject: "操作系统",
+      answerMode: "open-book",
+    }),
+    "exam408-choice:操作系统:all:mode-open-book",
+  );
 });
 
 test("reopening resumes after the last shown unfinished question", () => {

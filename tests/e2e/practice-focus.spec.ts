@@ -333,3 +333,61 @@ test.describe("固定刷题模式", () => {
     });
   }
 });
+
+test.describe("VIP 专业刷题", () => {
+  test.skip(!practiceMockEnabled, "需要 E2E_PRACTICE_MOCK=1 和本地模拟 Supabase 地址");
+
+  test("手机端可完成修改、多刷、开卷和快速回填", async ({ page }) => {
+    await installMockSupabase(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.evaluate(() => window.localStorage.clear());
+    await page.goto("/practice");
+
+    await expect(page.getByText("VIP 专业刷题", { exact: true })).toBeVisible();
+    await page.getByLabel("题源").selectOption("exam");
+    await page.getByLabel("科目").selectOption("操作系统");
+    await expect(page.getByText(/当前组合可刷 2 题/)).toBeVisible();
+
+    await page
+      .getByRole("button", { name: /^修改模式 提交后可改选/ })
+      .click();
+    await page.getByRole("button", { name: /进入修改模式/ }).click();
+    await page.locator("button.answer-choice").first().click();
+    await page.getByRole("button", { name: "提交答案" }).click();
+    await expect(page.getByRole("button", { name: "修改答案" })).toBeVisible();
+    await page.getByRole("button", { name: "修改答案" }).click();
+    await expect(page.getByRole("button", { name: "提交答案" })).toBeVisible();
+    await page.getByRole("button", { name: "提交答案" }).click();
+    await page.getByRole("button", { name: "下一题", exact: true }).first().click();
+    await page.getByRole("button", { name: "退出本轮" }).click();
+
+    await page
+      .getByRole("button", { name: /^开卷模式 不作答直接看答案/ })
+      .click();
+    await page.getByRole("button", { name: /进入开卷模式/ }).click();
+    await expect(page.getByRole("button", { name: "看完，下一题" })).toBeVisible();
+    await expect(page.getByText(/正确答案：/)).toHaveCount(0);
+    await page.getByRole("button", { name: "看完，下一题" }).click();
+    await page.getByRole("button", { name: "退出本轮" }).click();
+
+    await page
+      .getByRole("button", { name: /^快速回填 对照答案/ })
+      .click();
+    await page.getByRole("button", { name: /进入快速回填/ }).click();
+    await expect(page.getByRole("button", { name: "标记做错" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "标记做对" })).toBeVisible();
+    await page.getByRole("button", { name: "标记做对" }).click();
+    await page.getByRole("button", { name: "退出本轮" }).click();
+
+    await page
+      .getByRole("button", { name: /^多刷模式 题目不退出队列/ })
+      .click();
+    await page.getByRole("button", { name: /进入多刷模式/ }).click();
+    await page.locator("button.answer-choice").first().click();
+    await page.getByRole("button", { name: "提交答案" }).click();
+    await expect(page.getByText(/已作答 1 次/)).toBeVisible();
+    await page.getByRole("button", { name: "下一题", exact: true }).first().click();
+    await expect(page.getByText(/本组 2 题/)).toBeVisible();
+  });
+});

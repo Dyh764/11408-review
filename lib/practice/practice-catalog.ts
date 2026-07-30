@@ -4,9 +4,11 @@ import type {
   Difficulty,
   MasteryStatus,
   QuestionTextStatus,
+  QuestionSourceInfo,
   ReviewPriority,
 } from "../types";
 import { sortQuestionsForChapterList } from "../questions/question-sort.ts";
+import type { PracticeAnswerMode } from "./practice-mode";
 
 export type PracticeQuestion = {
   id: string;
@@ -23,7 +25,10 @@ export type PracticeQuestion = {
   choices?: ChoiceOption[] | null;
   priority_score?: number | null;
   created_at?: string | null;
+  source_info?: QuestionSourceInfo | null;
 };
+
+export type PracticeSourceRange = "all" | "book" | "exam" | "supplement";
 
 export type PracticeChapterOption = {
   subject: string;
@@ -42,7 +47,14 @@ export type PracticeFilter =
   | { type: "chapter"; subject: string; chapter: string }
   | { type: "mistake"; mistakeType: string }
   | { type: "topic"; topic: string }
-  | { type: "exam408-choice"; subject?: string; chapter?: string }
+  | {
+      type: "exam408-choice";
+      subject?: string;
+      chapter?: string;
+      difficulty?: string;
+      sourceRange?: PracticeSourceRange;
+      answerMode?: PracticeAnswerMode;
+    }
   | { type: "daily-choice"; date: string }
   | { type: "high-frequency-choice" };
 
@@ -88,6 +100,48 @@ function isExam408ChoiceQuestion(question: PracticeQuestion) {
     ["数据结构", "计算机组成原理", "操作系统", "计算机网络"].includes(question.subject) &&
     (question.choices?.length ?? 0) > 0
   );
+}
+
+function sourceInfoText(question: PracticeQuestion) {
+  const sourceInfo = question.source_info;
+
+  if (!sourceInfo) {
+    return "";
+  }
+
+  return [
+    sourceInfo.type,
+    sourceInfo.name,
+    sourceInfo.raw,
+    sourceInfo.paper,
+    sourceInfo.section,
+    sourceInfo.source_file,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function getPracticeSourceRange(
+  question: PracticeQuestion,
+): Exclude<PracticeSourceRange, "all"> | "other" {
+  const text = sourceInfoText(question);
+
+  if (/王道|教材|做题本|配套题/.test(text)) {
+    return "book";
+  }
+
+  if (/真题|统考/.test(text)) {
+    return "exam";
+  }
+
+  if (
+    /补充|习题|练习|模拟/.test(text) ||
+    question.source_info?.collection_role === "practice_bank"
+  ) {
+    return "supplement";
+  }
+
+  return "other";
 }
 
 function isPersonalHighFrequencyQuestion(question: PracticeQuestion) {
@@ -213,7 +267,11 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
         return (
           isExam408ChoiceQuestion(question) &&
           (!filter.subject || question.subject === filter.subject) &&
-          (!filter.chapter || chapterLabel(question) === filter.chapter)
+          (!filter.chapter || chapterLabel(question) === filter.chapter) &&
+          (!filter.difficulty || question.difficulty === filter.difficulty) &&
+          (!filter.sourceRange ||
+            filter.sourceRange === "all" ||
+            getPracticeSourceRange(question) === filter.sourceRange)
         );
       }
 

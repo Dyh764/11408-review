@@ -40,8 +40,9 @@ test("/practice keeps deck navigation available after submitting a choice", () =
   assert.match(deck, /event\.key === "ArrowLeft"/);
   assert.match(deck, /event\.key === "ArrowRight"/);
   assert.match(deck, /if \(navigationLocked\) \{\s*return;\s*\}/);
-  assert.match(deck, /disabled=\{navigationLocked \|\| safeActiveIndex === 0\}/);
-  assert.match(deck, /disabled=\{navigationLocked \|\| safeActiveIndex >= reviews\.length - 1\}/);
+  assert.match(deck, /loopNavigation\?: boolean/);
+  assert.match(deck, /!loopNavigation && safeActiveIndex === 0/);
+  assert.match(deck, /!loopNavigation && safeActiveIndex >= reviews\.length - 1/);
   assert.doesNotMatch(deck, /先看完解析/);
 });
 
@@ -130,6 +131,35 @@ test("/practice default entry is a 408 choice drill surface, not the old mixed c
   );
   assert.doesNotMatch(defaultPanel, /chapterOptions/);
   assert.doesNotMatch(defaultPanel, /mistakeOptions/);
+});
+
+test("/practice exposes real VIP filters and editable, repeat, open-book and quick-fill behavior", () => {
+  const source = read("app/practice/page.tsx");
+  const card = read("components/study/ReviewFlashcard.tsx");
+  const deck = read("components/study/ReviewFlashcardDeck.tsx");
+  const catalog = read("lib/practice/practice-catalog.ts");
+  const mode = read("lib/practice/practice-mode.ts");
+
+  assert.match(source, /VIP 专业刷题/);
+  assert.match(source, /vipSourceRange/);
+  assert.match(source, /vipDifficulty/);
+  assert.match(source, /practiceAnswerModeOptions/);
+  assert.match(source, /activeAnswerMode === "repeat"/);
+  assert.match(source, /handleEditChoice/);
+  assert.match(source, /handleOpenBookNext/);
+  assert.match(source, /错题二刷与统计/);
+  assert.match(source, /收藏夹与 PDF/);
+  assert.match(card, /practiceMode === "quick-fill"/);
+  assert.match(card, /标记做错/);
+  assert.match(card, /标记做对/);
+  assert.match(card, /practiceMode === "open-book"/);
+  assert.match(card, /修改答案/);
+  assert.match(deck, /loopNavigation/);
+  assert.match(catalog, /getPracticeSourceRange/);
+  assert.match(mode, /editable/);
+  assert.match(mode, /repeat/);
+  assert.match(mode, /open-book/);
+  assert.match(mode, /quick-fill/);
 });
 
 test("import preview keeps noisy per-card checks collapsed below the main import action", () => {

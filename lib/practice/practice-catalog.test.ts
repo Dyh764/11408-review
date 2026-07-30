@@ -268,3 +268,81 @@ test("filterPracticeQuestions builds a personal high-frequency wrong-question ro
     ["priority-high", "unstable"],
   );
 });
+
+test("VIP practice filters real book, exam and supplement sources without mistaking book edition years for exams", () => {
+  const sourceBase = {
+    type: "",
+    name: "",
+    section: "",
+    part: "",
+    volume: "",
+    paper: "",
+    page: "",
+    problem_number: "",
+    raw: "",
+  };
+  const questions = [
+    {
+      ...baseQuestion,
+      id: "book",
+      subject: "操作系统",
+      choices: [{ label: "A", text: "1" }],
+      difficulty: "中等",
+      source_info: {
+        ...sourceBase,
+        type: "题库",
+        name: "王道《操作系统》选择题做题本",
+        volume: "2027",
+        collection_role: "practice_bank" as const,
+      },
+    },
+    {
+      ...baseQuestion,
+      id: "exam",
+      subject: "操作系统",
+      choices: [{ label: "A", text: "1" }],
+      difficulty: "较难",
+      source_info: {
+        ...sourceBase,
+        type: "真题",
+        name: "2024 年 408 真题",
+      },
+    },
+    {
+      ...baseQuestion,
+      id: "supplement",
+      subject: "操作系统",
+      choices: [{ label: "A", text: "1" }],
+      difficulty: "中等",
+      source_info: {
+        ...sourceBase,
+        type: "补充习题",
+        name: "自建补充题库",
+        collection_role: "practice_bank" as const,
+      },
+    },
+  ];
+
+  assert.deepEqual(
+    filterPracticeQuestions(questions, {
+      type: "exam408-choice",
+      sourceRange: "book",
+      difficulty: "中等",
+    }).map((question) => question.id),
+    ["book"],
+  );
+  assert.deepEqual(
+    filterPracticeQuestions(questions, {
+      type: "exam408-choice",
+      sourceRange: "exam",
+    }).map((question) => question.id),
+    ["exam"],
+  );
+  assert.deepEqual(
+    filterPracticeQuestions(questions, {
+      type: "exam408-choice",
+      sourceRange: "supplement",
+    }).map((question) => question.id),
+    ["supplement"],
+  );
+});
