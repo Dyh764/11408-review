@@ -20,6 +20,7 @@ import {
   filterPracticeQuestions,
   type PracticeQuestion,
 } from "@/lib/practice/practice-catalog";
+import { fetchCurrentUserQuestionRecords } from "@/lib/questions";
 import { createClient } from "@/lib/supabase/client";
 import type { QuestionSourceInfo } from "@/lib/types";
 
@@ -892,14 +893,8 @@ export default function DashboardPage() {
 
       const currentDay = todayIsoDate();
       const activityStart = `${addDays(currentDay, -89)}T00:00:00.000Z`;
-      const [questionsResult, recentReviewsResult, dueReviewsResult] = await Promise.all([
-        client
-          .from("questions")
-          .select(
-            "id,subject,chapter,knowledge_point,difficulty,image_path,user_note,solution_summary,source,source_info,question_text,choices,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,answer_source,mistake_types,created_at",
-          )
-          .eq("user_id", user.id)
-          .is("deleted_at", null),
+      const [questionRecords, recentReviewsResult, dueReviewsResult] = await Promise.all([
+        fetchCurrentUserQuestionRecords(client),
         client
           .from("reviews")
           .select("question_id,review_result,completed_at")
@@ -913,13 +908,13 @@ export default function DashboardPage() {
           .is("completed_at", null),
       ]);
 
-      const error = questionsResult.error ?? recentReviewsResult.error ?? dueReviewsResult.error;
+      const error = recentReviewsResult.error ?? dueReviewsResult.error;
       if (error) {
         setMessage(`错题资产更新失败：${error.message}`);
         return;
       }
 
-      const questions = (questionsResult.data ?? []) as AnalyticsQuestion[];
+      const questions = questionRecords as AnalyticsQuestion[];
       const reviews = [
         ...((recentReviewsResult.data ?? []) as AnalyticsReviewResult[]),
         ...((dueReviewsResult.data ?? []) as AnalyticsReviewResult[]),

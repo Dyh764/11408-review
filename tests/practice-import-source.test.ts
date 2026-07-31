@@ -218,8 +218,11 @@ test("question-bank importer uploads only real figures and clears wrong images f
 
 test("large question banks and due reviews paginate queries and batch-sign image paths", () => {
   const questions = read("lib/questions.ts");
+  const home = read("app/page.tsx");
   const reviews = read("lib/reviews.ts");
 
+  assert.match(home, /fetchCurrentUserQuestionRecords/);
+  assert.match(questions, /export async function fetchCurrentUserQuestionRecords/);
   assert.match(questions, /\.range\(offset, offset \+ 999\)/);
   assert.match(questions, /\.createSignedUrls\(batch/);
   assert.match(reviews, /\.range\(offset, offset \+ 999\)/);

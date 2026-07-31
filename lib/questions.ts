@@ -122,7 +122,7 @@ async function addSignedImageUrls(
   }));
 }
 
-export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
+export async function fetchCurrentUserQuestionRecords(supabase: SupabaseClient) {
   const questions: QuestionRecord[] = [];
 
   for (let offset = 0; ; offset += 1000) {
@@ -145,6 +145,11 @@ export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
     }
   }
 
+  return questions;
+}
+
+export async function fetchCurrentUserQuestions(supabase: SupabaseClient) {
+  const questions = await fetchCurrentUserQuestionRecords(supabase);
   return addSignedImageUrls(supabase, questions);
 }
 
