@@ -893,7 +893,12 @@ export default function DashboardPage() {
 
       const currentDay = todayIsoDate();
       const activityStart = `${addDays(currentDay, -89)}T00:00:00.000Z`;
-      const [questionRecords, recentReviewsResult, dueReviewsResult] = await Promise.all([
+      const [
+        questionRecords,
+        recentReviewsResult,
+        dueReviewsResult,
+        dueReviewCountResult,
+      ] = await Promise.all([
         fetchCurrentUserQuestionRecords(client),
         client
           .from("reviews")
@@ -906,9 +911,18 @@ export default function DashboardPage() {
           .eq("user_id", user.id)
           .lte("scheduled_date", currentDay)
           .is("completed_at", null),
+        client
+          .from("reviews")
+          .select("question_id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .lte("scheduled_date", currentDay)
+          .is("completed_at", null),
       ]);
 
-      const error = recentReviewsResult.error ?? dueReviewsResult.error;
+      const error =
+        recentReviewsResult.error ??
+        dueReviewsResult.error ??
+        dueReviewCountResult.error;
       if (error) {
         setMessage(`错题资产更新失败：${error.message}`);
         return;
@@ -937,7 +951,7 @@ export default function DashboardPage() {
           practiceTools: buildProfessionalPracticeTools(
             questions,
             practiceQuestions,
-            dueReviewsResult.data?.length ?? 0,
+            dueReviewCountResult.count ?? dueReviewsResult.data?.length ?? 0,
           ),
         });
         setMessage("");

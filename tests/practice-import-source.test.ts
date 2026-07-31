@@ -222,6 +222,8 @@ test("large question banks and due reviews paginate queries and batch-sign image
   const reviews = read("lib/reviews.ts");
 
   assert.match(home, /fetchCurrentUserQuestionRecords/);
+  assert.match(home, /count: "exact", head: true/);
+  assert.match(home, /dueReviewCountResult\.count/);
   assert.match(questions, /export async function fetchCurrentUserQuestionRecords/);
   assert.match(questions, /\.range\(offset, offset \+ 999\)/);
   assert.match(questions, /\.createSignedUrls\(batch/);
