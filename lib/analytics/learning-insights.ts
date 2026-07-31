@@ -13,7 +13,20 @@ export type AnalyticsQuestion = {
   chapter: string | null;
   knowledge_point: string | null;
   source?: string | null;
-  source_info?: { type?: string; name?: string; raw?: string } | string | null;
+  source_info?:
+    | {
+        type?: string;
+        name?: string;
+        raw?: string;
+        image_required?: boolean;
+        collection_role?: "practice_bank" | "wrong_question";
+      }
+    | string
+    | null;
+  difficulty?: string | null;
+  image_path?: string | null;
+  user_note?: string | null;
+  solution_summary?: string | null;
   question_text?: string | null;
   choices?: ChoiceOption[] | null;
   standard_answer?: string | null;

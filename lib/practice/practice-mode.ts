@@ -1,3 +1,7 @@
+import { parseAnswerChoiceLabels } from "../questions/answer-choice.ts";
+import { questionDependsOnImage } from "../questions/question-image.ts";
+import type { ChoiceOption, QuestionSourceInfo } from "../types.ts";
+
 export type PracticeAnswerMode =
   | "standard"
   | "editable"
@@ -47,4 +51,45 @@ export function parsePracticeAnswerMode(value: string | null | undefined): Pract
     value === "quick-fill"
     ? value
     : "standard";
+}
+
+export type PracticeModeQuestion = {
+  subject: string;
+  question_text?: string | null;
+  choices?: ChoiceOption[] | null;
+  standard_answer?: string | null;
+  answer_explanation?: string | null;
+  image_path?: string | null;
+  source_info?: QuestionSourceInfo | null;
+};
+
+const practiceSubjects = new Set([
+  "数据结构",
+  "计算机组成原理",
+  "操作系统",
+  "计算机网络",
+]);
+
+export function canUseQuestionInAnswerMode(
+  question: PracticeModeQuestion,
+  mode: PracticeAnswerMode,
+) {
+  const hasQuestion =
+    practiceSubjects.has(question.subject) &&
+    Boolean(question.question_text?.trim()) &&
+    (question.choices?.length ?? 0) > 0;
+  const hasRequiredImage =
+    !questionDependsOnImage(question) || Boolean(question.image_path?.trim());
+
+  if (!hasQuestion || !hasRequiredImage || mode === "standard") {
+    return hasQuestion && hasRequiredImage;
+  }
+
+  if (mode === "open-book") {
+    return Boolean(
+      question.standard_answer?.trim() || question.answer_explanation?.trim(),
+    );
+  }
+
+  return parseAnswerChoiceLabels(question.standard_answer).labels.length > 0;
 }

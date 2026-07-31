@@ -8,7 +8,10 @@ import type {
   ReviewPriority,
 } from "../types";
 import { sortQuestionsForChapterList } from "../questions/question-sort.ts";
-import type { PracticeAnswerMode } from "./practice-mode";
+import {
+  canUseQuestionInAnswerMode,
+  type PracticeAnswerMode,
+} from "./practice-mode.ts";
 
 export type PracticeQuestion = {
   id: string;
@@ -26,6 +29,10 @@ export type PracticeQuestion = {
   priority_score?: number | null;
   created_at?: string | null;
   source_info?: QuestionSourceInfo | null;
+  question_text?: string | null;
+  standard_answer?: string | null;
+  answer_explanation?: string | null;
+  image_path?: string | null;
 };
 
 export type PracticeSourceRange = "all" | "book" | "exam" | "supplement";
@@ -271,7 +278,9 @@ export function filterPracticeQuestions<T extends PracticeQuestion>(
           (!filter.difficulty || question.difficulty === filter.difficulty) &&
           (!filter.sourceRange ||
             filter.sourceRange === "all" ||
-            getPracticeSourceRange(question) === filter.sourceRange)
+            getPracticeSourceRange(question) === filter.sourceRange) &&
+          (!filter.answerMode ||
+            canUseQuestionInAnswerMode(question, filter.answerMode))
         );
       }
 

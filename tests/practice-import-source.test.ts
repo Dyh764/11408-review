@@ -133,22 +133,29 @@ test("/practice default entry is a 408 choice drill surface, not the old mixed c
   assert.doesNotMatch(defaultPanel, /mistakeOptions/);
 });
 
-test("/practice exposes real VIP filters and editable, repeat, open-book and quick-fill behavior", () => {
+test("home owns the professional launcher while /practice executes every real answer mode", () => {
+  const home = read("app/page.tsx");
+  const launcher = read("components/study/ProfessionalPracticeLauncher.tsx");
   const source = read("app/practice/page.tsx");
   const card = read("components/study/ReviewFlashcard.tsx");
   const deck = read("components/study/ReviewFlashcardDeck.tsx");
   const catalog = read("lib/practice/practice-catalog.ts");
   const mode = read("lib/practice/practice-mode.ts");
 
-  assert.match(source, /VIP 专业刷题/);
-  assert.match(source, /vipSourceRange/);
-  assert.match(source, /vipDifficulty/);
-  assert.match(source, /practiceAnswerModeOptions/);
+  assert.match(home, /ProfessionalPracticeLauncher/);
+  assert.match(launcher, /408 专业刷题/);
+  assert.match(launcher, /4 可用/);
+  assert.match(launcher, /当前条件不可用/);
+  assert.match(launcher, /配套模块检测/);
+  assert.match(launcher, /mode: "exam408-choice"/);
+  assert.match(launcher, /params\.set\("sourceRange"/);
+  assert.match(launcher, /params\.set\("difficulty"/);
+  assert.doesNotMatch(source, /VIP 专业刷题|vipSourceRange|vipDifficulty/);
+  assert.match(source, /sourceRangeParam/);
+  assert.match(source, /difficultyParam/);
   assert.match(source, /activeAnswerMode === "repeat"/);
   assert.match(source, /handleEditChoice/);
   assert.match(source, /handleOpenBookNext/);
-  assert.match(source, /错题二刷与统计/);
-  assert.match(source, /收藏夹与 PDF/);
   assert.match(card, /practiceMode === "quick-fill"/);
   assert.match(card, /标记做错/);
   assert.match(card, /标记做对/);
@@ -156,6 +163,7 @@ test("/practice exposes real VIP filters and editable, repeat, open-book and qui
   assert.match(card, /修改答案/);
   assert.match(deck, /loopNavigation/);
   assert.match(catalog, /getPracticeSourceRange/);
+  assert.match(catalog, /canUseQuestionInAnswerMode/);
   assert.match(mode, /editable/);
   assert.match(mode, /repeat/);
   assert.match(mode, /open-book/);

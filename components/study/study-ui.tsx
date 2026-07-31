@@ -54,7 +54,7 @@ export function StudyCard({
 
 export function StudyDashboardCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+    <div className="rounded-lg border border-blue-700 bg-blue-700 p-5 text-white shadow-[0_14px_32px_rgba(29,78,216,0.22)]">
       {children}
     </div>
   );

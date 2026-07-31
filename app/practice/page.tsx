@@ -24,7 +24,6 @@ import {
 import {
   parsePracticeAnswerMode,
   practiceAnswerModeLabels,
-  practiceAnswerModeOptions,
   type PracticeAnswerMode,
 } from "@/lib/practice/practice-mode";
 import {
@@ -218,11 +217,6 @@ export default function PracticePage() {
   const [activeReviewId, setActiveReviewId] = useState("");
   const [practiceSession, setPracticeSession] = useState<PracticeSessionV1 | null>(null);
   const [activeAnswerMode, setActiveAnswerMode] = useState<PracticeAnswerMode>("standard");
-  const [vipAnswerMode, setVipAnswerMode] =
-    useState<Exclude<PracticeAnswerMode, "standard">>("editable");
-  const [vipSourceRange, setVipSourceRange] = useState<PracticeSourceRange>("all");
-  const [vipSubject, setVipSubject] = useState("");
-  const [vipDifficulty, setVipDifficulty] = useState("");
   const practiceSessionRef = useRef<PracticeSessionV1 | null>(null);
   const unavailableImageIdsRef = useRef(new Set<string>());
   const [missingImageCount, setMissingImageCount] = useState(0);
@@ -267,6 +261,16 @@ export default function PracticePage() {
   const [answerModeParam] = useState(() =>
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("answerMode")?.trim() ?? ""
+      : "",
+  );
+  const [sourceRangeParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("sourceRange")?.trim() ?? ""
+      : "",
+  );
+  const [difficultyParam] = useState(() =>
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("difficulty")?.trim() ?? ""
       : "",
   );
   const [message, setMessage] = useState(
@@ -324,10 +328,22 @@ export default function PracticePage() {
           setQuestions(items);
           if (modeParam === "exam408-choice") {
             const answerMode = parsePracticeAnswerMode(answerModeParam);
+            const sourceRange = practiceSourceOptions.some(
+              (option) => option.key === sourceRangeParam,
+            )
+              ? (sourceRangeParam as PracticeSourceRange)
+              : undefined;
+            const difficulty = practiceDifficultyOptions.includes(
+              difficultyParam as (typeof practiceDifficultyOptions)[number],
+            )
+              ? difficultyParam
+              : undefined;
             const choiceFilter: PracticeFilter = {
               type: "exam408-choice",
               subject: subjectParam || undefined,
               chapter: chapterParam || undefined,
+              sourceRange,
+              difficulty,
               answerMode: answerMode === "standard" ? undefined : answerMode,
             };
             activatePreparedRound(
@@ -376,7 +392,9 @@ export default function PracticePage() {
     answerModeParam,
     supabase,
     chapterParam,
+    difficultyParam,
     modeParam,
+    sourceRangeParam,
     subjectParam,
     topicParam,
   ]);
@@ -414,19 +432,6 @@ export default function PracticePage() {
         };
       }),
     [questions],
-  );
-  const vipFilter = useMemo<PracticeFilter>(
-    () => ({
-      type: "exam408-choice",
-      subject: vipSubject || undefined,
-      difficulty: vipDifficulty || undefined,
-      sourceRange: vipSourceRange,
-    }),
-    [vipDifficulty, vipSourceRange, vipSubject],
-  );
-  const vipSelection = useMemo(
-    () => getPracticeQuestionSelection(questions, vipFilter),
-    [questions, vipFilter],
   );
   const completedTotal = Object.values(completedCounts).reduce((sum, count) => sum + count, 0);
   const progress =
@@ -782,152 +787,30 @@ export default function PracticePage() {
     return (
       <>
         <MobileSection>
-          <StudyDashboardCard>
-            <p className="text-sm font-bold text-white/75">408 选择题刷题</p>
-            <p className="mt-2 text-3xl font-black tracking-normal">当前可刷 {exam408ChoiceTotal} 题</p>
-            <p className="mt-3 text-sm leading-6 text-white/80">
-              默认只进入四门专业课选择题，自动续接上次进度，提交后先看对错和解析。
-            </p>
-            {exam408MissingImageTotal > 0 ? (
-              <p className="mt-2 rounded-lg bg-white/12 px-3 py-2 text-xs leading-5 text-white/85">
-                自动跳过 {exam408MissingImageTotal} 道缺少可用原图的题，不计入作答结果。
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => resetRound({ type: "exam408-choice" })}
-              disabled={exam408ChoiceTotal === 0}
-              className="mt-5 min-h-12 w-full rounded-lg bg-white px-4 text-sm font-black text-blue-700 disabled:bg-white/20 disabled:text-white/50"
-            >
-              开始 / 继续全部 408 选择题
-            </button>
-          </StudyDashboardCard>
-        </MobileSection>
-
-        <MobileSection>
-          <SectionHeader
-            title="VIP 专业刷题"
-            subtitle="使用你自己的题库，按题源、科目和难度组题；四种模式都可直接使用。"
-            action={<StudyBadge tone="amber">已解锁</StudyBadge>}
-          />
-          <StudyCard className="space-y-4">
-            <div>
-              <p className="mb-2 text-sm font-black text-slate-950">答题模式</p>
-              <div className="grid grid-cols-2 gap-2">
-                {practiceAnswerModeOptions.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setVipAnswerMode(option.key)}
-                    className={`min-h-[74px] rounded-lg p-3 text-left ${
-                      vipAnswerMode === option.key
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-50 text-slate-700 ring-1 ring-slate-100"
-                    }`}
-                  >
-                    <span className="block text-sm font-black">{option.label}</span>
-                    <span className="mt-1 block text-[11px] leading-4 opacity-75">
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
+          <div className="rounded-lg border border-slate-900 bg-slate-950 p-4 text-white shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+            <div className="gap-4 md:flex md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-black text-emerald-400">普通刷题</p>
+                <p className="mt-1 text-xl font-black">
+                  {exam408ChoiceTotal} 道 408 选择题
+                </p>
+                <p className="mt-1 text-xs leading-5 text-white/65">
+                  接着上次进度，提交后立即看对错和逐项解析。
+                  {exam408MissingImageTotal > 0
+                    ? ` 已排除 ${exam408MissingImageTotal} 道缺图题。`
+                    : ""}
+                </p>
               </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-600">题源</span>
-                <select
-                  value={vipSourceRange}
-                  onChange={(event) =>
-                    setVipSourceRange(event.target.value as PracticeSourceRange)
-                  }
-                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
-                >
-                  {practiceSourceOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-600">科目</span>
-                <select
-                  value={vipSubject}
-                  onChange={(event) => setVipSubject(event.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
-                >
-                  <option value="">全部科目</option>
-                  {exam408SubjectOptions.map((subject) => (
-                    <option key={subject} value={subject}>
-                      {subject}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-black text-slate-600">难度</span>
-                <select
-                  value={vipDifficulty}
-                  onChange={(event) => setVipDifficulty(event.target.value)}
-                  className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
-                >
-                  <option value="">全部难度</option>
-                  {practiceDifficultyOptions.map((difficulty) => (
-                    <option key={difficulty} value={difficulty}>
-                      {difficulty}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="rounded-lg bg-blue-50 p-3 text-sm leading-6 text-blue-800 ring-1 ring-blue-100">
-              当前组合可刷 <strong>{vipSelection.available.length}</strong> 题
-              {vipSelection.missingImageCount > 0
-                ? `，另有 ${vipSelection.missingImageCount} 道缺图题会自动跳过`
-                : ""}
-              。没有真实题目的题源会显示 0 题，不会用别的题冒充。
-            </div>
-
-            <button
-              type="button"
-              onClick={() => resetRound(vipFilter, vipAnswerMode)}
-              disabled={vipSelection.available.length === 0}
-              className="min-h-12 w-full rounded-lg bg-slate-950 px-4 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-500"
-            >
-              进入{practiceAnswerModeLabels[vipAnswerMode]}（
-              {vipSelection.available.length} 题）
-            </button>
-
-            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
-              <Link
-                href="/review"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              <button
+                type="button"
+                onClick={() => resetRound({ type: "exam408-choice" })}
+                disabled={exam408ChoiceTotal === 0}
+                className="mt-3 min-h-11 w-full rounded-xl bg-emerald-500 px-5 text-sm font-black text-white disabled:bg-white/10 disabled:text-white/40 md:mt-0 md:w-auto"
               >
-                错题二刷与统计
-              </Link>
-              <Link
-                href="/collections"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
-              >
-                收藏夹与 PDF
-              </Link>
-              <Link
-                href="/notes"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
-              >
-                题目与考点笔记
-              </Link>
-              <Link
-                href="/knowledge-map"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
-              >
-                考点与考频
-              </Link>
+                开始 / 继续
+              </button>
             </div>
-          </StudyCard>
+          </div>
         </MobileSection>
 
         <MobileSection>

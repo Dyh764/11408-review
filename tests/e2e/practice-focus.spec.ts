@@ -334,25 +334,24 @@ test.describe("固定刷题模式", () => {
   }
 });
 
-test.describe("VIP 专业刷题", () => {
+test.describe("首页专业刷题", () => {
   test.skip(!practiceMockEnabled, "需要 E2E_PRACTICE_MOCK=1 和本地模拟 Supabase 地址");
 
-  test("手机端可完成修改、多刷、开卷和快速回填", async ({ page }) => {
+  test("手机端从首页进入并完成修改、多刷、开卷和快速回填", async ({ page }) => {
     await installMockSupabase(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await page.evaluate(() => window.localStorage.clear());
-    await page.goto("/practice");
+    const launcher = page.locator('[data-testid="professional-practice-section"]:visible');
 
-    await expect(page.getByText("VIP 专业刷题", { exact: true })).toBeVisible();
-    await page.getByLabel("题源").selectOption("exam");
-    await page.getByLabel("科目").selectOption("操作系统");
-    await expect(page.getByText(/当前组合可刷 2 题/)).toBeVisible();
-
-    await page
-      .getByRole("button", { name: /^修改模式 提交后可改选/ })
-      .click();
-    await page.getByRole("button", { name: /进入修改模式/ }).click();
+    await expect(launcher.getByText("408 专业刷题", { exact: true })).toBeVisible();
+    await expect(launcher.getByText("4/4 可用", { exact: true })).toBeVisible();
+    await launcher.getByLabel("专业刷题题源").selectOption("exam");
+    await launcher.getByLabel("专业刷题科目").selectOption("操作系统");
+    await expect(launcher.getByText(/修改模式 · 2 题/)).toBeVisible();
+    await launcher.getByRole("link", { name: "开始刷题" }).click();
+    await expect(page).toHaveURL(/answerMode=editable/);
+    await expect(page).toHaveURL(/sourceRange=exam/);
     await page.locator("button.answer-choice").first().click();
     await page.getByRole("button", { name: "提交答案" }).click();
     await expect(page.getByRole("button", { name: "修改答案" })).toBeVisible();
@@ -360,34 +359,58 @@ test.describe("VIP 专业刷题", () => {
     await expect(page.getByRole("button", { name: "提交答案" })).toBeVisible();
     await page.getByRole("button", { name: "提交答案" }).click();
     await page.getByRole("button", { name: "下一题", exact: true }).first().click();
-    await page.getByRole("button", { name: "退出本轮" }).click();
+    await page.goto("/");
 
-    await page
-      .getByRole("button", { name: /^开卷模式 不作答直接看答案/ })
+    await launcher
+      .getByRole("button", { name: /^开卷模式/ })
       .click();
-    await page.getByRole("button", { name: /进入开卷模式/ }).click();
+    await launcher.getByRole("link", { name: "开始刷题" }).click();
     await expect(page.getByRole("button", { name: "看完，下一题" })).toBeVisible();
     await expect(page.getByText(/正确答案：/)).toHaveCount(0);
     await page.getByRole("button", { name: "看完，下一题" }).click();
-    await page.getByRole("button", { name: "退出本轮" }).click();
+    await page.goto("/");
 
-    await page
-      .getByRole("button", { name: /^快速回填 对照答案/ })
+    await launcher
+      .getByRole("button", { name: /^快速回填/ })
       .click();
-    await page.getByRole("button", { name: /进入快速回填/ }).click();
+    await launcher.getByRole("link", { name: "开始刷题" }).click();
     await expect(page.getByRole("button", { name: "标记做错" })).toBeVisible();
     await expect(page.getByRole("button", { name: "标记做对" })).toBeVisible();
     await page.getByRole("button", { name: "标记做对" }).click();
-    await page.getByRole("button", { name: "退出本轮" }).click();
+    await page.goto("/");
 
-    await page
-      .getByRole("button", { name: /^多刷模式 题目不退出队列/ })
+    await launcher
+      .getByRole("button", { name: /^多刷模式/ })
       .click();
-    await page.getByRole("button", { name: /进入多刷模式/ }).click();
+    await launcher.getByRole("link", { name: "开始刷题" }).click();
     await page.locator("button.answer-choice").first().click();
     await page.getByRole("button", { name: "提交答案" }).click();
     await expect(page.getByText(/已作答 1 次/)).toBeVisible();
     await page.getByRole("button", { name: "下一题", exact: true }).first().click();
     await expect(page.getByText(/本组 2 题/)).toBeVisible();
+  });
+
+  test("首页显示每个配套模块的数据状态且入口可到达", async ({ page }) => {
+    await installMockSupabase(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const launcher = page.locator('[data-testid="professional-practice-section"]:visible');
+
+    await launcher.getByText("配套模块检测", { exact: true }).click();
+    const modules = [
+      { name: /错题二刷/, path: "/review" },
+      { name: /收藏 \/ PDF/, path: "/collections" },
+      { name: /学习笔记/, path: "/notes" },
+      { name: /考点考频/, path: "/knowledge-map" },
+    ];
+
+    for (const practiceModule of modules) {
+      const link = launcher.getByRole("link", { name: practiceModule.name });
+      await expect(link).toHaveAttribute("href", practiceModule.path);
+      await link.click();
+      await expect(page).toHaveURL(new RegExp(`${practiceModule.path.replace("/", "\\/")}$`));
+      await page.goto("/");
+      await launcher.getByText("配套模块检测", { exact: true }).click();
+    }
   });
 });

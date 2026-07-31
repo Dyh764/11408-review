@@ -10,9 +10,18 @@ import {
   type TodayLiftFocus,
 } from "@/lib/analytics/learning-insights";
 import { BrandLogo } from "@/components/brand-logo";
+import {
+  ProfessionalPracticeLauncher,
+  type ProfessionalPracticeToolStatus,
+} from "@/components/study/ProfessionalPracticeLauncher";
 import { buildHomeActionCards, type HomeActionCard } from "@/lib/analytics/home-actions";
 import { todayIsoDate } from "@/lib/dates";
+import {
+  filterPracticeQuestions,
+  type PracticeQuestion,
+} from "@/lib/practice/practice-catalog";
 import { createClient } from "@/lib/supabase/client";
+import type { QuestionSourceInfo } from "@/lib/types";
 
 type SubjectProgress = {
   name: string;
@@ -29,6 +38,8 @@ type HomeStats = {
   actionCards: HomeActionCard[];
   subjects: SubjectProgress[];
   reviewActivity: Record<string, number>;
+  practiceQuestions: PracticeQuestion[];
+  practiceTools: ProfessionalPracticeToolStatus[];
 };
 
 const examSubjects = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
@@ -48,9 +59,22 @@ const emptyStats: HomeStats = {
   actionCards: buildHomeActionCards({ focus: emptyFocus, questions: [], reviews: [] }),
   subjects: examSubjects.map((name) => ({ name, total: 0, weak: 0, progress: 0 })),
   reviewActivity: {},
+  practiceQuestions: [],
+  practiceTools: [
+    { label: "错题二刷", href: "/review", count: 0 },
+    { label: "收藏 / PDF", href: "/collections", count: 0 },
+    { label: "学习笔记", href: "/notes", count: 0 },
+    { label: "考点考频", href: "/knowledge-map", count: 0 },
+  ],
 };
 
-const moduleLinks = [
+type HomeModuleLink = {
+  href: string;
+  title: string;
+  description: string;
+};
+
+const primaryModuleLinks: HomeModuleLink[] = [
   {
     href: "/questions",
     title: "错题本",
@@ -67,15 +91,18 @@ const moduleLinks = [
     description: "优先处理不会、不熟和需要人工核对的题卡",
   },
   {
-    href: "/practice",
-    title: "章节复盘",
-    description: "按章节和错因进入专项训练，不打乱正式题库",
+    href: "/questions?scope=recent",
+    title: "最近错题",
+    description: "进入最近导入或复盘过的题，继续做题或查看解析",
   },
   {
     href: "/exam-overview",
     title: "真题总览",
     description: "按科目、章节、题源和年份线索查看 408 题库覆盖",
   },
+];
+
+const secondaryModuleLinks: HomeModuleLink[] = [
   {
     href: "/memory-cards",
     title: "记忆卡片",
@@ -111,17 +138,11 @@ const moduleLinks = [
     title: "学习完成",
     description: "查看本轮总结、分组完成度和下一轮复盘入口，不自动切换题目",
   },
-  {
-    href: "/questions?scope=recent",
-    title: "最近错题",
-    description: "进入最近导入或复盘过的题，继续做题或查看解析",
-  },
 ];
 
 const featureLinks = [
   { href: "/import", label: "导入错题" },
   { href: "/questions", label: "错题库" },
-  { href: "/practice", label: "章节复盘" },
   { href: "/exam-overview", label: "真题总览" },
   { href: "/memory-cards", label: "记忆卡片" },
   { href: "/notes", label: "学习笔记" },
@@ -202,6 +223,53 @@ function buildReviewActivity(reviews: AnalyticsReviewResult[]) {
     }
     return activity;
   }, {});
+}
+
+function toPracticeQuestion(question: AnalyticsQuestion): PracticeQuestion {
+  return {
+    id: question.id,
+    subject: question.subject,
+    chapter: question.chapter,
+    knowledge_point: question.knowledge_point,
+    difficulty: question.difficulty ?? null,
+    mastery_status: question.mastery_status ?? null,
+    question_text_status: question.question_text_status,
+    answer_status: question.answer_status,
+    needs_manual_check: question.needs_manual_check,
+    review_priority: question.review_priority,
+    mistake_types: question.mistake_types ?? null,
+    choices: question.choices ?? [],
+    created_at: question.created_at,
+    source_info:
+      question.source_info && typeof question.source_info === "object"
+        ? (question.source_info as QuestionSourceInfo)
+        : null,
+    question_text: question.question_text,
+    standard_answer: question.standard_answer,
+    answer_explanation: question.answer_explanation,
+    image_path: question.image_path,
+  };
+}
+
+function buildProfessionalPracticeTools(
+  questions: AnalyticsQuestion[],
+  practiceQuestions: PracticeQuestion[],
+  dueReviewCount: number,
+): ProfessionalPracticeToolStatus[] {
+  const choiceCount = filterPracticeQuestions(practiceQuestions, {
+    type: "exam408-choice",
+  }).length;
+  const noteCount = questions.filter(
+    (question) =>
+      question.user_note?.trim() || question.solution_summary?.trim(),
+  ).length;
+
+  return [
+    { label: "错题二刷", href: "/review", count: dueReviewCount },
+    { label: "收藏 / PDF", href: "/collections", count: questions.length },
+    { label: "学习笔记", href: "/notes", count: noteCount },
+    { label: "考点考频", href: "/knowledge-map", count: choiceCount },
+  ];
 }
 
 function HomeExamLogo({ compact = false }: { compact?: boolean }) {
@@ -291,7 +359,7 @@ function HomeContributionHeatmap({ activity }: { activity: Record<string, number
           href="/practice"
           className="rounded-lg bg-white px-3 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-100"
         >
-          专项练习
+          408 刷题
         </Link>
       </div>
     </div>
@@ -452,7 +520,15 @@ function WeaknessPanel({ focus, weakQuestionCount }: { focus: TodayLiftFocus; we
   );
 }
 
-function HomeDesktopLayout({ stats, message }: { stats: HomeStats; message: string }) {
+function HomeDesktopLayout({
+  stats,
+  message,
+  loading,
+}: {
+  stats: HomeStats;
+  message: string;
+  loading: boolean;
+}) {
   return (
     <div data-testid="home-desktop-dashboard" className="hidden min-h-screen bg-[#f7f9fb] text-slate-950 lg:block">
       <nav aria-label="桌面首页导航" className="border-b border-slate-100 bg-white px-8 py-5">
@@ -520,6 +596,12 @@ function HomeDesktopLayout({ stats, message }: { stats: HomeStats; message: stri
         {message ? (
           <p className="rounded-[18px] border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-amber-800">{message}</p>
         ) : null}
+
+        <ProfessionalPracticeLauncher
+          questions={stats.practiceQuestions}
+          tools={stats.practiceTools}
+          loading={loading}
+        />
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_386px]">
           <div className="grid gap-4">
@@ -612,13 +694,45 @@ function HomeDesktopLayout({ stats, message }: { stats: HomeStats; message: stri
   );
 }
 
-function HomeMobileLayout({ stats, message }: { stats: HomeStats; message: string }) {
+function HomeMobileModuleLink({ link }: { link: HomeModuleLink }) {
+  return (
+    <Link
+      href={link.href}
+      className="flex min-h-16 items-center justify-between gap-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]"
+    >
+      <span className="min-w-0">
+        <span className="block text-base font-black text-slate-950">{link.title}</span>
+        <span className="mt-1 block text-xs leading-5 text-slate-500">{link.description}</span>
+      </span>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-sm font-black text-[#10b981]">
+        &gt;
+      </span>
+    </Link>
+  );
+}
+
+function HomeMobileLayout({
+  stats,
+  message,
+  loading,
+}: {
+  stats: HomeStats;
+  message: string;
+  loading: boolean;
+}) {
   return (
     <div data-testid="home-mobile-dashboard" className="min-h-screen bg-[#f7f9fb] px-4 pb-28 pt-4 text-slate-950 lg:hidden">
       <header className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
         <div className="flex items-center justify-between gap-3">
           <HomeExamLogo compact />
-          <Link href="/profile" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-black text-slate-500">档</Link>
+          <Link
+            href="/profile"
+            aria-label="打开学习档案"
+            title="学习档案"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-black text-slate-500"
+          >
+            档
+          </Link>
         </div>
         <div className="mt-5 rounded-[18px] bg-emerald-50 p-4">
           <p className="text-xs font-black text-[#10b981]">首页面板</p>
@@ -668,22 +782,34 @@ function HomeMobileLayout({ stats, message }: { stats: HomeStats; message: strin
         </Link>
       </section>
 
+      <ProfessionalPracticeLauncher
+        questions={stats.practiceQuestions}
+        tools={stats.practiceTools}
+        loading={loading}
+        className="mt-5"
+      />
+
       <section className="mt-5">
         <div className="mb-3">
           <h2 className="text-base font-black text-slate-950">核心模块</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">错题本、导入错题、四科入口和最近错题优先。</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">先处理错题、薄弱题和 408 刷题，其他工具按需展开。</p>
         </div>
         <div className="grid gap-3">
-          {moduleLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="flex min-h-16 items-center justify-between gap-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
-              <span className="min-w-0">
-                <span className="block text-base font-black text-slate-950">{link.title}</span>
-                <span className="mt-1 block text-xs leading-5 text-slate-500">{link.description}</span>
-              </span>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-sm font-black text-[#10b981]">&gt;</span>
-            </Link>
+          {primaryModuleLinks.map((link) => (
+            <HomeMobileModuleLink key={link.href} link={link} />
           ))}
         </div>
+        <details className="group mt-3">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between rounded-[18px] border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 [&::-webkit-details-marker]:hidden">
+            <span>更多学习工具</span>
+            <span className="text-xs text-slate-400">{secondaryModuleLinks.length} 个入口</span>
+          </summary>
+          <div className="mt-3 grid gap-3">
+            {secondaryModuleLinks.map((link) => (
+              <HomeMobileModuleLink key={link.href} link={link} />
+            ))}
+          </div>
+        </details>
       </section>
 
       <section className="mt-5">
@@ -743,6 +869,7 @@ export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState<HomeStats>(emptyStats);
   const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看真实错题资产。");
+  const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
     if (!supabase) {
@@ -769,7 +896,7 @@ export default function DashboardPage() {
         client
           .from("questions")
           .select(
-            "id,subject,chapter,knowledge_point,source,source_info,question_text,choices,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,answer_source,mistake_types,created_at",
+            "id,subject,chapter,knowledge_point,difficulty,image_path,user_note,solution_summary,source,source_info,question_text,choices,standard_answer,answer_explanation,mastery_status,review_priority,needs_manual_check,question_text_status,answer_status,answer_source,mistake_types,created_at",
           )
           .eq("user_id", user.id)
           .is("deleted_at", null),
@@ -800,6 +927,7 @@ export default function DashboardPage() {
       const focus = selectTodayLiftFocus(questions, reviews, { today: currentDay });
       const actionCards = buildHomeActionCards({ focus, questions, reviews });
       const qualitySummary = buildQuestionQualitySummary(questions);
+      const practiceQuestions = questions.map(toPracticeQuestion);
 
       if (isActive) {
         setStats({
@@ -810,6 +938,12 @@ export default function DashboardPage() {
           actionCards,
           subjects: buildSubjectProgress(questions),
           reviewActivity: buildReviewActivity(reviews),
+          practiceQuestions,
+          practiceTools: buildProfessionalPracticeTools(
+            questions,
+            practiceQuestions,
+            dueReviewsResult.data?.length ?? 0,
+          ),
         });
         setMessage("");
       }
@@ -818,6 +952,10 @@ export default function DashboardPage() {
     loadHomeStats().catch((error) => {
       if (isActive) {
         setMessage(error instanceof Error ? error.message : "错题资产更新失败。");
+      }
+    }).finally(() => {
+      if (isActive) {
+        setIsLoading(false);
       }
     });
 
@@ -828,8 +966,8 @@ export default function DashboardPage() {
 
   return (
     <>
-      <HomeDesktopLayout stats={stats} message={message} />
-      <HomeMobileLayout stats={stats} message={message} />
+      <HomeDesktopLayout stats={stats} message={message} loading={isLoading} />
+      <HomeMobileLayout stats={stats} message={message} loading={isLoading} />
     </>
   );
 }

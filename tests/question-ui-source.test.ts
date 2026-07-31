@@ -305,13 +305,15 @@ test("home page is a wrong-question asset cockpit, not a technical menu", () => 
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
 
-test("mobile home keeps primary study routes visible and optional tools collapsed", () => {
+test("mobile home keeps primary study routes visible and gives 408 practice its own section", () => {
   const source = read("app/page.tsx");
+  const launcher = read("components/study/ProfessionalPracticeLauncher.tsx");
 
   assert.match(source, /primaryModuleLinks/);
   assert.match(source, /secondaryModuleLinks/);
   assert.match(source, /更多学习工具/);
-  assert.match(source, /title: "408 刷题"/);
+  assert.match(source, /ProfessionalPracticeLauncher/);
+  assert.match(launcher, /408 专业刷题/);
   assert.doesNotMatch(source, /title: "章节复盘"/);
   assert.match(source, /aria-label="打开学习档案"/);
 });
@@ -814,7 +816,8 @@ test("/practice is a 408 choice drill surface using the shared swipe flashcard d
 
   assert.match(source, /408 选择题刷题/);
   assert.match(source, /exam408SubjectOptions/);
-  assert.match(source, /开始 \/ 继续全部 408 选择题/);
+  assert.match(source, /普通刷题/);
+  assert.match(source, /开始 \/ 继续/);
   assert.match(source, /先导入 408 选择题/);
   assert.doesNotMatch(source, /buildPracticeCatalog/);
   assert.doesNotMatch(source, /章节复盘/);
@@ -848,7 +851,7 @@ test("/practice supports a four-course choice-only round", () => {
   assert.match(source, /subjectParam/);
   assert.match(source, /chapterParam/);
   assert.match(source, /exam408-choice/);
-  assert.match(source, /四门专业课选择题/);
+  assert.match(source, /普通刷题/);
   assert.match(catalog, /type: "exam408-choice"/);
   assert.match(catalog, /chapter\?: string/);
   assert.match(catalog, /choices\?:/);
