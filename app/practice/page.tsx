@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LoadingState, MobilePageShell, MobileSection } from "@/components/mobile/primitives";
 import { MotivationBanner } from "@/components/study/MotivationBanner";
 import { ReviewFlashcardDeck } from "@/components/study/ReviewFlashcardDeck";
@@ -209,8 +210,9 @@ function preparePracticeRound(
   };
 }
 
-export default function PracticePage() {
+function PracticeContent() {
   const supabase = useMemo(() => createClient(), []);
+  const searchParams = useSearchParams();
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [activeFilter, setActiveFilter] = useState<PracticeFilter | null>(null);
   const [queue, setQueue] = useState<FlashcardReview[]>([]);
@@ -238,43 +240,15 @@ export default function PracticePage() {
   const [openBookViewedCount, setOpenBookViewedCount] = useState(0);
   const [draftAnswers, setDraftAnswers] = useState<Record<string, string>>({});
   const [processingReviewId, setProcessingReviewId] = useState("");
-  const [topicParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("topic")?.trim() ?? ""
-      : "",
-  );
-  const [modeParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("mode")?.trim() ?? ""
-      : "",
-  );
-  const [subjectParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("subject")?.trim() ?? ""
-      : "",
-  );
-  const [chapterParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("chapter")?.trim() ?? ""
-      : "",
-  );
-  const [answerModeParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("answerMode")?.trim() ?? ""
-      : "",
-  );
-  const [sourceRangeParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("sourceRange")?.trim() ?? ""
-      : "",
-  );
-  const [difficultyParam] = useState(() =>
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("difficulty")?.trim() ?? ""
-      : "",
-  );
+  const topicParam = searchParams.get("topic")?.trim() ?? "";
+  const modeParam = searchParams.get("mode")?.trim() ?? "";
+  const subjectParam = searchParams.get("subject")?.trim() ?? "";
+  const chapterParam = searchParams.get("chapter")?.trim() ?? "";
+  const answerModeParam = searchParams.get("answerMode")?.trim() ?? "";
+  const sourceRangeParam = searchParams.get("sourceRange")?.trim() ?? "";
+  const difficultyParam = searchParams.get("difficulty")?.trim() ?? "";
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看 408 刷题数据。",
+    supabase ? "" : "当前未连接错题数据，请先到设置完成连接。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
@@ -592,7 +566,7 @@ export default function PracticePage() {
     options: { lock: boolean; failurePrefix: string },
   ) {
     if (!supabase) {
-      setMessage("请配置 Supabase 环境变量后再记录刷题结果。");
+      setMessage("当前未连接错题数据，暂时不能记录刷题结果。");
       return false;
     }
 
@@ -865,18 +839,12 @@ export default function PracticePage() {
               </span>
             </Link>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3">
             <Link
               href="/collections"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
             >
-              收藏夹 / PDF
-            </Link>
-            <Link
-              href="/notes"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
-            >
-              题目与考点笔记
+              题目分组 / PDF
             </Link>
           </div>
         </MobileSection>
@@ -918,8 +886,8 @@ export default function PracticePage() {
               <p className="text-sm font-black text-slate-950">先导入 408 选择题</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {exam408MissingImageTotal > 0
-                  ? `当前 ${exam408MissingImageTotal} 道选择题依赖图片但没有可用原图，已自动跳过。`
-                  : "当前没有可刷的 408 选择题。导入时请让 JSON 包含 subject、choices 和 standard_answer，导入后这里会自动出现刷题入口。"}
+                  ? `当前 ${exam408MissingImageTotal} 道选择题缺少可用原图，已经自动跳过。`
+                  : "当前没有可刷的 408 选择题。先导入一道带选项和答案的专业课错题，这里就会出现刷题入口。"}
               </p>
               <Link
                 href="/import"
@@ -999,7 +967,7 @@ export default function PracticePage() {
 
   if (activeFilter && queue.length > 0) {
     return (
-      <MobilePageShell className="flex h-full min-h-0 flex-col space-y-0 overflow-hidden bg-slate-50 pb-[env(safe-area-inset-bottom)]">
+      <MobilePageShell className="fixed inset-0 z-40 flex h-dvh min-h-0 flex-col space-y-0 overflow-hidden bg-slate-50 pb-[env(safe-area-inset-bottom)]">
         <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
           <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
             <div className="min-w-0">
@@ -1146,5 +1114,21 @@ export default function PracticePage() {
 
       {activeFilter && queue.length === 0 && initialCount > 0 ? renderSummary() : null}
     </MobilePageShell>
+  );
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense
+      fallback={
+        <MobilePageShell>
+          <MobileSection>
+            <LoadingState label="正在读取 408 刷题数据..." />
+          </MobileSection>
+        </MobilePageShell>
+      }
+    >
+      <PracticeContent />
+    </Suspense>
   );
 }

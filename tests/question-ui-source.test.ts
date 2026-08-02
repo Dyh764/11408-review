@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -22,16 +22,17 @@ test("/questions uses compact text previews without duplicate title or meta", ()
   assert.doesNotMatch(source, />chatgpt_import</);
 });
 
-test("import page previews only issue cards and persists last import undo ids", () => {
+test("import page previews every parsed card and persists last import undo ids", () => {
   const source = read("app/import/page.tsx");
 
   assert.match(source, /LAST_IMPORT_STORAGE_KEY/);
   assert.match(source, /localStorage\.setItem\(LAST_IMPORT_STORAGE_KEY/);
   assert.match(source, /localStorage\.getItem\(LAST_IMPORT_STORAGE_KEY/);
   assert.match(source, /clearImportDraft/);
-  assert.match(source, /previewIssueCards/);
-  assert.match(source, /previewIssueCards\.map/);
-  assert.doesNotMatch(source, /previewCards\.map\(\(item\) => \(\s*<ImportPreviewCard/);
+  assert.match(source, /previewCards\.map\(\(item\) => \(/);
+  assert.match(source, /<ImportPreviewCard/);
+  assert.match(source, /我已核对题干、选项、答案和原图/);
+  assert.doesNotMatch(source, /previewIssueCards/);
 });
 
 test("import page can bind local images to parsed cards before importing", () => {
@@ -250,14 +251,14 @@ test("/review keeps answer hints hidden until answer reveal", () => {
   assert.match(answerPanel, /one_sentence_tip/);
 });
 
-test("/questions/[id] keeps a simplified detail flow with answer reveal only", () => {
+test("/questions/[id] keeps a simplified detail flow with answer reveal and sharing", () => {
   const source = read("app/questions/[id]/page.tsx");
 
-  for (const title of ["题目", "先做题", "查看答案", "更多操作"]) {
+  for (const title of ["题目", "先做题", "查看答案", "下一步", "分享错题", "更多操作"]) {
     assert.match(source, new RegExp(title));
   }
 
-  for (const title of ["答题卡点", "正确思路", "智能增强", "更多信息", "错题分享"]) {
+  for (const title of ["答题卡点", "正确思路", "智能增强", "更多信息"]) {
     assert.doesNotMatch(source, new RegExp(`<MobileSection title="${title}"`));
   }
 
@@ -272,6 +273,8 @@ test("/questions/[id] keeps a simplified detail flow with answer reveal only", (
   assert.doesNotMatch(source, /<MobileSection title="我的卡点"/);
   assert.doesNotMatch(source, /stuckPointOptions/);
   assert.doesNotMatch(source, /toggleStuckPoint/);
+  assert.match(source, /复习本章/);
+  assert.match(source, /href="\/questions\?scope=weak"/);
 });
 
 test("mobile UI exposes the mature learning-app components", () => {
@@ -289,29 +292,31 @@ test("mobile UI exposes the mature learning-app components", () => {
   }
 });
 
-test("home page is a wrong-question asset cockpit, not a technical menu", () => {
+test("home page is a focused wrong-question workflow, not a technical menu", () => {
   const source = read("app/page.tsx");
 
-  assert.match(source, /数学错题资产管理/);
-  assert.match(source, /核心模块/);
-  assert.match(source, /错题本/);
+  assert.match(source, /11408 错题复盘/);
+  assert.match(source, /quickActions/);
+  assert.match(source, /错题库/);
   assert.match(source, /今日提分焦点/);
-  assert.match(source, /导入诊断/);
+  assert.match(source, /导入错题/);
   assert.match(source, /最近错题/);
   assert.match(source, /loadHomeStats/);
   assert.match(source, /selectTodayLiftFocus/);
   assert.doesNotMatch(source, /dashboardStats/);
-  assert.doesNotMatch(source, /开始今日复习|今日学习驾驶舱|打卡/);
+  assert.doesNotMatch(source, /学习排行榜|算法专题|功能区|更多学习工具/);
   assert.doesNotMatch(source, /StatusPill label="mock"|>mock</);
 });
 
-test("mobile home keeps primary study routes visible and gives 408 practice its own section", () => {
+test("mobile home keeps the five primary routes visible and gives 408 practice its own section", () => {
   const source = read("app/page.tsx");
   const launcher = read("components/study/ProfessionalPracticeLauncher.tsx");
 
-  assert.match(source, /primaryModuleLinks/);
-  assert.match(source, /secondaryModuleLinks/);
-  assert.match(source, /更多学习工具/);
+  assert.match(source, /href: "\/questions"/);
+  assert.match(source, /href: "\/import"/);
+  assert.match(source, /href: "\/review\/today"/);
+  assert.match(source, /href: "\/practice"/);
+  assert.match(source, /href="\/profile"/);
   assert.match(source, /ProfessionalPracticeLauncher/);
   assert.match(launcher, /408 专业刷题/);
   assert.doesNotMatch(source, /title: "章节复盘"/);
@@ -375,27 +380,27 @@ test("scheme C moves closer to the 408os light exam dashboard reference", () => 
   assert.doesNotMatch(source, /等一号|澄潇宇|帕拉迪宇|Bilibili|微信公众号|院校 PK|支持项目/);
 });
 
-test("home page prioritizes core modules before lightweight focus", () => {
+test("home page prioritizes core actions before analytics", () => {
   const source = read("app/page.tsx");
-  const modulesIndex = source.indexOf("核心模块");
+  const actionsIndex = source.indexOf("function HomeQuickActions");
   const focusIndex = source.indexOf("今日提分焦点");
   const questionsIndex = source.indexOf("/questions");
   const importIndex = source.indexOf("/import");
 
-  assert.notEqual(modulesIndex, -1);
+  assert.notEqual(actionsIndex, -1);
   assert.notEqual(focusIndex, -1);
   assert.notEqual(questionsIndex, -1);
   assert.notEqual(importIndex, -1);
-  assert.ok(modulesIndex >= 0);
+  assert.ok(actionsIndex >= 0);
   assert.ok(focusIndex >= 0);
   assert.match(source, /打开错题本/);
-  assert.match(source, /进入导入诊断/);
+  assert.match(source, /导入错题/);
   assert.match(source, /暂无明显薄弱点，先完成错题复习/);
   assert.doesNotMatch(source, /selectHomeFocusTrend/);
   assert.doesNotMatch(source, /weaknessTrends\.map/);
 });
 
-test("home page applies the selected 408 exam platform layout without external identities", () => {
+test("home page applies a unified responsive layout without external identities", () => {
   const home = read("app/page.tsx");
   const shell = read("app/app-shell.tsx");
 
@@ -404,23 +409,19 @@ test("home page applies the selected 408 exam platform layout without external i
   assert.match(home, /function HomeDesktopLayout/);
   assert.match(home, /function HomeMobileLayout/);
   assert.match(home, /function HomeExamLogo/);
-  assert.match(home, /function HomeContributionHeatmap/);
+  assert.match(home, /function HomeQuickActions/);
   assert.match(home, /data-testid="home-desktop-dashboard"/);
   assert.match(home, /data-testid="home-mobile-dashboard"/);
   assert.match(home, /desktopNavLinks/);
-  assert.match(home, /href: "\/knowledge-map"/);
-  assert.match(home, /href: "\/statistics"/);
-  assert.match(home, /首页面板/);
-  assert.match(home, /错题总览/);
-  assert.match(home, /错题分析/);
-  assert.match(home, /知识图谱/);
-  assert.match(home, /数据统计/);
+  assert.match(home, /href: "\/questions"/);
+  assert.match(home, /href: "\/import"/);
+  assert.match(home, /href: "\/practice"/);
+  assert.match(home, /href: "\/profile"/);
+  assert.doesNotMatch(home, /href: "\/statistics"|学习排行榜|功能区/);
   assert.match(home, /BrandLogo/);
-  assert.match(home, /做题贡献（最近90天）/);
   assert.match(home, /数学 \+ 408 掌握进度/);
   assert.match(home, /本章欠缺分析/);
-  assert.match(home, /功能区/);
-  assert.match(home, /学习档案/);
+  assert.match(home, /我的/);
   assert.match(home, /#10b981/);
   assert.doesNotMatch(home, /等一号|澄潇宇|帕拉迪宇|Bilibili|微信公众号|院校 PK|支持项目/);
 });
@@ -437,18 +438,17 @@ test("home dashboard includes math in the subject progress system", () => {
   assert.doesNotMatch(home, /四科平均掌握率/);
 });
 
-test("home contribution panel has real review and practice entry points", () => {
+test("home quick actions have real import, library, review, and practice entry points", () => {
   const home = read("app/page.tsx");
 
-  assert.match(home, /function HomeContributionHeatmap/);
-  assert.match(home, /reviewActivityTotal/);
-  assert.match(home, /activeReviewDays/);
-  assert.match(home, /href=\{`\/profile\?day=\$\{day\}`\}/);
-  assert.match(home, /href="\/review\/today"/);
-  assert.match(home, /href="\/practice"/);
+  assert.match(home, /function HomeQuickActions/);
+  assert.match(home, /href: "\/questions"/);
+  assert.match(home, /href: "\/import"/);
+  assert.match(home, /href: "\/review\/today"/);
+  assert.match(home, /href: "\/practice"/);
   assert.match(home, /今日复习/);
-  assert.match(home, /408 刷题/);
-  assert.match(home, /90天内完成/);
+  assert.match(home, /专项练习/);
+  assert.doesNotMatch(home, /HomeContributionHeatmap/);
 });
 
 test("home profile and collection entries route to real content", () => {
@@ -459,9 +459,9 @@ test("home profile and collection entries route to real content", () => {
   assert.match(home, /href="\/profile"/);
   assert.match(home, /href="\/questions\?scope=weak"/);
   assert.match(home, /href="\/questions\?scope=inbox"/);
-  assert.match(home, /不熟题本/);
+  assert.match(home, /薄弱复习/);
   assert.match(home, /待整理/);
-  assert.match(shell, /href="\/profile"/);
+  assert.match(shell, /href: "\/profile"/);
   assert.match(bottomNav, /href: "\/profile"/);
   assert.match(bottomNav, /label: "我的"/);
 });
@@ -476,6 +476,7 @@ test("profile page is a real learning archive instead of a settings alias", () =
   assert.match(source, /最近复盘/);
   assert.match(source, /dayParam/);
   assert.match(source, /当天完成/);
+  assert.match(source, /href="\/notes"/);
   assert.match(source, /href=\{`\/questions\/\$\{item\.questionId\}`\}/);
 });
 
@@ -490,7 +491,7 @@ test("non-home routes keep a desktop navigation shell instead of forcing phone w
   assert.doesNotMatch(shell, /return \(\s*<div className="phone-shell">/);
 });
 
-test("408 dashboard nav has real question-bank knowledge map and statistics pages", () => {
+test("knowledge map remains route-backed while legacy statistics redirects to reports", () => {
   const knowledgeMap = read("app/knowledge-map/page.tsx");
   const insights = read("lib/question-bank/question-bank-insights.ts");
   const statistics = read("app/statistics/page.tsx");
@@ -506,42 +507,30 @@ test("408 dashboard nav has real question-bank knowledge map and statistics page
   assert.match(insights, /操作系统/);
   assert.match(insights, /计算机网络/);
 
-  assert.match(statistics, /数据统计/);
-  assert.match(statistics, /学习报告/);
-  assert.match(statistics, /href: "\/reports"/);
-  assert.match(statistics, /href: "\/questions\?scope=weak"/);
-  assert.match(statistics, /href: "\/questions\?scope=inbox"/);
-  assert.match(statistics, /不新建一套统计逻辑/);
-  assert.match(statistics, /不新增 schema/);
+  assert.match(statistics, /redirect\("\/reports"\)/);
+  assert.doesNotMatch(statistics, /统计入口|学习排行榜|算法专题/);
 });
 
-test("408 platform exposes memory cards as a real route-backed feature", () => {
+test("memory cards merge into the review route without becoming a primary navigation item", () => {
   const shell = read("app/app-shell.tsx");
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const memoryCards = read("app/memory-cards/page.tsx");
 
-  assert.match(shell, /href: "\/memory-cards"/);
-  assert.match(shell, /label: "记忆卡片"/);
-  assert.match(home, /href: "\/memory-cards"/);
-  assert.match(home, /记忆卡片/);
-  assert.match(statistics, /href: "\/memory-cards"/);
+  assert.doesNotMatch(shell, /href: "\/memory-cards"/);
+  assert.doesNotMatch(home, /href: "\/memory-cards"/);
   assert.match(memoryCards, /export default function MemoryCardsPage/);
-  assert.match(memoryCards, /记忆卡片/);
-  assert.match(memoryCards, /fetchCurrentUserQuestions/);
-  assert.match(memoryCards, /standard_answer/);
-  assert.match(memoryCards, /answer_explanation/);
-  assert.match(memoryCards, /查看解析/);
+  assert.match(memoryCards, /redirect\("\/review"\)/);
 });
 
-test("408 platform exposes question notes as a real route-backed feature", () => {
+test("question notes remain route-backed but are removed from the homepage directory", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const notes = read("app/notes/page.tsx");
+  const practice = read("app/practice/page.tsx");
+  const profile = read("app/profile/page.tsx");
 
-  assert.match(home, /href: "\/notes"/);
-  assert.match(home, /学习笔记/);
-  assert.match(statistics, /href: "\/notes"/);
+  assert.doesNotMatch(home, /href: "\/notes"/);
+  assert.doesNotMatch(practice, /href="\/notes"/);
+  assert.match(profile, /href="\/notes"/);
   assert.match(notes, /export default function NotesPage/);
   assert.match(notes, /学习笔记/);
   assert.match(notes, /fetchCurrentUserQuestions/);
@@ -550,18 +539,16 @@ test("408 platform exposes question notes as a real route-backed feature", () =>
   assert.match(notes, /题目详情/);
 });
 
-test("408 platform exposes collections and mastery groups as a real route-backed feature", () => {
+test("automatic question groups remain route-backed without pretending to be manual favorites", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const collections = read("app/collections/page.tsx");
 
-  assert.match(home, /href: "\/collections"/);
-  assert.match(home, /我的收藏/);
-  assert.match(statistics, /href: "\/collections"/);
+  assert.doesNotMatch(home, /href: "\/collections"/);
   assert.match(collections, /export default function CollectionsPage/);
-  assert.match(collections, /我的收藏/);
+  assert.match(collections, /题目分组与导出/);
+  assert.match(collections, /这不是手动收藏/);
   assert.match(collections, /fetchCurrentUserQuestions/);
-  assert.match(collections, /不熟题本/);
+  assert.match(collections, /薄弱复习/);
   assert.match(collections, /待整理/);
   assert.match(collections, /已掌握/);
   assert.match(collections, /最近错题/);
@@ -569,14 +556,13 @@ test("408 platform exposes collections and mastery groups as a real route-backed
   assert.match(collections, /href: "\/questions\?scope=weak"/);
 });
 
-test("408 platform exposes exam overview as a real route-backed feature", () => {
+test("exam overview remains route-backed but is hidden from the homepage", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const examOverview = read("app/exam-overview/page.tsx");
+  const knowledgeMap = read("app/knowledge-map/page.tsx");
 
-  assert.match(home, /href: "\/exam-overview"/);
-  assert.match(home, /真题总览/);
-  assert.match(statistics, /href: "\/exam-overview"/);
+  assert.doesNotMatch(home, /href: "\/exam-overview"/);
+  assert.doesNotMatch(knowledgeMap, /href="\/exam-overview"/);
   assert.match(examOverview, /export default function ExamOverviewPage/);
   assert.match(examOverview, /真题总览/);
   assert.match(examOverview, /fetchCurrentUserQuestions/);
@@ -587,33 +573,22 @@ test("408 platform exposes exam overview as a real route-backed feature", () => 
   assert.match(examOverview, /href="\/practice\?mode=exam408-choice"/);
 });
 
-test("408 platform exposes ranking as a real route-backed feature", () => {
+test("ranking UI is fully removed from the personal review product", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
-  const ranking = read("app/ranking/page.tsx");
+  const shell = read("app/app-shell.tsx");
 
-  assert.match(home, /href: "\/ranking"/);
-  assert.match(home, /学习排行榜/);
-  assert.match(statistics, /href: "\/ranking"/);
-  assert.match(ranking, /export default function RankingPage/);
-  assert.match(ranking, /学习排行榜/);
-  assert.match(ranking, /fetchCurrentUserQuestions/);
-  assert.match(ranking, /院校榜/);
-  assert.match(ranking, /个人榜/);
-  assert.match(ranking, /我的排名/);
-  assert.match(ranking, /通关率/);
-  assert.match(ranking, /刷题量/);
-  assert.match(ranking, /不伪造全站排名/);
+  assert.doesNotMatch(home, /href: "\/ranking"|学习排行榜/);
+  assert.doesNotMatch(shell, /href: "\/ranking"/);
+  assert.equal(existsSync(join(root, "app/ranking/page.tsx")), false);
 });
 
-test("408 platform exposes algorithm topics as a real route-backed feature", () => {
+test("algorithm topics remain route-backed but are hidden from the homepage", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const algorithms = read("app/algorithms/page.tsx");
+  const studyMode = read("app/study-mode/page.tsx");
 
-  assert.match(home, /href: "\/algorithms"/);
-  assert.match(home, /算法专题/);
-  assert.match(statistics, /href: "\/algorithms"/);
+  assert.doesNotMatch(home, /href: "\/algorithms"|算法专题/);
+  assert.doesNotMatch(studyMode, /href: "\/algorithms"|href="\/algorithms"|算法专题/);
   assert.match(algorithms, /export default function AlgorithmsPage/);
   assert.match(algorithms, /算法专题/);
   assert.match(algorithms, /fetchCurrentUserQuestions/);
@@ -644,35 +619,31 @@ test("408 platform exposes algorithm detail as a real step-through feature", () 
   assert.match(algorithmDetail, /href="\/algorithms"/);
 });
 
-test("408 platform exposes study mode as a real route-backed feature", () => {
+test("study mode remains route-backed but is hidden from the homepage", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const studyMode = read("app/study-mode/page.tsx");
 
-  assert.match(home, /href: "\/study-mode"/);
-  assert.match(home, /学习模式/);
-  assert.match(statistics, /href: "\/study-mode"/);
+  assert.doesNotMatch(home, /href: "\/study-mode"|学习模式/);
   assert.match(studyMode, /export default function StudyModePage/);
   assert.match(studyMode, /学习模式/);
   assert.match(studyMode, /fetchCurrentUserQuestions/);
   assert.match(studyMode, /快速刷题/);
-  assert.match(studyMode, /记忆卡片/);
+  assert.match(studyMode, /记忆复习/);
   assert.match(studyMode, /收藏夹/);
-  assert.match(studyMode, /算法专题/);
+  assert.doesNotMatch(studyMode, /算法专题/);
   assert.match(studyMode, /学习完成/);
   assert.match(studyMode, /href="\/practice\?mode=exam408-choice"/);
-  assert.match(studyMode, /href="\/memory-cards"/);
+  assert.match(studyMode, /href="\/review"/);
+  assert.doesNotMatch(studyMode, /href="\/memory-cards"/);
   assert.match(studyMode, /href="\/collections"/);
 });
 
-test("408 platform exposes study completion as a real route-backed feature", () => {
+test("study completion remains route-backed but is hidden from the homepage", () => {
   const home = read("app/page.tsx");
-  const statistics = read("app/statistics/page.tsx");
   const studyMode = read("app/study-mode/page.tsx");
   const studyComplete = read("app/study-complete/page.tsx");
 
-  assert.match(home, /href: "\/study-complete"/);
-  assert.match(statistics, /href: "\/study-complete"/);
+  assert.doesNotMatch(home, /href: "\/study-complete"|学习完成/);
   assert.match(studyMode, /href="\/study-complete"/);
   assert.match(studyComplete, /export default function StudyCompletePage/);
   assert.match(studyComplete, /学习完成/);
@@ -681,7 +652,8 @@ test("408 platform exposes study completion as a real route-backed feature", () 
   assert.match(studyComplete, /分组完成/);
   assert.match(studyComplete, /下一轮/);
   assert.match(studyComplete, /继续刷题/);
-  assert.match(studyComplete, /记忆卡片/);
+  assert.match(studyComplete, /记忆复习/);
+  assert.match(studyComplete, /href="\/review"/);
   assert.match(studyComplete, /收藏夹/);
   assert.match(studyComplete, /不伪造完成记录/);
 });
@@ -702,7 +674,7 @@ test("brand system uses the selected A logo across mobile and desktop shells", (
   assert.match(brandLogo, /export function BrandLogo/);
   assert.match(brandLogo, /408 错题复盘系统/);
   assert.match(appShell, /<BrandLogo href="\/" size="lg"/);
-  assert.match(appShell, /<BrandMark size="sm" className="rounded-full"/);
+  assert.doesNotMatch(appShell, /<BrandMark/);
   assert.match(bottomNav, /<BrandMark size="sm"/);
   assert.match(studyUi, /<BrandMark size="sm"/);
   assert.match(pageHeader, /<BrandMark size="sm"/);
@@ -723,11 +695,11 @@ test("import page explains JSON import with aggregate preview stats", () => {
     "共解析",
     "包含答案",
     "未绑定原图",
-    "需要核对",
-    "导入前质检",
-    "可直接导入",
-    "建议待整理",
-    "严重错误",
+    "等待核对",
+    "导入预览",
+    "可以导入",
+    "导入后待整理",
+    "阻止导入",
   ]) {
     assert.match(source, new RegExp(text));
   }
@@ -802,7 +774,7 @@ test("learning analytics surfaces stay mobile-first across home, review, questio
   assert.match(questions, /quickScope === "inbox"/);
   assert.match(questions, /需要修正/);
   assert.match(questions, /未分类/);
-  assert.match(practice, /URLSearchParams/);
+  assert.match(practice, /useSearchParams/);
   assert.match(practice, /topic/);
   assert.match(reports, /7 天薄弱点变化/);
   assert.match(reports, /题卡质量概览/);
@@ -969,10 +941,11 @@ test("/review uses the shared swipe deck instead of a next-button interstitial",
   assert.doesNotMatch(source, /下一题/);
 });
 
-test("question detail hides the visible share section and its client-only actions", () => {
+test("question detail sharing stays a local PNG download without native share clutter", () => {
   const source = read("app/questions/[id]/page.tsx");
 
-  assert.doesNotMatch(source, /<MobileSection title="错题分享"/);
+  assert.match(source, /<MobileSection title="分享错题"/);
+  assert.match(source, /下载 PNG 图片/);
   assert.doesNotMatch(source, /navigator\.share/);
   assert.doesNotMatch(source, /new File/);
   assert.doesNotMatch(source, /分享面板/);
@@ -1032,7 +1005,8 @@ test("reports and settings use learning and account language instead of ops lang
   assert.match(settings, /账号与数据/);
   assert.match(settings, /主要功能状态/);
   assert.match(settings, /可选增强/);
-  assert.match(settings, /当前主流程不依赖 OpenAI、Gemini 或 DeepSeek/);
+  assert.match(settings, /错题数据已经连接/);
+  assert.match(settings, /错题数据尚未连接/);
   assert.doesNotMatch(settings, /Bucket:|保存 timezone|image_path/);
 });
 
@@ -1056,17 +1030,20 @@ test("DeepSeek enhancement only updates the allowed question fields", () => {
   ]);
 });
 
-test("v3 home page is an asset and decision system, not a daily review loop", () => {
+test("home page keeps the main review workflow focused", () => {
   const source = read("app/page.tsx");
 
   assert.match(source, /selectTodayLiftFocus/);
-  assert.match(source, /数学错题资产管理/);
+  assert.match(source, /11408 错题复盘/);
+  assert.match(source, /408 错题库/);
+  assert.match(source, /HomeQuickActions/);
+  assert.match(source, /导入错题/);
+  assert.match(source, /今日复习/);
+  assert.match(source, /专项练习/);
   assert.match(source, /3道最该做错题/);
   assert.match(source, /今日提分焦点/);
-  assert.match(source, /导入诊断/);
   assert.match(source, /最近错题/);
-  assert.doesNotMatch(source, /dueToday|completedToday|completionRate/);
-  assert.doesNotMatch(source, /开始今日复习|今日待复习|今日学习进度|打卡/);
+  assert.doesNotMatch(source, /学习排行榜|算法专题|学习模式|功能区/);
 });
 
 test("v3 bottom navigation removes review as a primary module", () => {
@@ -1092,7 +1069,7 @@ test("primary learning copy routes users to import or practice instead of upload
   assert.match(questions, /导入 ChatGPT 错题卡|导入错题卡/);
 });
 
-test("v3 questions page exposes asset filters without restoring detail share actions", () => {
+test("questions page exposes quick scopes and detail sharing", () => {
   const source = read("app/questions/page.tsx");
   const detail = read("app/questions/[id]/page.tsx");
 
@@ -1101,8 +1078,12 @@ test("v3 questions page exposes asset filters without restoring detail share act
   assert.match(source, /quickScope === "recent"/);
   assert.match(source, /quickScope === "weak"/);
   assert.match(source, /quickScope === "inbox"/);
-  assert.doesNotMatch(detail, /share-card/);
-  assert.doesNotMatch(detail, /generateShareCardImage/);
+  assert.match(source, /quickScopeLabels/);
+  assert.match(source, /当前范围/);
+  assert.match(detail, /share-card/);
+  assert.match(detail, /generateShareCardImage/);
+  assert.match(detail, /<MobileSection title="分享错题"/);
+  assert.match(detail, /下载 PNG 图片/);
 });
 
 test("/questions keeps question rows visible when due-review loading fails", () => {
@@ -1126,12 +1107,12 @@ test("/questions exposes a guarded clear-library action", () => {
   assert.match(source, /此操作会软删除当前错题库中的全部错题/);
 });
 
-test("import page confirms import from the top action panel and supports undoing the last import", () => {
+test("import page previews first, then confirms and supports undoing the last import", () => {
   const source = read("app/import/page.tsx");
-  const bottomPreview = source.slice(source.indexOf("{previewCards.map"));
+  const pageContent = source.slice(source.lastIndexOf("return ("));
 
   assert.match(source, /function ImportActionPanel/);
-  assert.match(source, /顶部确认/);
+  assert.match(source, /确认导入/);
   assert.match(source, /handleUndoLastImport/);
   assert.match(source, /lastImportSuccesses/);
   assert.match(source, /body: JSON\.stringify\(\{ ids: lastImportSuccesses\.map/);
@@ -1140,7 +1121,10 @@ test("import page confirms import from the top action panel and supports undoing
   assert.match(source, /导入成功/);
   assert.match(source, /importResultRef/);
   assert.match(source, /scrollIntoView/);
-  assert.match(source, /去错题库查看/);
-  assert.doesNotMatch(bottomPreview, /确认导入/);
-  assert.doesNotMatch(bottomPreview, /导入到待整理/);
+  assert.match(source, /firstQuestionId/);
+  assert.match(source, /打开刚导入的题/);
+  assert.ok(
+    pageContent.indexOf('title="导入预览"') < pageContent.indexOf("<ImportActionPanel"),
+    "preview should appear before the final import action",
+  );
 });

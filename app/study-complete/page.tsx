@@ -81,7 +81,7 @@ function formatToday() {
 export default function StudyCompletePage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看学习完成页。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看学习完成页。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
@@ -199,10 +199,10 @@ export default function StudyCompletePage() {
           </Link>
           <div className="grid grid-cols-2 gap-2">
             <Link
-              href="/memory-cards"
+              href="/review"
               className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-blue-700 ring-1 ring-blue-100"
             >
-              记忆卡片
+              记忆复习
             </Link>
             <Link
               href="/collections"
@@ -214,7 +214,7 @@ export default function StudyCompletePage() {
               href="/questions?scope=weak"
               className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-blue-700 ring-1 ring-blue-100"
             >
-              薄弱题本
+              薄弱复习
             </Link>
             <Link
               href="/profile"

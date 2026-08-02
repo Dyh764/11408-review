@@ -189,7 +189,7 @@ function ReviewList({ items, emptyLabel }: { items: ReviewItem[]; emptyLabel: st
 function ProfileContent() {
   const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState<ProfileStats>(emptyStats);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看学习档案。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看学习档案。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const searchParams = useSearchParams();
   const dayParam = searchParams.get("day");
@@ -284,6 +284,9 @@ function ProfileContent() {
               <Link href="/questions" className="inline-flex min-h-10 items-center rounded-lg bg-[#10b981] px-4 text-sm font-black text-white">
                 打开错题库
               </Link>
+              <Link href="/notes" className="inline-flex min-h-10 items-center rounded-lg bg-white px-4 text-sm font-black text-slate-700 ring-1 ring-slate-100">
+                题目笔记
+              </Link>
               <Link href="/settings" className="inline-flex min-h-10 items-center rounded-lg bg-white px-4 text-sm font-black text-slate-700 ring-1 ring-slate-100">
                 数据设置
               </Link>
@@ -318,7 +321,7 @@ function ProfileContent() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black text-slate-950">薄弱章节</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">点击进入错题库的不熟题本继续处理。</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">点击进入错题库的薄弱复习范围继续处理。</p>
               </div>
               <Link href="/questions?scope=weak" className="text-sm font-black text-[#10b981]">查看全部</Link>
             </div>
@@ -353,7 +356,7 @@ function ProfileContent() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black text-slate-950">{selectedDay} 当天完成</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">从首页贡献日历进入时，会定位到这一天。</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">通过日期参数进入时，会定位到对应日期。</p>
               </div>
               <Link href="/review/today" className="text-sm font-black text-[#10b981]">今日复习</Link>
             </div>

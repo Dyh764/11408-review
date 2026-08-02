@@ -69,7 +69,7 @@ export default function KnowledgeMapPage() {
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
   const [range, setRange] = useState<QuestionRange>("all");
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 后查看考点刷题。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看考点刷题。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
@@ -349,16 +349,10 @@ export default function KnowledgeMapPage() {
             星级按当前章节覆盖的真题年份数计算，最多 3 星；它表示你的题库覆盖，不代表官方命题概率。当前范围共有{" "}
             {choiceCount} 道可刷选择题。
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link
-              href="/exam-overview"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-3 text-sm font-black text-blue-700 ring-1 ring-blue-100"
-            >
-              真题总览
-            </Link>
+          <div className="mt-3">
             <Link
               href="/practice"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-black text-white"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-black text-white"
             >
               返回刷题
             </Link>

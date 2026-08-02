@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { MobileCard, MobilePageShell, MobileSection, SectionCard, StatCard } from "@/components/mobile/primitives";
 import { ChoiceList } from "@/components/mobile/ChoiceList";
@@ -48,20 +49,31 @@ type ImportSuccess = {
   inbox?: boolean;
 };
 
+function needsImportConfirmation(item: ImportParsedCard) {
+  return Boolean(
+    item.card.needs_manual_check ||
+      item.card.question_text_status !== "verified",
+  );
+}
+
 const LAST_IMPORT_STORAGE_KEY = "11408-review:last-import-successes";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function mergeUploadedImagePaths(
+function buildImportJson(
   cards: ImportParsedCard[],
   uploadedByIndex: Map<number, string>,
+  confirmedIndexes: Set<number>,
 ) {
   return JSON.stringify(
     cards.map((item) => ({
       ...(isRecord(item.raw) ? item.raw : item.card),
       image_path: uploadedByIndex.get(item.index) ?? item.card.image_path ?? undefined,
+      ...(confirmedIndexes.has(item.index)
+        ? { needs_manual_check: false, question_text_status: "verified" }
+        : {}),
     })),
     null,
     2,
@@ -121,17 +133,36 @@ function ImportPreviewCard({
   item,
   quality,
   selectedImageFile,
+  needsConfirmation,
+  isConfirmed,
   onSelectImage,
+  onConfirm,
 }: {
   item: ImportParsedCard;
   quality?: ImportQualityRow;
   selectedImageFile?: File;
+  needsConfirmation: boolean;
+  isConfirmed: boolean;
   onSelectImage: (index: number, file: File | null) => void;
+  onConfirm: (index: number, confirmed: boolean) => void;
 }) {
   const { card } = item;
   const hasAnswer = Boolean(card.standard_answer?.trim());
   const hasChoices = card.choices.length > 0;
   const hasWarnings = Boolean(quality?.recommendedInbox);
+  const imagePreviewUrl = useMemo(
+    () => (selectedImageFile ? URL.createObjectURL(selectedImageFile) : ""),
+    [selectedImageFile],
+  );
+
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    },
+    [imagePreviewUrl],
+  );
 
   return (
     <MobileCard>
@@ -151,6 +182,11 @@ function ImportPreviewCard({
         <StatusPill label={hasAnswer ? "包含答案" : "未包含答案，可后续补充"} tone={hasAnswer ? "blue" : "amber"} />
         <StatusPill label={getAnswerStatusLabel(card.answer_status)} tone="amber" />
         {hasWarnings ? <StatusPill label="建议进入待整理" tone="amber" /> : null}
+        {needsConfirmation ? (
+          <StatusPill label={isConfirmed ? "已人工核对" : "需要人工核对"} tone={isConfirmed ? "green" : "amber"} />
+        ) : (
+          <StatusPill label="可以导入" tone="green" />
+        )}
       </div>
       {quality?.issues.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -218,6 +254,18 @@ function ImportPreviewCard({
               ? "已存在原图路径；重新选择会替换为本地图片。"
               : "可把截图绑定到这道题，确认导入时自动上传。"}
         </p>
+        {imagePreviewUrl ? (
+          <div className="mt-3 overflow-hidden rounded-lg bg-white ring-1 ring-blue-100">
+            <Image
+              src={imagePreviewUrl}
+              alt={`第 ${item.index} 条错题的本地原图预览`}
+              width={960}
+              height={540}
+              unoptimized
+              className="max-h-72 w-full object-contain"
+            />
+          </div>
+        ) : null}
         {selectedImageFile ? (
           <button
             type="button"
@@ -228,6 +276,17 @@ function ImportPreviewCard({
           </button>
         ) : null}
       </div>
+      {needsConfirmation ? (
+        <label className="mt-3 flex min-h-12 cursor-pointer items-center gap-3 rounded-lg bg-amber-50 px-3 text-sm font-bold text-amber-900 ring-1 ring-amber-100">
+          <input
+            type="checkbox"
+            checked={isConfirmed}
+            onChange={(event) => onConfirm(item.index, event.target.checked)}
+            className="h-5 w-5 rounded border-amber-300"
+          />
+          <span>我已核对题干、选项、答案和原图</span>
+        </label>
+      ) : null}
       <dl className="mt-3 space-y-2 text-sm">
         <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
           <dt className="font-semibold text-slate-800">题源信息</dt>
@@ -270,83 +329,41 @@ function ImportPreviewCard({
   );
 }
 
-function ImportImageBindingCard({
-  item,
-  selectedImageFile,
-  onSelectImage,
-}: {
-  item: ImportParsedCard;
-  selectedImageFile?: File;
-  onSelectImage: (index: number, file: File | null) => void;
-}) {
-  const { card } = item;
-
-  return (
-    <MobileCard>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-black text-slate-950">
-            第 {item.index} 条 · {card.knowledge_point || card.chapter || "待整理题目"}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {card.image_path ? "已存在原图路径；重新选择会替换为本地图片。" : "可把截图绑定到这道题。"}
-          </p>
-        </div>
-        <StatusPill
-          label={selectedImageFile ? "已选本地图片" : card.image_path ? "已有原图" : "未绑定原图"}
-          tone={selectedImageFile || card.image_path ? "blue" : "amber"}
-        />
-      </div>
-      <label className="mt-3 block rounded-lg bg-blue-50/60 p-3 ring-1 ring-blue-100">
-        <span className="text-xs font-black text-blue-700">绑定原题图片</span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(event) => onSelectImage(item.index, event.target.files?.[0] ?? null)}
-          className="mt-2 block w-full text-xs text-slate-600 file:mr-3 file:min-h-9 file:rounded-lg file:border-0 file:bg-white file:px-3 file:text-xs file:font-black file:text-blue-700"
-        />
-      </label>
-      {selectedImageFile ? (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs leading-5 text-slate-600">已选择：{selectedImageFile.name}</p>
-          <button
-            type="button"
-            onClick={() => onSelectImage(item.index, null)}
-            className="min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100"
-          >
-            移除本题图片
-          </button>
-        </div>
-      ) : null}
-    </MobileCard>
-  );
-}
-
 function ImportActionPanel({
   previewCount,
-  directCount,
+  readyCount,
+  pendingReviewCount,
   inboxCount,
   seriousCount,
   missingRequiredImageCount,
   repairNotices,
+  isConfigured,
   canImport,
+  canInboxImport,
   isImporting,
   successCount,
   failureCount,
+  error,
+  firstQuestionId,
   resultRef,
   onImport,
   onInboxImport,
 }: {
   previewCount: number;
-  directCount: number;
+  readyCount: number;
+  pendingReviewCount: number;
   inboxCount: number;
   seriousCount: number;
   missingRequiredImageCount: number;
   repairNotices: string[];
+  isConfigured: boolean;
   canImport: boolean;
+  canInboxImport: boolean;
   isImporting: boolean;
   successCount?: number;
   failureCount?: number;
+  error?: string;
+  firstQuestionId?: string;
   resultRef: RefObject<HTMLDivElement | null>;
   onImport: () => void;
   onInboxImport: () => void;
@@ -354,17 +371,33 @@ function ImportActionPanel({
   const hasImportSuccess = typeof successCount === "number" && successCount > 0;
 
   return (
-    <MobileSection title="顶部确认">
-      <SectionCard subtitle="解析后可直接在这里确认导入，不用翻到预览列表底部。">
-        <div className="grid grid-cols-2 gap-3">
+    <MobileSection title="确认导入" subtitle="先看完上方预览，再决定写入错题库还是暂存为待整理。">
+      <SectionCard>
+        <div ref={resultRef} className="scroll-mt-4" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <StatCard label="共解析" value={previewCount} tone="blue" />
-          <StatCard label="严重错误" value={seriousCount} tone={seriousCount > 0 ? "red" : "slate"} />
-          <StatCard label="可直接导入" value={directCount} tone="green" />
-          <StatCard label="建议待整理" value={inboxCount} tone="amber" />
+          <StatCard label="可以导入" value={readyCount} tone="green" />
+          <StatCard label="导入后待整理" value={inboxCount} tone="amber" />
+          <StatCard label="等待核对" value={pendingReviewCount} tone="amber" />
+          <StatCard label="阻止导入" value={seriousCount} tone={seriousCount > 0 ? "red" : "slate"} />
         </div>
+        {!isConfigured ? (
+          <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-800 ring-1 ring-red-100">
+            <p className="font-black">数据库尚未连接，当前不能保存错题。</p>
+            <p className="mt-1">你仍可检查解析和预览；连接完成后再确认导入。</p>
+            <Link href="/settings" className="mt-2 inline-flex font-black underline underline-offset-4">
+              查看运行状态
+            </Link>
+          </div>
+        ) : null}
+        {pendingReviewCount > 0 ? (
+          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900 ring-1 ring-amber-100">
+            还有 {pendingReviewCount} 道题没有完成人工核对。逐题勾选后可正常导入，也可以先放入待整理。
+          </p>
+        ) : null}
         {missingRequiredImageCount > 0 ? (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900 ring-1 ring-amber-100">
-            {missingRequiredImageCount} 道题依赖原图但尚未绑定：会进入待整理，并在刷题时自动跳过。可在下方“高级检查”中补图。
+            {missingRequiredImageCount} 道题依赖原图但尚未绑定：会进入待整理，并在刷题时自动跳过。可在上方预览中补图。
           </p>
         ) : null}
         {repairNotices.length > 0 ? (
@@ -386,30 +419,39 @@ function ImportActionPanel({
             disabled={!canImport}
             className="min-h-14 rounded-lg bg-blue-600 px-4 text-base font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.2)] disabled:bg-slate-300"
           >
-            {isImporting ? "导入中..." : "确认导入"}
+            {isImporting ? "导入中..." : `确认导入 ${previewCount} 道题`}
           </button>
           <button
             type="button"
             onClick={onInboxImport}
-            disabled={!canImport}
+            disabled={!canInboxImport}
             aria-label="导入到待整理"
             className="min-h-11 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 disabled:text-slate-400"
           >
-            导入到待整理
+            暂存到待整理
           </button>
         </div>
+        {error ? (
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-800 ring-1 ring-red-100">
+            {error}
+          </p>
+        ) : null}
         {hasImportSuccess ? (
-          <div
-            ref={resultRef}
-            className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100"
-          >
+          <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100">
             <p className="font-black">导入成功：已写入 {successCount} 道错题。</p>
             {failureCount && failureCount > 0 ? (
               <p className="mt-1 text-amber-800">另有 {failureCount} 条未导入，请查看下方失败明细。</p>
             ) : null}
-            <Link href="/questions" className="mt-2 inline-flex font-black text-emerald-800 underline underline-offset-4">
-              去错题库查看
-            </Link>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {firstQuestionId ? (
+                <Link href={`/questions/${firstQuestionId}`} className="inline-flex min-h-10 items-center rounded-lg bg-emerald-700 px-3 font-black text-white">
+                  打开刚导入的题
+                </Link>
+              ) : null}
+              <Link href="/questions?scope=recent" className="inline-flex min-h-10 items-center rounded-lg bg-white px-3 font-black text-emerald-800 ring-1 ring-emerald-100">
+                查看最近导入
+              </Link>
+            </div>
           </div>
         ) : null}
       </SectionCard>
@@ -423,6 +465,7 @@ export default function ImportPage() {
   const importResultRef = useRef<HTMLDivElement | null>(null);
   const [jsonText, setJsonText] = useState("");
   const [selectedImageFiles, setSelectedImageFiles] = useState<Record<number, File>>({});
+  const [confirmedIndexes, setConfirmedIndexes] = useState<Set<number>>(new Set());
   const [parseErrors, setParseErrors] = useState<ImportRowError[]>([]);
   const [importDiagnostics, setImportDiagnostics] = useState<ImportDiagnostic[]>([]);
   const [parseNotice, setParseNotice] = useState("");
@@ -464,25 +507,29 @@ export default function ImportPage() {
     () => new Map(qualityReport.rows.map((row) => [row.index, row])),
     [qualityReport],
   );
-  const previewIssueCards = useMemo(
-    () =>
-      previewCards.filter((item) => {
-        const quality = qualityByIndex.get(item.index);
-        return Boolean(quality?.recommendedInbox || quality?.issues.length);
-      }),
-    [previewCards, qualityByIndex],
-  );
   const previewStats = useMemo(() => {
     const withAnswer = previewCards.filter((item) => item.card.standard_answer?.trim()).length;
     const withoutImage = previewCards.filter(
       (item) => !item.card.image_path && !selectedImageFiles[item.index],
     ).length;
-    const needsCheck = previewCards.filter(
-      (item) => item.card.needs_manual_check || item.card.question_text_status !== "verified",
-    ).length;
-
-    return { withAnswer, withoutImage, needsCheck };
+    return { withAnswer, withoutImage };
   }, [previewCards, selectedImageFiles]);
+  const pendingReviewCount = useMemo(
+    () =>
+      previewCards.filter((item) => {
+        const quality = qualityByIndex.get(item.index);
+        return quality?.importable && needsImportConfirmation(item) && !confirmedIndexes.has(item.index);
+      }).length,
+    [confirmedIndexes, previewCards, qualityByIndex],
+  );
+  const readyCount = useMemo(
+    () =>
+      previewCards.filter((item) => {
+        const quality = qualityByIndex.get(item.index);
+        return quality?.importable && !quality.recommendedInbox && (!needsImportConfirmation(item) || confirmedIndexes.has(item.index));
+      }).length,
+    [confirmedIndexes, previewCards, qualityByIndex],
+  );
   const missingRequiredImageCount = useMemo(
     () =>
       qualityReport.rows.filter(
@@ -492,12 +539,20 @@ export default function ImportPage() {
       ).length,
     [qualityReport, selectedImageFiles],
   );
-  const canImport = previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
+  const isConfigured = Boolean(supabase);
+  const canImport =
+    isConfigured &&
+    previewCards.length > 0 &&
+    qualityReport.seriousCount === 0 &&
+    pendingReviewCount === 0 &&
+    !isImporting;
+  const canInboxImport =
+    isConfigured && previewCards.length > 0 && qualityReport.seriousCount === 0 && !isImporting;
   const visibleRepairNotices =
     parseRepairNotices.length > 0 ? parseRepairNotices : (parsed.repairNotices ?? []);
 
   useEffect(() => {
-    if (apiResult && typeof apiResult.successCount === "number") {
+    if (apiResult) {
       importResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [apiResult]);
@@ -523,6 +578,7 @@ export default function ImportPage() {
     setApiResult(null);
     setCopyStatus("");
     setSelectedImageFiles({});
+    setConfirmedIndexes(new Set());
   }
 
   function clearImportDraft() {
@@ -589,6 +645,18 @@ export default function ImportPage() {
     setSelectedImageFiles((current) => ({ ...current, [index]: file }));
   }
 
+  function handleConfirmCard(index: number, confirmed: boolean) {
+    setConfirmedIndexes((current) => {
+      const next = new Set(current);
+      if (confirmed) {
+        next.add(index);
+      } else {
+        next.delete(index);
+      }
+      return next;
+    });
+  }
+
   async function cleanupUploadedImages(paths: string[]) {
     if (!supabase || paths.length === 0) {
       return;
@@ -609,7 +677,7 @@ export default function ImportPage() {
     }
 
     if (!supabase) {
-      throw new Error("请先配置 Supabase 环境变量，再导入本地图片。");
+      throw new Error("错题数据尚未连接，暂时无法导入本地图片。");
     }
 
     const {
@@ -658,10 +726,9 @@ export default function ImportPage() {
       const uploadResult = await uploadImportImages(previewCards);
       uploadedByIndex = uploadResult.uploadedByIndex;
       uploadedPaths = uploadResult.uploadedPaths;
-      const importJsonText =
-        uploadedByIndex.size > 0 ? mergeUploadedImagePaths(previewCards, uploadedByIndex) : jsonText;
+      const importJsonText = buildImportJson(previewCards, uploadedByIndex, confirmedIndexes);
 
-      if (uploadedByIndex.size > 0) {
+      if (uploadedByIndex.size > 0 || confirmedIndexes.size > 0) {
         setJsonText(importJsonText);
       }
 
@@ -744,14 +811,26 @@ export default function ImportPage() {
   return (
     <MobilePageShell>
       <PageHeader
-        title="导入 ChatGPT 错题卡"
-        subtitle="粘贴 ChatGPT 生成的 JSON 数组，先预览，再写入错题库和复习计划。"
+        title="导入错题"
+        subtitle="粘贴整理好的错题内容，逐题核对预览后再保存到错题库。"
       />
 
-      <MobileSection>
+      {!isConfigured ? (
+        <MobileSection>
+          <div className="rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-800 ring-1 ring-red-100">
+            <p className="font-black">当前仅可解析和预览，暂时不能保存。</p>
+            <p className="mt-1">数据库连接完成后，确认导入按钮会自动恢复。</p>
+            <Link href="/settings" className="mt-2 inline-flex font-black underline underline-offset-4">
+              查看运行状态
+            </Link>
+          </div>
+        </MobileSection>
+      ) : null}
+
+      <MobileSection title="其他导入方式">
         <Link
           href="/import/question-bank"
-          className="flex min-h-12 items-center justify-between rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-[0_12px_26px_rgba(37,99,235,0.18)]"
+          className="flex min-h-11 items-center justify-between rounded-lg bg-white px-4 text-sm font-black text-blue-700 ring-1 ring-blue-100"
         >
           <span>批量导入王道 408 题库</span>
           <span aria-hidden>→</span>
@@ -787,36 +866,36 @@ export default function ImportPage() {
                 setJsonText(event.target.value);
                 resetImportParsing();
               }}
-              rows={12}
+              rows={8}
               className="mt-2 w-full resize-y rounded-lg border border-blue-100 bg-white px-3 py-3 text-sm leading-6 text-slate-950 outline-none focus:border-blue-500"
               placeholder="把 ChatGPT 生成的 JSON 粘贴到这里。"
             />
           </label>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleParse}
+              className="col-span-2 min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white sm:col-span-1 sm:order-3"
+            >
+              解析并预览
+            </button>
             <button
               type="button"
               onClick={() => {
                 setJsonText(importExampleJson);
                 resetImportParsing();
               }}
-              className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
+              className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 sm:order-1"
             >
               插入示例 JSON
             </button>
             <button
               type="button"
               onClick={clearImportDraft}
-              className="min-h-12 rounded-lg bg-white px-4 text-sm font-semibold text-red-700 ring-1 ring-red-100"
+              className="min-h-12 rounded-lg bg-white px-4 text-sm font-semibold text-red-700 ring-1 ring-red-100 sm:order-2"
             >
               清空输入
-            </button>
-            <button
-              type="button"
-              onClick={handleParse}
-              className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
-            >
-              解析
             </button>
           </div>
 
@@ -865,7 +944,7 @@ export default function ImportPage() {
       ) : null}
 
       {importDiagnostics.length > 0 ? (
-        <MobileSection title="导入诊断">
+        <MobileSection title="格式问题">
           <div className="space-y-3">
             {importDiagnostics.map((diagnostic, index) => (
               <ImportDiagnosticCard
@@ -919,75 +998,24 @@ export default function ImportPage() {
       ) : null}
 
       {previewCards.length > 0 ? (
-        <ImportActionPanel
-          previewCount={previewCards.length}
-          directCount={qualityReport.importableCount - qualityReport.inboxRecommendedCount}
-          inboxCount={qualityReport.inboxRecommendedCount}
-          seriousCount={qualityReport.seriousCount}
-          missingRequiredImageCount={missingRequiredImageCount}
-          repairNotices={visibleRepairNotices}
-          canImport={canImport}
-          isImporting={isImporting}
-          successCount={apiResult?.successCount}
-          failureCount={apiResult?.failureCount}
-          resultRef={importResultRef}
-          onImport={() => handleImport("normal")}
-          onInboxImport={() => handleImport("inbox")}
-        />
-      ) : null}
-
-      {previewCards.length > 0 ? (
-        <MobileSection>
-          <details className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-            <summary className="cursor-pointer list-none text-sm font-black text-blue-700">
-              高级检查
-            </summary>
-          <div className="mt-3 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">导入前质检</h2>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <StatCard label="共解析" value={previewCards.length} tone="blue" />
-              <StatCard label="可直接导入" value={qualityReport.importableCount - qualityReport.inboxRecommendedCount} tone="green" />
-              <StatCard label="建议待整理" value={qualityReport.inboxRecommendedCount} tone="amber" />
-              <StatCard label="严重错误" value={qualityReport.seriousCount} tone={qualityReport.seriousCount > 0 ? "red" : "slate"} />
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <StatCard label="包含答案" value={previewStats.withAnswer} tone="green" />
-              <StatCard label="未绑定原图" value={previewStats.withoutImage} tone="amber" />
-              <StatCard label="需要核对" value={previewStats.needsCheck} />
-            </div>
+        <MobileSection title="导入预览" subtitle="每一道题都会显示。请核对题干、选项、答案和原图后再继续。">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label="共解析" value={previewCards.length} tone="blue" />
+            <StatCard label="包含答案" value={previewStats.withAnswer} tone="green" />
+            <StatCard label="未绑定原图" value={previewStats.withoutImage} tone="amber" />
+            <StatCard label="等待核对" value={pendingReviewCount} tone="amber" />
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">原图绑定</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              给带表格、图形或截图的题逐条绑定本地图片，确认导入时会自动上传。
-            </p>
-            <div className="mt-3 grid gap-3">
-              {previewCards.map((item) => (
-                <ImportImageBindingCard
-                  key={item.index}
-                  item={item}
-                  selectedImageFile={selectedImageFiles[item.index]}
-                  onSelectImage={handleSelectCardImage}
-                />
-              ))}
-            </div>
-          </div>
-          <h2 className="text-base font-semibold text-slate-950">
-            需要检查 {previewIssueCards.length} 张错题卡
-          </h2>
-          {previewIssueCards.length === 0 ? (
-            <p className="rounded-lg bg-emerald-50 p-3 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
-              本次解析没有发现需要预览的问题题卡，干净题可直接用顶部按钮导入。
-            </p>
-          ) : null}
-          {previewIssueCards.map((item) => (
+          <div className="mt-4 grid gap-4">
+          {previewCards.map((item) => (
             <ImportPreviewCard
               key={item.index}
               item={item}
               quality={qualityByIndex.get(item.index)}
               selectedImageFile={selectedImageFiles[item.index]}
+              needsConfirmation={needsImportConfirmation(item)}
+              isConfirmed={confirmedIndexes.has(item.index)}
               onSelectImage={handleSelectCardImage}
+              onConfirm={handleConfirmCard}
             />
           ))}
           {qualityReport.seriousCount > 0 ? (
@@ -996,40 +1024,50 @@ export default function ImportPage() {
             </p>
           ) : null}
           </div>
-          </details>
         </MobileSection>
       ) : null}
 
-      {apiResult ? (
+      {previewCards.length > 0 ? (
+        <ImportActionPanel
+          previewCount={previewCards.length}
+          readyCount={readyCount}
+          pendingReviewCount={pendingReviewCount}
+          inboxCount={qualityReport.inboxRecommendedCount}
+          seriousCount={qualityReport.seriousCount}
+          missingRequiredImageCount={missingRequiredImageCount}
+          repairNotices={visibleRepairNotices}
+          isConfigured={isConfigured}
+          canImport={canImport}
+          canInboxImport={canInboxImport}
+          isImporting={isImporting}
+          successCount={apiResult?.successCount}
+          failureCount={apiResult?.failureCount}
+          error={apiResult?.error}
+          firstQuestionId={apiResult?.successes?.[0]?.questionId}
+          resultRef={importResultRef}
+          onImport={() => handleImport("normal")}
+          onInboxImport={() => handleImport("inbox")}
+        />
+      ) : null}
+
+      {apiResult &&
+      (Boolean(undoStatus) ||
+        lastImportSuccesses.length > 0 ||
+        Boolean(apiResult.failures?.length) ||
+        Boolean(apiResult.successes?.some((success) => success.warning))) ? (
         <MobileSection>
           <div className="space-y-3">
-          {apiResult.error ? (
-            <p className="rounded-lg bg-red-50 p-3 text-sm leading-6 text-red-700 ring-1 ring-red-100">
-              {apiResult.error}
-            </p>
-          ) : null}
-          {typeof apiResult.successCount === "number" ? (
-            <div className="rounded-lg bg-emerald-50 p-4 text-sm leading-6 text-emerald-800 ring-1 ring-emerald-100">
-              已导入 {apiResult.successCount} 条；失败 {apiResult.failureCount ?? 0} 条。
-              {apiResult.successes?.some((success) => success.inbox) ? " 已自动标记部分题为待整理。" : ""}
-              {lastImportSuccesses.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href="/questions?scope=recent"
-                    className="inline-flex min-h-9 items-center rounded-lg bg-white px-3 text-xs font-black text-emerald-800 ring-1 ring-emerald-100"
-                  >
-                    查看最近导入
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleUndoLastImport}
-                    disabled={isUndoing}
-                    className="min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
-                  >
-                    {isUndoing ? "撤销中..." : "撤销本次导入"}
-                  </button>
-                </div>
-              ) : null}
+          {lastImportSuccesses.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-3 ring-1 ring-slate-200">
+              <p className="text-sm font-semibold text-slate-700">本次已保存 {lastImportSuccesses.length} 道错题。</p>
+              <button
+                type="button"
+                onClick={handleUndoLastImport}
+                disabled={isUndoing}
+                className="min-h-9 rounded-lg bg-white px-3 text-xs font-black text-red-700 ring-1 ring-red-100 disabled:text-slate-400"
+              >
+                {isUndoing ? "撤销中..." : "撤销本次导入"}
+              </button>
             </div>
           ) : null}
           {undoStatus ? (

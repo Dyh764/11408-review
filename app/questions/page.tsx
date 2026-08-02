@@ -26,6 +26,7 @@ import {
 } from "@/lib/questions/source-info";
 import {
   buildQuestionDirectory,
+  filterVisibleQuestionDirectory,
   type QuestionChapterGroup,
   type QuestionSubjectDirectory,
 } from "@/lib/taxonomy/question-taxonomy";
@@ -52,6 +53,15 @@ const textStatusFilters: Array<QuestionTextStatus | "全部"> = [
 ];
 
 type QuickScope = "all" | "recent" | "weak" | "inbox" | "needs_fix" | "uncategorized";
+
+const quickScopeLabels: Record<QuickScope, string> = {
+  all: "全部错题",
+  recent: "最近错题",
+  weak: "薄弱复习",
+  inbox: "待整理",
+  needs_fix: "需要修正",
+  uncategorized: "未分类",
+};
 
 type FilterPanelProps = {
   quickScope: QuickScope;
@@ -177,7 +187,7 @@ export default function QuestionsPage() {
   const [activeChapter, setActiveChapter] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看真实错题库。",
+    supabase ? "" : "当前未连接错题数据，请先到设置完成连接。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -309,7 +319,10 @@ export default function QuestionsPage() {
     () => buildQuestionDirectory(filteredQuestions, dueTodayIds),
     [dueTodayIds, filteredQuestions],
   );
-  const visibleActiveDirectory = directory;
+  const visibleActiveDirectory = useMemo(
+    () => filterVisibleQuestionDirectory(directory, { hideEmptySubjects: true }),
+    [directory],
+  );
   const selectedSubject = visibleActiveDirectory.find((group) => group.subject === activeSubject) ?? null;
   const subjectQuestions = useMemo(
     () => selectedSubject?.chapters.flatMap((chapter) => chapter.questions) ?? [],
@@ -401,7 +414,7 @@ export default function QuestionsPage() {
 
   async function handleBatchAction(action: "mastered" | "needs_fix" | "sprint") {
     if (!supabase) {
-      setMessage("Supabase 尚未配置，无法批量操作。");
+      setMessage("错题数据尚未连接，无法批量操作。");
       return;
     }
 
@@ -618,9 +631,33 @@ export default function QuestionsPage() {
   return (
     <MobilePageShell className="bg-slate-50 md:mx-auto md:max-w-[1240px] md:px-8 md:py-8">
       <StudyPageHeader
-        title="错题库目录"
-        subtitle="按科目、章节、题目三层浏览。数学题会拆到高数、线代和概率统计，找题更快。"
+        title={quickScope === "all" ? "错题库" : quickScopeLabels[quickScope]}
+        subtitle={
+          quickScope === "all"
+            ? "先选科目，再按题源或章节找到具体题目。"
+            : `当前只显示“${quickScopeLabels[quickScope]}”范围，可随时切回全部错题。`
+        }
       />
+
+      {quickScope !== "all" ? (
+        <MobileSection>
+          <StudyCard className="border-blue-100 bg-blue-50/50">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-blue-900">当前范围：{quickScopeLabels[quickScope]}</p>
+                <p className="mt-1 text-xs text-blue-700">共找到 {filteredQuestions.length} 道题</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => filterPanelProps.onQuickScopeChange("all")}
+                className="min-h-10 shrink-0 rounded-lg bg-white px-3 text-xs font-black text-blue-700 ring-1 ring-blue-100"
+              >
+                查看全部
+              </button>
+            </div>
+          </StudyCard>
+        </MobileSection>
+      ) : null}
 
       {questions.length > 0 ? (
         <MobileSection>
@@ -659,16 +696,22 @@ export default function QuestionsPage() {
         </MobileSection>
       ) : null}
 
+      {questions.length > 0 ? (
+        <MobileSection>
+          <FilterPanel {...filterPanelProps} showSearch />
+        </MobileSection>
+      ) : null}
+
       <MobileSection>
         <div className="space-y-4 md:grid md:grid-cols-[minmax(0,1fr)] md:gap-5 md:space-y-0">
         {!isLoading && filteredQuestions.length === 0 ? (
           <EmptyState
-            title="还没有符合条件的错题"
-            description="可以清空筛选条件，或先导入 ChatGPT 错题卡。"
-            action={{ href: "/import", label: "导入错题卡" }}
+            title={questions.length === 0 ? "错题库还是空的" : `“${quickScopeLabels[quickScope]}”暂时没有题目`}
+            description={questions.length === 0 ? "先导入一道错题，之后就能在这里按科目和章节查找。" : "可以切回全部错题，或调整上方筛选条件。"}
+            action={questions.length === 0 ? { href: "/import", label: "导入第一道错题" } : undefined}
           />
         ) : null}
-        {!selectedSubject ? (
+        {!selectedSubject && visibleActiveDirectory.length > 0 ? (
           <SubjectDirectory
             directory={visibleActiveDirectory}
             onSelectSubject={(subject) => {
@@ -865,13 +908,13 @@ function SubjectDirectory({
     <section>
       <SectionHeader
         title="科目目录"
-        subtitle="先选科目，再按题源、部分、章节和具体题目进入。"
+        subtitle="选择科目后，可按题源或章节继续查找。"
         action={<StudyBadge tone="purple">{directory.length} 科目</StudyBadge>}
       />
       <div className="grid gap-3">
         {directory.map((subject) => {
           const choiceCount = getExam408ChoiceCount(subject);
-          const canStartPractice = isExam408DisplaySubject(subject.subject);
+          const canStartPractice = isExam408DisplaySubject(subject.subject) && choiceCount > 0;
 
           return (
             <StudyCard key={subject.subject}>
@@ -879,7 +922,8 @@ function SubjectDirectory({
                 <button
                   type="button"
                   onClick={() => onSelectSubject(subject.subject)}
-                  className="min-w-0 flex-1 text-left"
+                  disabled={subject.totalCount === 0}
+                  className="min-w-0 flex-1 text-left disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <p className="text-lg font-black text-slate-950">{subject.subject}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">

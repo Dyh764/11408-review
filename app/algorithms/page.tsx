@@ -117,7 +117,7 @@ function buildTopicStats(questions: QuestionWithImage[]): TopicStats[] {
 export default function AlgorithmsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看算法专题。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看算法专题。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {

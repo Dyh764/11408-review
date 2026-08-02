@@ -23,7 +23,7 @@ export function LoginForm() {
 
   function authMessage(messageText: string) {
     if (messageText.toLowerCase().includes("email not confirmed")) {
-      return "邮箱未验证，请先检查邮箱，或在 Supabase 关闭邮箱验证。";
+      return "邮箱未验证，请先检查邮箱里的验证邮件。";
     }
 
     return messageText;
@@ -47,7 +47,7 @@ export function LoginForm() {
     setMessage("");
 
     if (!supabase) {
-      setMessage("请先配置 NEXT_PUBLIC_SUPABASE_URL 和 NEXT_PUBLIC_SUPABASE_ANON_KEY。");
+      setMessage("当前未连接账号服务，请先完成应用设置。");
       return;
     }
 
@@ -84,7 +84,7 @@ export function LoginForm() {
 
   async function handleLogout() {
     if (!supabase) {
-      setMessage("Supabase 尚未配置。");
+      setMessage("当前未连接账号与错题数据。");
       return;
     }
 
@@ -98,7 +98,7 @@ export function LoginForm() {
       <div className="space-y-4">
       {!supabase ? (
         <Notice tone="amber">
-          请先配置 `.env.local` 中的 Supabase URL 和 anon key，然后重启 dev server。
+          当前环境尚未连接账号与错题数据，请先完成运行配置后再登录。
         </Notice>
       ) : null}
 

@@ -3,24 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { BrandLogo, BrandMark } from "@/components/brand-logo";
+import { BrandLogo } from "@/components/brand-logo";
 import { BottomNav } from "@/components/bottom-nav";
 
 const desktopNavItems = [
-  { href: "/", label: "首页面板" },
-  { href: "/questions", label: "错题总览" },
-  { href: "/reports", label: "错题分析" },
-  { href: "/knowledge-map", label: "知识图谱" },
-  { href: "/memory-cards", label: "记忆卡片" },
-  { href: "/statistics", label: "数据统计" },
+  { href: "/", label: "首页" },
+  { href: "/questions", label: "错题库" },
+  { href: "/import", label: "导入" },
+  { href: "/practice", label: "复习" },
+  { href: "/profile", label: "我的" },
 ];
 
 function DesktopAppNav({ pathname }: { pathname: string }) {
   return (
-    <nav aria-label="桌面主导航" className="hidden border-b border-slate-100 bg-white px-8 py-5 md:block">
+    <nav aria-label="桌面主导航" className="hidden shrink-0 border-b border-slate-100 bg-white px-8 py-5 md:block">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-8">
         <BrandLogo href="/" size="lg" />
-        <div className="flex items-center gap-12 text-base font-bold text-slate-500">
+        <div className="flex items-center gap-8 text-base font-bold text-slate-500">
           {desktopNavItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
@@ -35,12 +34,8 @@ function DesktopAppNav({ pathname }: { pathname: string }) {
             );
           })}
         </div>
-        <Link
-          href="/profile"
-          className="flex items-center gap-3 text-sm font-bold text-slate-500 hover:text-slate-900"
-        >
-          <BrandMark size="sm" className="rounded-full" />
-          <span className="text-slate-700">学习档案</span>
+        <Link href="/settings" className="text-sm font-bold text-slate-500 hover:text-slate-900">
+          设置
         </Link>
       </div>
     </nav>
@@ -51,7 +46,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isDesignPreview = pathname.startsWith("/design-preview");
   const isHome = pathname === "/";
-  const isPractice = pathname === "/practice";
 
   if (isDesignPreview) {
     return <main className="min-h-screen w-full overflow-x-hidden">{children}</main>;
@@ -69,34 +63,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div
-      className={
-        isPractice
-          ? "flex h-dvh min-h-0 flex-col overflow-hidden bg-[#f7f9fb] text-slate-950"
-          : "min-h-screen bg-[#f7f9fb] text-slate-950"
-      }
-    >
+    <div className="min-h-screen bg-[#f7f9fb] text-slate-950 md:flex md:flex-col">
       <DesktopAppNav pathname={pathname} />
-      <div
-        className={`mx-auto w-full max-w-[520px] bg-[#f8fafc] md:max-w-[1500px] md:bg-transparent ${
-          isPractice ? "min-h-0 flex-1" : "min-h-screen"
-        }`}
-      >
-        <main
-          className={
-            isPractice
-              ? "h-full min-h-0 overflow-hidden"
-              : "min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-10"
-          }
-        >
+      <div className="mx-auto min-h-screen w-full max-w-[520px] bg-[#f8fafc] md:flex md:min-h-0 md:max-w-[1500px] md:flex-1 md:flex-col md:bg-transparent">
+        <main className="min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] md:min-h-0 md:flex-1 md:pb-10">
           {children}
         </main>
       </div>
-      {!isPractice ? (
-        <div className="md:hidden">
-          <BottomNav />
-        </div>
-      ) : null}
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
     </div>
   );
 }

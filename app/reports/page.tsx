@@ -317,7 +317,7 @@ export default function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看真实报告。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看真实报告。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [isGenerating, setIsGenerating] = useState(false);
@@ -470,7 +470,7 @@ export default function ReportsPage() {
             <button
               type="button"
               onClick={() => handleGenerateReport("rule")}
-              disabled={isGenerating}
+              disabled={!supabase || isGenerating}
               className="mt-4 min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
             >
               {isGenerating ? "生成中..." : generateButtonLabels[tab]}
@@ -491,14 +491,16 @@ export default function ReportsPage() {
             />
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            {aiConfigured
-              ? "可在现有统计基础上生成一版学习建议；普通报告始终可用。"
-              : "当前先使用普通学习统计，不影响报告生成。"}
+            {!supabase
+              ? "连接错题数据后可生成普通报告；智能总结仍为可选。"
+              : aiConfigured
+                ? "可在现有统计基础上生成一版学习建议；普通报告始终可用。"
+                : "当前先使用普通学习统计，不影响报告生成。"}
           </p>
           <button
             type="button"
             onClick={() => handleGenerateReport("ai")}
-            disabled={isGenerating || !aiConfigured}
+            disabled={!supabase || isGenerating || !aiConfigured}
             className="mt-4 min-h-12 w-full rounded-lg bg-amber-100 px-4 text-sm font-semibold text-amber-800 disabled:bg-slate-100 disabled:text-slate-400"
           >
             生成智能总结

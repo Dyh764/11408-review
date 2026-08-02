@@ -99,7 +99,7 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState(defaultTimeZone);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看设置和导出数据。",
+    supabase ? "" : "当前未连接错题数据，导出和账号设置暂不可用。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [isSavingTimezone, setIsSavingTimezone] = useState(false);
@@ -161,7 +161,7 @@ export default function SettingsPage() {
 
   async function handleSaveTimezone() {
     if (!supabase) {
-      setMessage("Supabase 尚未配置。");
+      setMessage("错题数据尚未连接。");
       return;
     }
 
@@ -191,7 +191,7 @@ export default function SettingsPage() {
 
   async function handleExport(format: ExportFormat) {
     if (!supabase) {
-      setMessage("Supabase 尚未配置，无法导出。");
+      setMessage("错题数据尚未连接，无法导出。");
       return;
     }
 
@@ -222,7 +222,7 @@ export default function SettingsPage() {
 
   async function handleLogout() {
     if (!supabase) {
-      setMessage("Supabase 尚未配置。");
+      setMessage("错题数据尚未连接。");
       return;
     }
 
@@ -234,8 +234,8 @@ export default function SettingsPage() {
   return (
     <MobilePageShell>
       <PageHeader
-        title="我的"
-        subtitle="管理账号和自己的学习数据。主流程不依赖可选 AI 服务。"
+        title="设置"
+        subtitle="检查运行状态，管理账号、导出数据和复习时区。"
       />
 
       {isLoading ? (
@@ -268,8 +268,8 @@ export default function SettingsPage() {
                   key={format}
                   type="button"
                   onClick={() => handleExport(format)}
-                  disabled={Boolean(exportingFormat)}
-                  className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:text-slate-400"
+                  disabled={!supabase || Boolean(exportingFormat)}
+                  className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:text-slate-400"
                 >
                   {exportingFormat === format ? "导出中..." : `导出 ${format.toUpperCase()}`}
                 </button>
@@ -282,7 +282,8 @@ export default function SettingsPage() {
               <select
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
-                className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500"
+                disabled={!supabase}
+                className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-base outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
               >
                 {timezoneOptions.map((item) => (
                   <option key={item} value={item}>
@@ -293,7 +294,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={handleSaveTimezone}
-                disabled={isSavingTimezone}
+                disabled={!supabase || isSavingTimezone}
                 className="min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
               >
                 {isSavingTimezone ? "保存中..." : "保存复习日期时区"}
@@ -304,7 +305,8 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleLogout}
-            className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white"
+            disabled={!supabase}
+            className="min-h-12 w-full rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             退出登录
           </button>
@@ -315,7 +317,7 @@ export default function SettingsPage() {
         <SectionCard>
           <div className="flex flex-wrap gap-2">
             <StatusPill
-              label={status?.supabase.configured ? "Supabase 已配置" : "Supabase 未配置"}
+              label={status?.supabase.configured ? "错题数据已连接" : "错题数据未连接"}
               tone={status?.supabase.configured ? "blue" : "red"}
             />
             <StatusPill
@@ -324,7 +326,9 @@ export default function SettingsPage() {
             />
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            当前主流程不依赖 OpenAI、Gemini 或 DeepSeek。你可以正常导入、复习和查看答案。
+            {status?.supabase.configured
+              ? "错题数据已经连接，可以正常导入、复习和查看答案。AI 学习分析属于可选增强。"
+              : "错题数据尚未连接，目前只能浏览界面和检查导入内容，不能保存、复习或生成真实报告。"}
           </p>
         </SectionCard>
       </MobileSection>

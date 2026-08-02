@@ -25,19 +25,6 @@ type StudyMode = {
 };
 
 const examSubjects = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
-const algorithmKeywords = [
-  "排序",
-  "查找",
-  "二分",
-  "折半",
-  "树",
-  "图",
-  "调度",
-  "页面置换",
-  "最短路径",
-  "生成树",
-  "死锁",
-];
 
 function hasText(value?: string | null) {
   return Boolean(value?.trim());
@@ -82,28 +69,11 @@ function isExamChoice(question: QuestionWithImage) {
   return examSubjects.includes(question.subject) && (question.choices?.length ?? 0) > 0;
 }
 
-function isAlgorithmQuestion(question: QuestionWithImage) {
-  const source = [
-    question.subject,
-    question.chapter,
-    question.knowledge_point,
-    question.question_text,
-    question.solution_summary,
-    question.answer_explanation,
-    ...(question.mistake_types ?? []),
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return algorithmKeywords.some((keyword) => source.includes(keyword));
-}
-
 function buildStudyModes(questions: QuestionWithImage[]): StudyMode[] {
   const weakQuestions = questions.filter(isWeakQuestion);
   const inboxQuestions = questions.filter(needsOrganizing);
   const memoryCards = questions.filter(hasAnswerContent);
   const examChoices = questions.filter(isExamChoice);
-  const algorithms = questions.filter(isAlgorithmQuestion);
 
   return [
     {
@@ -118,9 +88,9 @@ function buildStudyModes(questions: QuestionWithImage[]): StudyMode[] {
     },
     {
       key: "memory",
-      title: "记忆卡片",
+      title: "记忆复习",
       description: "先回忆题干和知识点，再翻开答案解析，适合睡前或碎片时间复盘。",
-      href: "/memory-cards",
+      href: "/review",
       count: memoryCards.length,
       helper: "可回忆题卡",
       badge: "回忆模式",
@@ -135,16 +105,6 @@ function buildStudyModes(questions: QuestionWithImage[]): StudyMode[] {
       helper: "需处理题卡",
       badge: "题本分组",
       tone: "amber",
-    },
-    {
-      key: "algorithms",
-      title: "算法专题",
-      description: "按排序、查找、树与图、操作系统算法聚合已有 408 算法错题。",
-      href: "/algorithms",
-      count: algorithms.length,
-      helper: "命中算法题",
-      badge: "步骤动画演示",
-      tone: "cyan",
     },
     {
       key: "inbox",
@@ -193,7 +153,7 @@ function ModeCard({ mode }: { mode: StudyMode }) {
 export default function StudyModePage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看学习模式。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看学习模式。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
@@ -236,7 +196,7 @@ export default function StudyModePage() {
       <StudyPageHeader
         eyebrow="408 考试平台"
         title="学习模式"
-        subtitle="参考 408os 的学习模式入口，把当前题库分到刷题、记忆、收藏、算法和完成回看中；不新建数据表，只复用已有题卡。"
+        subtitle="把当前题库分到刷题、记忆复习、题目分组和完成回看中；不新建数据表，只复用已有题卡。"
       />
 
       <MobileSection>
@@ -256,10 +216,10 @@ export default function StudyModePage() {
             快速刷题
           </Link>
           <Link
-            href="/memory-cards"
+            href="/review"
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-4 text-sm font-black text-blue-700 ring-1 ring-blue-100"
           >
-            记忆卡片
+            记忆复习
           </Link>
         </div>
       </MobileSection>
@@ -292,7 +252,7 @@ export default function StudyModePage() {
           <div className="flex flex-wrap gap-2">
             <StudyBadge tone="green">学习完成</StudyBadge>
             <StudyBadge tone="cyan">收藏夹</StudyBadge>
-            <StudyBadge tone="amber">算法专题</StudyBadge>
+            <StudyBadge tone="amber">薄弱复习</StudyBadge>
           </div>
           <p className="text-sm leading-6 text-slate-600">
             本页只负责分发学习路径。刷题提交后的答案解析停留逻辑仍在 /practice 内完成；学完一轮后进入完成页看总结。

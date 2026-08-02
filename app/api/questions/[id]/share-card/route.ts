@@ -13,7 +13,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const supabase = await createClient();
 
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase 未配置。" }, { status: 500 });
+    return NextResponse.json({ error: "错题数据服务尚未连接。" }, { status: 500 });
   }
 
   const {

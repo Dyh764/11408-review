@@ -41,7 +41,7 @@ function sortNotes(notes: QuestionWithImage[]) {
 export default function NotesPage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看学习笔记。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看学习笔记。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [filter, setFilter] = useState<NoteFilter>("all");
 
@@ -190,7 +190,7 @@ export default function NotesPage() {
             <StudyCard>
               <p className="text-sm font-black text-slate-950">这一组暂时没有笔记</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                可以在题目详情里补充 user_note 或 solution_summary，之后这里会自动汇总。
+                可以在题目详情里补充“我的备注”或“正确思路”，之后这里会自动汇总。
               </p>
               <Link
                 href="/questions"

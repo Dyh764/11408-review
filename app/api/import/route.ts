@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   if (!supabase) {
-    return NextResponse.json({ error: "请先配置 Supabase 环境变量。" }, { status: 503 });
+    return NextResponse.json({ error: "错题数据服务尚未连接。" }, { status: 503 });
   }
 
   const {

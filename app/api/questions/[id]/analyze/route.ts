@@ -11,7 +11,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
   if (!supabase) {
     return NextResponse.json(
-      { error: "请先配置 Supabase 环境变量。", source: "mock" },
+      { error: "错题数据服务尚未连接。", source: "mock" },
       { status: 503 },
     );
   }

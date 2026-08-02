@@ -120,7 +120,7 @@ export default function UploadPage() {
 
   async function handleSave() {
     if (!supabase) {
-      setMessage("请先配置 Supabase 环境变量，再重启项目。");
+      setMessage("错题数据尚未连接，暂时无法保存上传结果。");
       return;
     }
 

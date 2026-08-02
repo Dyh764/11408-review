@@ -10,16 +10,10 @@ import {
   type TodayLiftFocus,
 } from "@/lib/analytics/learning-insights";
 import { BrandLogo } from "@/components/brand-logo";
-import {
-  ProfessionalPracticeLauncher,
-  type ProfessionalPracticeToolStatus,
-} from "@/components/study/ProfessionalPracticeLauncher";
+import { ProfessionalPracticeLauncher } from "@/components/study/ProfessionalPracticeLauncher";
 import { buildHomeActionCards, type HomeActionCard } from "@/lib/analytics/home-actions";
 import { todayIsoDate } from "@/lib/dates";
-import {
-  filterPracticeQuestions,
-  type PracticeQuestion,
-} from "@/lib/practice/practice-catalog";
+import type { PracticeQuestion } from "@/lib/practice/practice-catalog";
 import { fetchCurrentUserQuestionRecords } from "@/lib/questions";
 import { createClient } from "@/lib/supabase/client";
 import type { QuestionSourceInfo } from "@/lib/types";
@@ -38,9 +32,7 @@ type HomeStats = {
   focus: TodayLiftFocus;
   actionCards: HomeActionCard[];
   subjects: SubjectProgress[];
-  reviewActivity: Record<string, number>;
   practiceQuestions: PracticeQuestion[];
-  practiceTools: ProfessionalPracticeToolStatus[];
 };
 
 const examSubjects = ["数学", "数据结构", "计算机组成原理", "操作系统", "计算机网络"];
@@ -59,112 +51,22 @@ const emptyStats: HomeStats = {
   focus: emptyFocus,
   actionCards: buildHomeActionCards({ focus: emptyFocus, questions: [], reviews: [] }),
   subjects: examSubjects.map((name) => ({ name, total: 0, weak: 0, progress: 0 })),
-  reviewActivity: {},
   practiceQuestions: [],
-  practiceTools: [
-    { label: "错题二刷", href: "/review", count: 0 },
-    { label: "收藏 / PDF", href: "/collections", count: 0 },
-    { label: "学习笔记", href: "/notes", count: 0 },
-    { label: "考点考频", href: "/knowledge-map", count: 0 },
-  ],
 };
 
-type HomeModuleLink = {
-  href: string;
-  title: string;
-  description: string;
-};
-
-const primaryModuleLinks: HomeModuleLink[] = [
-  {
-    href: "/questions",
-    title: "错题本",
-    description: "按章节、知识点、错因和掌握程度管理长期错题资产",
-  },
-  {
-    href: "/import",
-    title: "导入错题",
-    description: "粘贴 ChatGPT JSON，预览确认后进入错题库",
-  },
-  {
-    href: "/questions?scope=weak",
-    title: "薄弱题本",
-    description: "优先处理不会、不熟和需要人工核对的题卡",
-  },
-  {
-    href: "/questions?scope=recent",
-    title: "最近错题",
-    description: "进入最近导入或复盘过的题，继续做题或查看解析",
-  },
-  {
-    href: "/exam-overview",
-    title: "真题总览",
-    description: "按科目、章节、题源和年份线索查看 408 题库覆盖",
-  },
-];
-
-const secondaryModuleLinks: HomeModuleLink[] = [
-  {
-    href: "/memory-cards",
-    title: "记忆卡片",
-    description: "先回忆题干和卡点，再翻开答案解析核对",
-  },
-  {
-    href: "/notes",
-    title: "学习笔记",
-    description: "汇总个人备注、正确思路和错因标签",
-  },
-  {
-    href: "/collections",
-    title: "我的收藏",
-    description: "按不熟、待整理、已掌握和 408 选择题自动归类",
-  },
-  {
-    href: "/ranking",
-    title: "学习排行榜",
-    description: "按科目和章节查看当前账号的通关率、刷题量和掌握榜",
-  },
-  {
-    href: "/algorithms",
-    title: "算法专题",
-    description: "按排序、查找、树图和操作系统算法聚合 408 算法错题",
-  },
-  {
-    href: "/study-mode",
-    title: "学习模式",
-    description: "把刷题、记忆卡片、收藏夹、算法专题和学习完成回看集中成一个入口",
-  },
-  {
-    href: "/study-complete",
-    title: "学习完成",
-    description: "查看本轮总结、分组完成度和下一轮复盘入口，不自动切换题目",
-  },
-];
-
-const featureLinks = [
-  { href: "/import", label: "导入错题" },
-  { href: "/questions", label: "错题库" },
-  { href: "/exam-overview", label: "真题总览" },
-  { href: "/memory-cards", label: "记忆卡片" },
-  { href: "/notes", label: "学习笔记" },
-  { href: "/collections", label: "我的收藏" },
-  { href: "/ranking", label: "学习排行榜" },
-  { href: "/algorithms", label: "算法专题" },
-  { href: "/study-mode", label: "学习模式" },
-  { href: "/study-complete", label: "学习完成" },
-  { href: "/reports", label: "学习报告" },
-  { href: "/profile", label: "学习档案" },
-  { href: "/questions?scope=recent", label: "最近错题" },
-  { href: "/settings", label: "数据设置" },
+const quickActions = [
+  { href: "/questions", label: "错题库", helper: "查找和整理错题" },
+  { href: "/import", label: "导入错题", helper: "预览后再保存" },
+  { href: "/review/today", label: "今日复习", helper: "处理今天到期的题" },
+  { href: "/practice", label: "专项练习", helper: "连续练习 408 选择题" },
 ];
 
 const desktopNavLinks = [
-  { href: "/", label: "首页面板" },
-  { href: "/questions", label: "错题总览" },
-  { href: "/reports", label: "错题分析" },
-  { href: "/knowledge-map", label: "知识图谱" },
-  { href: "/memory-cards", label: "记忆卡片" },
-  { href: "/statistics", label: "数据统计" },
+  { href: "/", label: "首页" },
+  { href: "/questions", label: "错题库" },
+  { href: "/import", label: "导入" },
+  { href: "/practice", label: "复习" },
+  { href: "/profile", label: "我的" },
 ];
 
 function addDays(dateKey: string, amount: number) {
@@ -216,16 +118,6 @@ function buildSubjectProgress(questions: AnalyticsQuestion[]): SubjectProgress[]
   });
 }
 
-function buildReviewActivity(reviews: AnalyticsReviewResult[]) {
-  return reviews.reduce<Record<string, number>>((activity, review) => {
-    const key = review.completed_at?.slice(0, 10);
-    if (key) {
-      activity[key] = (activity[key] ?? 0) + 1;
-    }
-    return activity;
-  }, {});
-}
-
 function toPracticeQuestion(question: AnalyticsQuestion): PracticeQuestion {
   return {
     id: question.id,
@@ -252,27 +144,6 @@ function toPracticeQuestion(question: AnalyticsQuestion): PracticeQuestion {
   };
 }
 
-function buildProfessionalPracticeTools(
-  questions: AnalyticsQuestion[],
-  practiceQuestions: PracticeQuestion[],
-  dueReviewCount: number,
-): ProfessionalPracticeToolStatus[] {
-  const choiceCount = filterPracticeQuestions(practiceQuestions, {
-    type: "exam408-choice",
-  }).length;
-  const noteCount = questions.filter(
-    (question) =>
-      question.user_note?.trim() || question.solution_summary?.trim(),
-  ).length;
-
-  return [
-    { label: "错题二刷", href: "/review", count: dueReviewCount },
-    { label: "收藏 / PDF", href: "/collections", count: questions.length },
-    { label: "学习笔记", href: "/notes", count: noteCount },
-    { label: "考点考频", href: "/knowledge-map", count: choiceCount },
-  ];
-}
-
 function HomeExamLogo({ compact = false }: { compact?: boolean }) {
   return <BrandLogo size={compact ? "md" : "lg"} compact={false} />;
 }
@@ -293,77 +164,26 @@ function HomePanel({
   );
 }
 
-function HomeContributionHeatmap({ activity }: { activity: Record<string, number> }) {
-  const today = todayIsoDate();
-  const days = Array.from({ length: 90 }, (_, index) => addDays(today, index - 89));
-  const reviewActivityTotal = days.reduce((total, day) => total + (activity[day] ?? 0), 0);
-  const activeReviewDays = days.filter((day) => (activity[day] ?? 0) > 0).length;
-  const todayCount = activity[today] ?? 0;
-
+function HomeQuickActions() {
   return (
-    <div>
-      <div className="grid grid-flow-col grid-rows-6 gap-1">
-        {days.map((day, index) => {
-          const count = activity[day] ?? 0;
-          const tone =
-            count >= 4
-              ? "bg-emerald-600"
-              : count >= 2
-                ? "bg-emerald-400"
-                : count === 1
-                  ? "bg-emerald-100"
-                  : index % 9 === 0
-                    ? "bg-slate-100"
-                    : "bg-slate-50";
-
-          return (
-            <Link
-              key={day}
-              href={`/profile?day=${day}`}
-              aria-label={`${day} 完成 ${count} 题`}
-              className={`h-3 w-3 rounded ${tone} ring-offset-2 transition hover:ring-2 hover:ring-emerald-300`}
-              title={`${day}: ${count}`}
-            />
-          );
-        })}
-      </div>
-      <div className="mt-4 flex items-center justify-center gap-1 text-xs font-black text-slate-400">
-        <span>少</span>
-        <span className="h-3 w-3 rounded bg-slate-100" />
-        <span className="h-3 w-3 rounded bg-emerald-100" />
-        <span className="h-3 w-3 rounded bg-emerald-400" />
-        <span className="h-3 w-3 rounded bg-emerald-600" />
-        <span>多</span>
-      </div>
-      <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-lg bg-slate-50 px-2 py-3">
-          <p className="text-lg font-black text-slate-950">{reviewActivityTotal}</p>
-          <p className="mt-1 text-[11px] font-bold text-slate-500">90天内完成</p>
-        </div>
-        <div className="rounded-lg bg-slate-50 px-2 py-3">
-          <p className="text-lg font-black text-slate-950">{activeReviewDays}</p>
-          <p className="mt-1 text-[11px] font-bold text-slate-500">活跃天数</p>
-        </div>
-        <div className="rounded-lg bg-emerald-50 px-2 py-3">
-          <p className="text-lg font-black text-emerald-700">{todayCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-emerald-700">今日完成</p>
-        </div>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+    <section aria-label="核心操作" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {quickActions.map((action, index) => (
         <Link
-          href="/review/today"
-          className="rounded-lg bg-[#10b981] px-3 py-3 text-center text-sm font-black text-white"
+          key={action.href}
+          href={action.href}
+          className={`rounded-[18px] p-4 transition hover:-translate-y-0.5 hover:shadow-sm ${
+            index === 1
+              ? "bg-[#10b981] text-white shadow-[0_14px_30px_rgba(16,185,129,0.2)]"
+              : "border border-slate-100 bg-white text-slate-950"
+          }`}
         >
-          今日复习
+          <p className="text-base font-black">{action.label}</p>
+          <p className={`mt-1 text-xs leading-5 ${index === 1 ? "text-white/80" : "text-slate-500"}`}>
+            {action.helper}
+          </p>
         </Link>
-        <Link
-          href="/practice"
-          className="rounded-lg bg-white px-3 py-3 text-center text-sm font-black text-slate-700 ring-1 ring-slate-100"
-        >
-          408 刷题
-        </Link>
-      </div>
-    </div>
+      ))}
+    </section>
   );
 }
 
@@ -531,11 +351,11 @@ function HomeDesktopLayout({
   loading: boolean;
 }) {
   return (
-    <div data-testid="home-desktop-dashboard" className="hidden min-h-screen bg-[#f7f9fb] text-slate-950 lg:block">
+    <div data-testid="home-desktop-dashboard" className="hidden min-h-screen bg-[#f7f9fb] text-slate-950 md:block">
       <nav aria-label="桌面首页导航" className="border-b border-slate-100 bg-white px-8 py-5">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-8">
           <HomeExamLogo />
-          <div className="flex items-center gap-12 text-base font-bold text-slate-500">
+          <div className="flex items-center gap-8 text-base font-bold text-slate-500">
             {desktopNavLinks.map((item, index) => (
               <Link
                 key={item.href}
@@ -546,9 +366,8 @@ function HomeDesktopLayout({
               </Link>
             ))}
           </div>
-          <Link href="/profile" className="flex items-center gap-3 text-sm font-bold text-slate-500 hover:text-slate-900">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-slate-100">光</span>
-            <span className="text-slate-700">学习档案</span>
+          <Link href="/settings" className="text-sm font-bold text-slate-500 hover:text-slate-900">
+            设置
           </Link>
         </div>
       </nav>
@@ -556,7 +375,6 @@ function HomeDesktopLayout({
       <main className="mx-auto grid max-w-[1500px] gap-4 px-6 py-4">
         <section className="grid gap-4 lg:grid-cols-4">
           <HomePanel className="flex min-h-36 items-center gap-5">
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-700">档</div>
             <div>
               <p className="text-sm font-black text-slate-500">当前题库</p>
               <p className="mt-2 text-3xl font-black tracking-normal text-slate-900">408 错题库</p>
@@ -566,7 +384,6 @@ function HomeDesktopLayout({
             </div>
           </HomePanel>
           <HomePanel className="flex min-h-36 items-center gap-5">
-            <div className="text-3xl text-slate-600">□</div>
             <div>
               <p className="text-sm font-black text-slate-600">错题总量</p>
               <p className="mt-2 text-4xl font-black tracking-normal text-slate-900">{stats.totalQuestions}</p>
@@ -584,7 +401,6 @@ function HomeDesktopLayout({
             </Link>
           </HomePanel>
           <HomePanel className="flex min-h-36 items-center gap-5">
-            <div className="grid h-12 w-12 place-items-center rounded-lg bg-emerald-100 text-2xl font-black text-emerald-600">中</div>
             <div>
               <p className="text-sm font-black text-slate-700">11408通关进度</p>
               <p className="mt-2 text-3xl font-black tracking-normal text-slate-900">
@@ -598,117 +414,28 @@ function HomeDesktopLayout({
           <p className="rounded-[18px] border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-amber-800">{message}</p>
         ) : null}
 
+        <HomeQuickActions />
+
         <ProfessionalPracticeLauncher
           questions={stats.practiceQuestions}
-          tools={stats.practiceTools}
           loading={loading}
         />
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_386px]">
-          <div className="grid gap-4">
-            <div className="grid gap-4 xl:grid-cols-[0.9fr_0.9fr_0.9fr]">
-              <HomePanel>
-                <h2 className="text-lg font-black text-slate-900">做题贡献（最近90天）</h2>
-                <div className="mt-8 grid place-items-center">
-                  <HomeContributionHeatmap activity={stats.reviewActivity} />
-                </div>
-              </HomePanel>
-              <HomeActionPanel actions={stats.actionCards} />
-              <HomePanel>
-                <h2 className="text-lg font-black text-slate-900">最近错题</h2>
-                <p className="mt-1 text-xs font-bold text-slate-400">今日提分焦点会优先展示 3 道最该做错题。</p>
-                <div className="mt-4">
-                  <RecentQuestions focus={stats.focus} />
-                </div>
-              </HomePanel>
+        <section className="grid gap-4 xl:grid-cols-3">
+          <HomeActionPanel actions={stats.actionCards} />
+          <HomePanel>
+            <h2 className="text-lg font-black text-slate-900">最近错题</h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">优先显示今天最值得回看的 3 道题。</p>
+            <div className="mt-4">
+              <RecentQuestions focus={stats.focus} />
             </div>
-
-            <HomeSubjectProgress subjects={stats.subjects} />
-            <WeaknessPanel focus={stats.focus} weakQuestionCount={stats.weakQuestionCount} />
-          </div>
-
-          <aside className="grid content-start gap-4">
-            <HomePanel>
-              <h2 className="text-lg font-black text-slate-900">功能区</h2>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {featureLinks.map((item, index) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`rounded-lg px-3 py-4 text-center text-sm font-black transition active:scale-[0.98] ${
-                      index < 2 ? "bg-emerald-50 text-emerald-700" : "bg-white text-slate-700 ring-1 ring-slate-100"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            </HomePanel>
-
-            <HomePanel>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-black text-slate-900">我的收藏夹</h2>
-                <Link href="/questions?scope=weak" className="text-sm font-bold text-slate-500">查看</Link>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/questions?scope=weak" className="rounded-lg bg-blue-100 p-4 text-blue-700 transition hover:-translate-y-0.5 hover:shadow-sm">
-                  <p className="text-2xl font-black">{stats.weakQuestionCount}题</p>
-                  <p className="mt-3 text-base font-black">不熟题本</p>
-                </Link>
-                <Link href="/questions?scope=inbox" className="rounded-lg bg-emerald-100 p-4 text-emerald-800 transition hover:-translate-y-0.5 hover:shadow-sm">
-                  <p className="text-2xl font-black">{stats.inboxQuestionCount}题</p>
-                  <p className="mt-3 text-base font-black">待整理</p>
-                </Link>
-              </div>
-              {stats.weakQuestionCount + stats.inboxQuestionCount === 0 ? (
-                <Link href="/questions" className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-white px-3 text-sm font-black text-slate-600 ring-1 ring-slate-100">
-                  去错题库收藏和整理
-                </Link>
-              ) : null}
-            </HomePanel>
-
-            <HomePanel>
-              <p className="text-lg font-black text-slate-900">本地学习档案</p>
-              <p className="mt-1 text-sm font-bold text-slate-500">只展示当前错题资产，不接入外部社区身份。</p>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-xl font-black text-slate-950">{stats.totalQuestions}</p>
-                  <p className="mt-1 text-[11px] font-bold text-slate-500">累计导入</p>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3">
-                  <p className="text-xl font-black text-slate-950">{Object.values(stats.reviewActivity).reduce((sum, value) => sum + value, 0)}</p>
-                  <p className="mt-1 text-[11px] font-bold text-slate-500">90天完成</p>
-                </div>
-                <div className="rounded-lg bg-emerald-50 p-3">
-                  <p className="text-xl font-black text-emerald-700">{stats.subjects.filter((subject) => subject.weak > 0).length}</p>
-                  <p className="mt-1 text-[11px] font-bold text-emerald-700">薄弱科目</p>
-                </div>
-              </div>
-              <Link href="/profile" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-[#10b981] px-4 text-sm font-black text-white">
-                打开学习档案
-              </Link>
-            </HomePanel>
-          </aside>
+          </HomePanel>
+          <WeaknessPanel focus={stats.focus} weakQuestionCount={stats.weakQuestionCount} />
         </section>
+
+        <HomeSubjectProgress subjects={stats.subjects} />
       </main>
     </div>
-  );
-}
-
-function HomeMobileModuleLink({ link }: { link: HomeModuleLink }) {
-  return (
-    <Link
-      href={link.href}
-      className="flex min-h-16 items-center justify-between gap-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]"
-    >
-      <span className="min-w-0">
-        <span className="block text-base font-black text-slate-950">{link.title}</span>
-        <span className="mt-1 block text-xs leading-5 text-slate-500">{link.description}</span>
-      </span>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-sm font-black text-[#10b981]">
-        &gt;
-      </span>
-    </Link>
   );
 }
 
@@ -722,7 +449,7 @@ function HomeMobileLayout({
   loading: boolean;
 }) {
   return (
-    <div data-testid="home-mobile-dashboard" className="min-h-screen bg-[#f7f9fb] px-4 pb-28 pt-4 text-slate-950 lg:hidden">
+    <div data-testid="home-mobile-dashboard" className="min-h-screen bg-[#f7f9fb] px-4 pb-28 pt-4 text-slate-950 md:hidden">
       <header className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
         <div className="flex items-center justify-between gap-3">
           <HomeExamLogo compact />
@@ -730,15 +457,15 @@ function HomeMobileLayout({
             href="/profile"
             aria-label="打开学习档案"
             title="学习档案"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-black text-slate-500"
+            className="inline-flex min-h-10 shrink-0 items-center rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-600"
           >
-            档
+            我的
           </Link>
         </div>
         <div className="mt-5 rounded-[18px] bg-emerald-50 p-4">
-          <p className="text-xs font-black text-[#10b981]">首页面板</p>
-          <h1 className="mt-2 text-2xl font-black tracking-normal text-slate-950">数学错题资产管理</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">管理长期错题资产，分析薄弱点，并回答：我现在该做什么。</p>
+          <p className="text-xs font-black text-[#10b981]">今天从这里开始</p>
+          <h1 className="mt-2 text-2xl font-black tracking-normal text-slate-950">11408 错题复盘</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">导入错题、完成复习，并把薄弱章节逐个解决。</p>
         </div>
       </header>
 
@@ -767,7 +494,7 @@ function HomeMobileLayout({
           <span>&gt;</span>
         </Link>
         <Link href="/import" className="flex min-h-14 items-center justify-between rounded-[18px] border border-emerald-100 bg-white px-5 text-base font-black text-[#10b981]">
-          <span>进入导入诊断</span>
+          <span>导入错题</span>
           <span>&gt;</span>
         </Link>
       </section>
@@ -778,40 +505,16 @@ function HomeMobileLayout({
           <span className="mt-2 block text-xs font-semibold text-white/80">处理排到今天的题</span>
         </Link>
         <Link href="/questions?scope=weak" className="rounded-[18px] border border-amber-100 bg-amber-50 p-4 text-sm font-black text-amber-800">
-          不熟题本
+          薄弱复习
           <span className="mt-2 block text-xs font-semibold text-amber-700/80">{stats.weakQuestionCount} 题待处理</span>
         </Link>
       </section>
 
       <ProfessionalPracticeLauncher
         questions={stats.practiceQuestions}
-        tools={stats.practiceTools}
         loading={loading}
         className="mt-5"
       />
-
-      <section className="mt-5">
-        <div className="mb-3">
-          <h2 className="text-base font-black text-slate-950">核心模块</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">先处理错题、薄弱题和 408 刷题，其他工具按需展开。</p>
-        </div>
-        <div className="grid gap-3">
-          {primaryModuleLinks.map((link) => (
-            <HomeMobileModuleLink key={link.href} link={link} />
-          ))}
-        </div>
-        <details className="group mt-3">
-          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between rounded-[18px] border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 [&::-webkit-details-marker]:hidden">
-            <span>更多学习工具</span>
-            <span className="text-xs text-slate-400">{secondaryModuleLinks.length} 个入口</span>
-          </summary>
-          <div className="mt-3 grid gap-3">
-            {secondaryModuleLinks.map((link) => (
-              <HomeMobileModuleLink key={link.href} link={link} />
-            ))}
-          </div>
-        </details>
-      </section>
 
       <section className="mt-5">
         <div className="mb-3">
@@ -844,17 +547,6 @@ function HomeMobileLayout({
         </div>
       </section>
 
-      <section className="mt-5 rounded-[18px] border border-slate-100 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-black text-slate-950">做题贡献</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500">点击日期查看当天完成的题。</p>
-          </div>
-          <Link href="/profile" className="text-xs font-black text-[#10b981]">学习档案</Link>
-        </div>
-        <HomeContributionHeatmap activity={stats.reviewActivity} />
-      </section>
-
       <div className="mt-5">
         <HomeActionPanel actions={stats.actionCards} />
       </div>
@@ -869,7 +561,7 @@ function HomeMobileLayout({
 export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), []);
   const [stats, setStats] = useState<HomeStats>(emptyStats);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看真实错题资产。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，请先到设置完成连接。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
@@ -897,7 +589,6 @@ export default function DashboardPage() {
         questionRecords,
         recentReviewsResult,
         dueReviewsResult,
-        dueReviewCountResult,
       ] = await Promise.all([
         fetchCurrentUserQuestionRecords(client),
         client
@@ -911,18 +602,11 @@ export default function DashboardPage() {
           .eq("user_id", user.id)
           .lte("scheduled_date", currentDay)
           .is("completed_at", null),
-        client
-          .from("reviews")
-          .select("question_id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .lte("scheduled_date", currentDay)
-          .is("completed_at", null),
       ]);
 
       const error =
         recentReviewsResult.error ??
-        dueReviewsResult.error ??
-        dueReviewCountResult.error;
+        dueReviewsResult.error;
       if (error) {
         setMessage(`错题资产更新失败：${error.message}`);
         return;
@@ -946,13 +630,7 @@ export default function DashboardPage() {
           focus,
           actionCards,
           subjects: buildSubjectProgress(questions),
-          reviewActivity: buildReviewActivity(reviews),
           practiceQuestions,
-          practiceTools: buildProfessionalPracticeTools(
-            questions,
-            practiceQuestions,
-            dueReviewCountResult.count ?? dueReviewsResult.data?.length ?? 0,
-          ),
         });
         setMessage("");
       }

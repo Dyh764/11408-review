@@ -76,14 +76,14 @@ test("/practice persists a scoped resumable round and filters unavailable image 
   assert.match(image, /questionDependsOnImage/);
 });
 
-test("/practice uses a fixed focus shell with directional swipe locking", () => {
+test("/practice fixes only the active deck while keeping the empty page scrollable", () => {
   const source = read("app/practice/page.tsx");
   const deck = read("components/study/ReviewFlashcardDeck.tsx");
   const card = read("components/study/ReviewFlashcard.tsx");
   const sourceImage = read("components/study/QuestionSourceImage.tsx");
   const shell = read("app/app-shell.tsx");
 
-  assert.match(source, /flex h-full min-h-0 flex-col/);
+  assert.match(source, /fixed inset-0 z-40 flex h-dvh/);
   assert.match(source, /activeReviewId=\{activeReviewId\}/);
   assert.match(source, /onActiveReviewChange=\{handleActiveReviewChange\}/);
   assert.match(deck, /directionLockThreshold = 10/);
@@ -97,8 +97,8 @@ test("/practice uses a fixed focus shell with directional swipe locking", () => 
   assert.match(sourceImage, /max-h-\[30dvh\]/);
   assert.match(card, /compact=\{focusMode\}/);
   assert.match(read("components/mobile/ChoiceList.tsx"), /answer-choice flex w-full max-w-full/);
-  assert.match(shell, /isPractice\s*\?\s*"h-full min-h-0 overflow-hidden"/);
-  assert.match(shell, /!isPractice \?/);
+  assert.doesNotMatch(shell, /isPractice/);
+  assert.match(shell, /<BottomNav/);
 });
 
 test("submitted choices render per-option explanations with a legacy fallback", () => {
@@ -146,7 +146,7 @@ test("home owns the professional launcher while /practice executes every real an
   assert.match(launcher, /408 专业刷题/);
   assert.match(launcher, /4 可用/);
   assert.match(launcher, /当前条件不可用/);
-  assert.match(launcher, /配套模块检测/);
+  assert.doesNotMatch(launcher, /配套模块检测/);
   assert.match(launcher, /mode: "exam408-choice"/);
   assert.match(launcher, /params\.set\("sourceRange"/);
   assert.match(launcher, /params\.set\("difficulty"/);
@@ -170,12 +170,19 @@ test("home owns the professional launcher while /practice executes every real an
   assert.match(mode, /quick-fill/);
 });
 
-test("import preview keeps noisy per-card checks collapsed below the main import action", () => {
+test("import preview shows every card before the final import action", () => {
   const source = read("app/import/page.tsx");
+  const pageContent = source.slice(source.lastIndexOf("return ("));
 
-  assert.match(source, /<details/);
-  assert.match(source, /ImportImageBindingCard/);
   assert.match(source, /ImportPreviewCard/);
+  assert.match(source, /previewCards\.map/);
+  assert.match(source, /我已核对题干、选项、答案和原图/);
+  assert.match(source, /URL\.createObjectURL/);
+  assert.doesNotMatch(source, /ImportImageBindingCard/);
+  assert.ok(
+    pageContent.indexOf('title="导入预览"') < pageContent.indexOf("<ImportActionPanel"),
+    "preview cards should appear before the final import action",
+  );
 });
 
 test("question-bank importer uploads only real figures and clears wrong images from text-only cards", () => {
@@ -216,14 +223,13 @@ test("question-bank importer uploads only real figures and clears wrong images f
   assert.match(verifier, /被多题共用的图片/);
 });
 
-test("large question banks and due reviews paginate queries and batch-sign image paths", () => {
+test("large question banks paginate queries and batch-sign image paths without redundant home counts", () => {
   const questions = read("lib/questions.ts");
   const home = read("app/page.tsx");
   const reviews = read("lib/reviews.ts");
 
   assert.match(home, /fetchCurrentUserQuestionRecords/);
-  assert.match(home, /count: "exact", head: true/);
-  assert.match(home, /dueReviewCountResult\.count/);
+  assert.doesNotMatch(home, /dueReviewCountResult/);
   assert.match(questions, /export async function fetchCurrentUserQuestionRecords/);
   assert.match(questions, /\.range\(offset, offset \+ 999\)/);
   assert.match(questions, /\.createSignedUrls\(batch/);

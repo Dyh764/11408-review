@@ -50,7 +50,7 @@ export default function TodayReviewListPage() {
   const supabase = useMemo(() => createClient(), []);
   const [reviews, setReviews] = useState<DueReview[]>([]);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看今日复习题单。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看今日复习题单。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const today = todayIsoDate();

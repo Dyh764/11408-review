@@ -80,8 +80,8 @@ function buildCollections(questions: QuestionWithImage[]): CollectionGroup[] {
   return [
     {
       key: "weak",
-      title: "不熟题本",
-      description: "优先处理不会、不稳、需要人工核对的题。",
+      title: "薄弱复习",
+      description: "合并不会、不稳、需要人工核对和薄弱章节中的题。",
       href: "/questions?scope=weak",
       items: sorted.filter(isWeakQuestion),
       tone: "amber",
@@ -124,7 +124,7 @@ function buildCollections(questions: QuestionWithImage[]): CollectionGroup[] {
 export default function CollectionsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看我的收藏。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看题目分组。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [activeKey, setActiveKey] = useState<CollectionKey>("weak");
   const [printMessage, setPrintMessage] = useState("");
@@ -140,12 +140,12 @@ export default function CollectionsPage() {
       .then((items) => {
         if (isActive) {
           setQuestions(items);
-          setMessage(items.length === 0 ? "还没有可归类的题卡，先导入错题后再查看收藏夹。" : "");
+          setMessage(items.length === 0 ? "还没有可归类的题目，先导入错题后再查看分组。" : "");
         }
       })
       .catch((error) => {
         if (isActive) {
-          setMessage(error instanceof Error ? error.message : "我的收藏读取失败。");
+          setMessage(error instanceof Error ? error.message : "题目分组读取失败。");
         }
       })
       .finally(() => {
@@ -203,7 +203,7 @@ export default function CollectionsPage() {
     <MobilePageShell className="bg-slate-50">
       <StudyPageHeader
         eyebrow="408 考试平台"
-        title="我的收藏"
+        title="题目分组与导出"
         subtitle="按掌握度自动归类题本，并支持生成“题目在前、答案在后”的打印版或 PDF。"
       />
 
@@ -238,12 +238,12 @@ export default function CollectionsPage() {
 
       {isLoading ? (
         <MobileSection>
-          <LoadingState label="正在读取我的收藏..." />
+          <LoadingState label="正在读取题目分组..." />
         </MobileSection>
       ) : null}
 
       <MobileSection>
-        <SectionHeader title="收藏夹" subtitle="按当前题卡状态自动分组，点分类查看示例题。" />
+        <SectionHeader title="自动分组" subtitle="系统按当前题目状态自动归类，这不是手动收藏。" />
         <div className="grid gap-2">
           {collections.map((collection) => (
             <button
@@ -316,7 +316,7 @@ export default function CollectionsPage() {
 
             {!isLoading && activeCollection.items.length === 0 ? (
               <div className="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-100">
-                <p className="text-sm font-black text-slate-950">这个收藏夹暂时为空</p>
+                <p className="text-sm font-black text-slate-950">这个分组暂时为空</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   先导入题卡，或者回到错题库补齐掌握度、答案状态和人工核对标记。
                 </p>

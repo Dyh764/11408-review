@@ -87,7 +87,7 @@ function buildSourceDistribution(questions: QuestionWithImage[]) {
 export default function ExamOverviewPage() {
   const supabase = useMemo(() => createClient(), []);
   const [questions, setQuestions] = useState<QuestionWithImage[]>([]);
-  const [message, setMessage] = useState(supabase ? "" : "请配置 Supabase 后查看真题总览。");
+  const [message, setMessage] = useState(supabase ? "" : "当前未连接错题数据，暂时无法查看真题总览。");
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
   useEffect(() => {

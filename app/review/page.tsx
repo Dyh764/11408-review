@@ -65,7 +65,7 @@ export default function ReviewPage() {
   const [processingReviewId, setProcessingReviewId] = useState("");
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看真实今日复习。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看今日复习。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
@@ -110,7 +110,7 @@ export default function ReviewPage() {
 
   async function handleReview(review: DueReview, result: ReviewResult) {
     if (!supabase) {
-      setMessage("请配置 Supabase 环境变量后再记录复习结果。");
+      setMessage("错题数据尚未连接，暂时无法记录复习结果。");
       return;
     }
 

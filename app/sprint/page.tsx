@@ -32,7 +32,7 @@ export default function SprintPage() {
   const [subject, setSubject] = useState<Subject | "全部">("全部");
   const [processingQuestionId, setProcessingQuestionId] = useState("");
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看考前冲刺模式。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看考前冲刺模式。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
 
@@ -106,7 +106,7 @@ export default function SprintPage() {
 
   async function handleMarkMastered(item: SprintItem) {
     if (!supabase) {
-      setMessage("Supabase 尚未配置。");
+      setMessage("错题数据尚未连接。");
       return;
     }
 

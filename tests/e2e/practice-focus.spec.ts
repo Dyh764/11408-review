@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const practiceMockEnabled = process.env.E2E_PRACTICE_MOCK === "1";
+const e2eBaseUrl = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${process.env.E2E_PORT ?? 3000}`;
 
 const mockQuestions = [
   {
@@ -142,6 +143,42 @@ const mockQuestions = [
 ];
 
 async function installMockSupabase(page: Page) {
+  const now = Math.floor(Date.now() / 1000);
+  const encodeJwtPart = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const accessToken = `${encodeJwtPart({ alg: "HS256", typ: "JWT" })}.${encodeJwtPart({
+    aud: "authenticated",
+    email: "practice-focus@example.com",
+    exp: now + 3600,
+    role: "authenticated",
+    sub: "practice-focus-user",
+  })}.mock-signature`;
+  const user = {
+    id: "practice-focus-user",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "practice-focus@example.com",
+    app_metadata: {},
+    user_metadata: {},
+    identities: [],
+    created_at: "2026-07-23T10:00:00.000Z",
+  };
+  const session = {
+    access_token: accessToken,
+    refresh_token: "mock-refresh-token",
+    expires_in: 3600,
+    expires_at: now + 3600,
+    token_type: "bearer",
+    user,
+  };
+
+  await page.context().addCookies([
+    {
+      name: "sb-127-auth-token",
+      value: `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`,
+      url: e2eBaseUrl,
+    },
+  ]);
+
   await page.route("http://127.0.0.1:3139/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -150,7 +187,9 @@ async function installMockSupabase(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        headers: { "content-range": `0-${mockQuestions.length - 1}/${mockQuestions.length}` },
+        headers: {
+          "content-range": `0-${mockQuestions.length - 1}/${mockQuestions.length}`,
+        },
         body: JSON.stringify(mockQuestions),
       });
       return;
@@ -160,12 +199,7 @@ async function installMockSupabase(page: Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          id: "practice-focus-user",
-          aud: "authenticated",
-          role: "authenticated",
-          email: "practice-focus@example.com",
-        }),
+        body: JSON.stringify(user),
       });
       return;
     }
@@ -390,27 +424,15 @@ test.describe("首页专业刷题", () => {
     await expect(page.getByText(/本组 2 题/)).toBeVisible();
   });
 
-  test("首页显示每个配套模块的数据状态且入口可到达", async ({ page }) => {
+  test("首页隐藏配套模块目录并保留专业刷题", async ({ page }) => {
     await installMockSupabase(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const launcher = page.locator('[data-testid="professional-practice-section"]:visible');
 
-    await launcher.getByText("配套模块检测", { exact: true }).click();
-    const modules = [
-      { name: /错题二刷/, path: "/review" },
-      { name: /收藏 \/ PDF/, path: "/collections" },
-      { name: /学习笔记/, path: "/notes" },
-      { name: /考点考频/, path: "/knowledge-map" },
-    ];
-
-    for (const practiceModule of modules) {
-      const link = launcher.getByRole("link", { name: practiceModule.name });
-      await expect(link).toHaveAttribute("href", practiceModule.path);
-      await link.click();
-      await expect(page).toHaveURL(new RegExp(`${practiceModule.path.replace("/", "\\/")}$`));
-      await page.goto("/");
-      await launcher.getByText("配套模块检测", { exact: true }).click();
-    }
+    await expect(launcher.getByText("408 专业刷题", { exact: true })).toBeVisible();
+    await expect(launcher.getByText("配套模块检测", { exact: true })).toHaveCount(0);
+    await expect(launcher.getByRole("link", { name: "开始刷题" })).toBeVisible();
   });
+
 });

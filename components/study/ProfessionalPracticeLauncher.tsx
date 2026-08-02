@@ -21,12 +21,6 @@ const sourceOptions: Array<{ key: PracticeSourceRange; label: string }> = [
   { key: "supplement", label: "补充习题" },
 ];
 
-export type ProfessionalPracticeToolStatus = {
-  label: string;
-  href: string;
-  count: number;
-};
-
 function buildPracticeHref({
   answerMode,
   sourceRange,
@@ -58,12 +52,10 @@ function buildPracticeHref({
 
 export function ProfessionalPracticeLauncher({
   questions,
-  tools,
   loading = false,
   className = "",
 }: {
   questions: PracticeQuestion[];
-  tools: ProfessionalPracticeToolStatus[];
   loading?: boolean;
   className?: string;
 }) {
@@ -236,30 +228,6 @@ export function ProfessionalPracticeLauncher({
         )}
       </div>
 
-      <details className="group mt-3">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between text-xs font-black text-slate-600 [&::-webkit-details-marker]:hidden">
-          <span>配套模块检测</span>
-          <span className="text-slate-400">展开查看</span>
-        </summary>
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 md:grid-cols-4">
-          {tools.map((tool) => (
-            <Link
-              key={tool.href}
-              href={tool.href}
-              className="rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100"
-            >
-              <span className="block text-xs font-black text-slate-800">{tool.label}</span>
-              <span
-                className={`mt-1 block text-[11px] font-bold ${
-                  tool.count > 0 ? "text-emerald-700" : "text-slate-400"
-                }`}
-              >
-                {tool.count > 0 ? `${tool.count} 条数据` : "页面可用 · 暂无数据"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </details>
     </section>
   );
 }

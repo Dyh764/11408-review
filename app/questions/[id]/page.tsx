@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AnswerPanel } from "@/components/mobile/AnswerPanel";
@@ -22,6 +22,8 @@ import {
   type QuestionEditForm,
 } from "@/lib/questions/edit-question";
 import { createClient } from "@/lib/supabase/client";
+import { generateShareCardImage } from "@/lib/share/share-card-image";
+import type { ExportedQuestionCard } from "@/lib/share/question-card";
 import type {
   AnswerStatus,
   Difficulty,
@@ -168,7 +170,7 @@ export default function QuestionDetailPage() {
   const [question, setQuestion] = useState<QuestionWithImage | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const [message, setMessage] = useState(
-    supabase ? "" : "请配置 Supabase 环境变量后查看真实错题详情。",
+    supabase ? "" : "当前未连接错题数据，暂时无法查看错题详情。",
   );
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
   const [isSaving, setIsSaving] = useState(false);
@@ -181,6 +183,11 @@ export default function QuestionDetailPage() {
   const [choicePracticeResult, setChoicePracticeResult] = useState<ChoicePracticeResult | null>(null);
   const [isSubmittingPractice, setIsSubmittingPractice] = useState(false);
   const [form, setForm] = useState<QuestionEditForm | null>(null);
+  const [shareCard, setShareCard] = useState<ExportedQuestionCard | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
+  const [isPreparingShare, setIsPreparingShare] = useState(false);
+  const [isDownloadingShare, setIsDownloadingShare] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -294,7 +301,7 @@ export default function QuestionDetailPage() {
 
   async function handleSaveEdit() {
     if (!supabase || !question || !form) {
-      setMessage("请先配置 Supabase 并读取错题详情。");
+      setMessage("错题数据尚未连接，当前无法保存修改。");
       return;
     }
 
@@ -326,7 +333,7 @@ export default function QuestionDetailPage() {
 
       await refreshQuestion();
       setIsEditing(false);
-      setMessage("错题已保存，原始 image_path 未修改。");
+      setMessage("错题已保存，原图地址未修改。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "保存失败，请稍后重试。");
     } finally {
@@ -336,7 +343,7 @@ export default function QuestionDetailPage() {
 
   async function handleAddToTodayReview() {
     if (!supabase || !question) {
-      setMessage("请先配置 Supabase 并读取错题详情。");
+      setMessage("错题数据尚未连接，当前无法生成分享卡片。");
       return;
     }
 
@@ -373,6 +380,57 @@ export default function QuestionDetailPage() {
       setMessage(error instanceof Error ? error.message : "加入今日复习失败，请稍后重试。");
     } finally {
       setIsAddingReview(false);
+    }
+  }
+
+  async function handlePrepareShareCard() {
+    if (!question) {
+      return;
+    }
+
+    setIsPreparingShare(true);
+    setShareMessage("");
+
+    try {
+      const response = await fetch(`/api/questions/${question.id}/share-card`);
+      const result = (await response.json().catch(() => ({}))) as {
+        card?: ExportedQuestionCard;
+        error?: string;
+      };
+
+      if (!response.ok || !result.card) {
+        setShareMessage(result.error ?? "分享卡片生成失败，请稍后重试。");
+        return;
+      }
+
+      setShareCard(result.card);
+      setShareMessage("分享卡片已准备好，请确认内容后下载图片。");
+    } catch (error) {
+      setShareMessage(error instanceof Error ? error.message : "分享卡片生成失败，请稍后重试。");
+    } finally {
+      setIsPreparingShare(false);
+    }
+  }
+
+  async function handleDownloadShareCard() {
+    if (!question || !shareCardRef.current) {
+      return;
+    }
+
+    setIsDownloadingShare(true);
+    setShareMessage("");
+
+    try {
+      const dataUrl = await generateShareCardImage(shareCardRef.current);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataUrl;
+      downloadLink.download = `11408-错题-${question.id.slice(0, 8)}.png`;
+      downloadLink.click();
+      setShareMessage("分享图片已下载。答案和解析不会出现在图片中。");
+    } catch (error) {
+      setShareMessage(error instanceof Error ? error.message : "图片下载失败，请稍后重试。");
+    } finally {
+      setIsDownloadingShare(false);
     }
   }
 
@@ -595,6 +653,98 @@ export default function QuestionDetailPage() {
 
           {/* 查看答案与解析 */}
           <RelatedPracticeSection questions={relatedPracticeQuestions} />
+
+          {(choicePracticeResult || isAnswerVisible) && question.chapter?.trim() ? (
+            <MobileSection title="下一步" subtitle="看完解析后，继续处理同一章节或当前薄弱题。">
+              <div className="grid grid-cols-2 gap-3">
+                <Link
+                  href={`/practice?topic=${encodeURIComponent(question.chapter.trim())}`}
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+                >
+                  复习本章
+                </Link>
+                <Link
+                  href="/questions?scope=weak"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-blue-700 ring-1 ring-blue-100"
+                >
+                  薄弱复习
+                </Link>
+              </div>
+            </MobileSection>
+          ) : null}
+
+          <MobileSection title="分享错题" subtitle="生成一张不含答案的题目卡片，下载后可自行发送。">
+            <MobileCard>
+              {!shareCard ? (
+                <button
+                  type="button"
+                  onClick={handlePrepareShareCard}
+                  disabled={isPreparingShare}
+                  className="min-h-12 w-full rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+                >
+                  {isPreparingShare ? "生成中..." : "生成分享卡片"}
+                </button>
+              ) : (
+                <>
+                  <div
+                    ref={shareCardRef}
+                    className="overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 via-white to-blue-100 p-5 text-slate-950 ring-1 ring-violet-200 md:p-8"
+                  >
+                    <div className="flex items-start justify-between gap-4 border-b border-violet-200 pb-4">
+                      <div>
+                        <p className="text-sm font-black text-violet-700">11408 错题复盘</p>
+                        <p className="mt-1 text-xl font-black">{question.subject}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-violet-700">
+                        {shareCard.difficulty}
+                      </span>
+                    </div>
+                    <p className="mt-5 text-sm font-black text-violet-700">{shareCard.knowledge_point}</p>
+                    <MathText
+                      text={shareCard.question_text.slice(0, 760)}
+                      className="mt-3 text-lg font-bold leading-8 text-slate-950"
+                    />
+                    {shareCard.choices.length > 0 ? (
+                      <div className="mt-5 grid gap-2">
+                        {shareCard.choices.slice(0, 6).map((choice) => (
+                          <div key={choice.label} className="rounded-lg bg-white/85 p-3 text-sm font-semibold ring-1 ring-violet-100">
+                            <span className="mr-2 font-black text-violet-700">{choice.label}.</span>
+                            <MathText text={choice.text} compact className="inline" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="mt-5 rounded-lg bg-violet-700 p-4 text-white">
+                      <p className="text-xs font-black text-white/75">一句话提醒</p>
+                      <MathText text={shareCard.one_sentence_tip} compact className="mt-2 text-sm font-semibold leading-6" />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadShareCard}
+                      disabled={isDownloadingShare}
+                      className="min-h-12 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:bg-slate-300"
+                    >
+                      {isDownloadingShare ? "下载中..." : "下载 PNG 图片"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShareCard(null)}
+                      className="min-h-12 rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700"
+                    >
+                      取消预览
+                    </button>
+                  </div>
+                </>
+              )}
+              {shareMessage ? (
+                <p aria-live="polite" className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                  {shareMessage}
+                </p>
+              ) : null}
+            </MobileCard>
+          </MobileSection>
 
           <MobileSection title="更多操作">
             <MobileCard>
